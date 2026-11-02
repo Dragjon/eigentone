@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -63,7 +64,7 @@ fun EqGraph(
 ) {
     val currentFilters by rememberUpdatedState(filters)
     val measurer = rememberTextMeasurer()
-    val labelStyle = TextStyle(color = Palette.TextDim, fontSize = 10.sp)
+    val labelStyle = TextStyle(color = Palette.TextDim, fontSize = 11.sp)
     val accent = if (dimmed) Palette.TextDim else Palette.Amber
     // Curves only change when filters do, so spectrum redraws don't recalculate them.
     val curve = remember(curveFilters) {
@@ -137,18 +138,13 @@ fun EqGraph(
         GRID_FREQS.forEach { freq ->
             val x = xOf(freq.toDouble(), w)
             drawLine(Palette.Line, Offset(x, 0f), Offset(x, h), strokeWidth = 1f)
-            if (freq in LABEL_FREQS) {
-                val text = if (freq >= 1000) "${freq / 1000}k" else "$freq"
-                drawText(measurer, text, Offset(x + 4f, h - 34f), labelStyle)
-            }
         }
         GRID_DB.forEach { db ->
             val y = yOf(db.toDouble(), h)
             drawLine(
-                if (db == 0) Palette.TextDim.copy(alpha = 0.5f) else Palette.Line,
+                if (db == 0) Palette.Outline else Palette.Line,
                 Offset(0f, y), Offset(w, y), strokeWidth = 1f,
             )
-            if (db != 0) drawText(measurer, "$db", Offset(6f, y + 2f), labelStyle)
         }
 
         val zeroY = yOf(0.0, h)
@@ -183,6 +179,27 @@ fun EqGraph(
         }
 
         drawPath(curvePath, accent, style = Stroke(width = 2.5.dp.toPx()))
+
+        // Labels go over the curve on a backing, so the curve can never make them unreadable.
+        fun label(text: String, x: Float, y: Float) {
+            val measured = measurer.measure(text, labelStyle)
+            val pad = 3.dp.toPx()
+            val left = x.coerceIn(0f, w - measured.size.width - pad * 2)
+            val top = y.coerceIn(0f, h - measured.size.height - pad)
+            drawRoundRect(
+                Palette.Surface.copy(alpha = 0.85f),
+                topLeft = Offset(left, top),
+                size = Size(measured.size.width + pad * 2, measured.size.height + pad),
+                cornerRadius = CornerRadius(pad),
+            )
+            drawText(measured, topLeft = Offset(left + pad, top + pad / 2))
+        }
+        LABEL_FREQS.forEach { freq ->
+            label(if (freq >= 1000) "${freq / 1000} kHz" else "$freq Hz", xOf(freq.toDouble(), w) + 2f, h)
+        }
+        GRID_DB.filter { it != 0 }.forEach { db ->
+            label(if (db > 0) "+$db" else "$db", 4f, yOf(db.toDouble(), h) + 2f)
+        }
 
         filters.forEach { f ->
             val center = Offset(xOf(f.freq, w), yOf(if (f.type.hasGain) f.gainDb else 0.0, h))

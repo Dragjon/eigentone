@@ -59,7 +59,7 @@ data class AppState(
  */
 @Serializable
 enum class ListeningMode(val label: String) {
-    NOISE_CANCELLING("Noise cancelling"),
+    NOISE_CANCELLING("Cancelling"),
     TRANSPARENCY("Transparency"),
     NORMAL("Off"),
 }
