@@ -26,8 +26,22 @@ object Help {
         "How narrow the filter is. Low values change a wide range and sound gentle. High values target a small range, which suits fixing one problem frequency.",
     )
 
-    val bass = Tip("Bass", "Raises or lowers everything below about 105 Hz. It sits on top of your preset and doesn't change it.")
-    val treble = Tip("Treble", "Raises or lowers everything above about 8 kHz. It sits on top of your preset and doesn't change it.")
+    val bass = Tip("Bass", "Raises or lowers everything below about 105 Hz. This is saved with the preset when you save or update it.")
+    val treble = Tip("Treble", "Raises or lowers everything above about 8 kHz. This is saved with the preset when you save or update it.")
+    val vocals = Tip("Vocals", "Raises or lowers the range around 2.5 kHz, where voices and many instruments are easiest to pick out. This is saved with the preset.")
+    val strength = Tip(
+        "Preset strength",
+        "More or less of everything this preset does to the tone. 100% is as saved, 0% is flat, and 150% exaggerates it. An easy way to soften a sound that's too much. Surround and preamp aren't affected.",
+    )
+    val guide = Tip("Getting the best sound", "A few short tips, in the order that makes the most difference.")
+    val reset = Tip(
+        "Reset sound settings",
+        "Returns to Flat and clears night mode, balance, loudness and level settings. Your saved presets and output choices are kept.",
+    )
+    val finder = Tip(
+        "Find my sound",
+        "A short listening test. You pick your favourite of two versions a few times, and Phonons builds a preset from your answers. Nothing is kept unless you save it.",
+    )
     val bassTunerAmount = Tip(
         "Bass tuner amount",
         "Raises or lowers the low end up to the frequency you choose below. Use it when the fixed Bass control isn't the right range.",
@@ -36,14 +50,24 @@ object Help {
         "Bass tuner frequency",
         "Where the bass tuner's change fades out. Low values affect only deep rumble, and higher values reach into punch and warmth.",
     )
+    val eqMode = Tip(
+        "Parametric or Graphic",
+        "Both shape the same sound and work together. Graphic gives you fixed faders, which is the quick way. Parametric lets you choose each filter's exact frequency and width, which suits fixing a specific problem.",
+    )
     val graphic = Tip(
         "Graphic EQ",
-        "Nine fixed bands from deep bass to high treble, for quick adjustments. It sits on top of your preset and doesn't change it.",
+        "Fixed faders from deep bass to high treble. Drag a fader, or sweep your finger across to draw a curve. The sound follows the faders directly, and it's saved with the preset.",
     )
+    val graphicBands = Tip(
+        "Bands",
+        "More bands allow finer changes. 10 is quickest, and 31 is the most precise but harder to set by finger. Switching keeps your curve's overall shape.",
+    )
+    val graphicShapes = Tip("Shapes", "Ready-made curves to start from. Tap one, then adjust it to taste. It replaces the current faders.")
+    val graphicSmooth = Tip("Smooth", "Softens sharp steps between neighbouring faders, which often sounds more natural. Tap it again for a stronger effect.")
 
     val surround = Tip(
         "Virtual surround",
-        "Makes the sound feel wider than your head. It doesn't track head movement or create real surround channels. Higher values can make vocals feel less centred.",
+        "Makes the sound feel wider than your head. It doesn't track head movement or create real surround channels. Higher values can make vocals feel less centred. This is saved with the preset.",
     )
     val balance = Tip("Balance", "Shifts sound towards the left or right ear. Useful if one side sounds quieter to you.")
 
@@ -88,7 +112,7 @@ object Help {
         "Favourites",
         "Star the presets you switch between. The notification's Next preset button moves through your starred presets, or all of them if none are starred.",
     )
-    val saveNew = Tip("Save as new", "Saves the current sound, including your edits, as a new preset of your own.")
+    val saveNew = Tip("Save as new", "Saves the current sound as a new preset of your own: filters, graphic EQ, tone, surround and preamp.")
     val update = Tip("Update preset", "Replaces your saved preset with the edits you've just made.")
     val find = Tip(
         "Find headphones",
@@ -97,7 +121,7 @@ object Help {
     val importFile = Tip("Import EQ file", "Adds a preset from an AutoEq or Equalizer APO ParametricEQ.txt file.")
     val backup = Tip(
         "Back up presets",
-        "Saves your presets, output choices and favourites to a file. Tone, surround and other Sound settings aren't included.",
+        "Saves your presets, output choices and favourites to a file. Settings that aren't part of a preset, such as balance and night mode, aren't included.",
     )
     val restore = Tip(
         "Restore presets",

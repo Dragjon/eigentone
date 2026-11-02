@@ -3,6 +3,7 @@ package com.phonons.app.data
 import com.phonons.app.dsp.Eq
 import com.phonons.app.dsp.Filter
 import com.phonons.app.dsp.FilterType
+import com.phonons.app.dsp.GraphicEq
 import kotlin.math.log10
 import kotlin.math.min
 import kotlin.math.pow
@@ -21,8 +22,6 @@ data class ProcessingTarget(
 /** Turns the user's settings into the final processing. Pure, so it can be unit tested. */
 object Processing {
     const val MAX_TONE_DB = 12.0
-    val GRAPHIC_BANDS = listOf(62.5, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0)
-    private const val GRAPHIC_Q = 1.41
 
     // Compensation starts below this much volume attenuation, and is full at REFERENCE + RANGE.
     private const val LOUDNESS_REFERENCE_DB = 10.0
@@ -30,10 +29,13 @@ object Processing {
     private const val LOUDNESS_BASS_DB = 12.0
     private const val LOUDNESS_TREBLE_DB = 4.0
     private const val SHELF_Q = 0.71
+    private const val VOCALS_HZ = 2500.0
+    private const val VOCALS_Q = 0.7
 
-    fun toneFilters(bassDb: Double, trebleDb: Double): List<Filter> = listOfNotNull(
+    fun toneFilters(bassDb: Double, trebleDb: Double, vocalsDb: Double = 0.0): List<Filter> = listOfNotNull(
         if (bassDb != 0.0) Filter(-1, FilterType.LOW_SHELF, 105.0, bassDb, SHELF_Q) else null,
         if (trebleDb != 0.0) Filter(-2, FilterType.HIGH_SHELF, 8000.0, trebleDb, SHELF_Q) else null,
+        if (vocalsDb != 0.0) Filter(-6, FilterType.BELL, VOCALS_HZ, vocalsDb, VOCALS_Q) else null,
     )
 
     /**
@@ -50,23 +52,28 @@ object Processing {
         )
     }
 
-    /** One-octave bells. Missing or zero bands add nothing. */
-    fun graphicFilters(gains: List<Double>): List<Filter> = GRAPHIC_BANDS.mapIndexedNotNull { i, freq ->
-        gains.getOrNull(i)?.takeIf { it != 0.0 }?.let { gain ->
-            Filter(-10 - i, FilterType.BELL, freq, gain, GRAPHIC_Q)
-        }
-    }
-
     /** A shelf with an adjustable corner, for shaping the low end independently of the preset. */
     fun bassTunerFilters(gainDb: Double, freqHz: Double): List<Filter> =
         if (gainDb != 0.0) listOf(Filter(-5, FilterType.LOW_SHELF, freqHz, gainDb, SHELF_Q)) else emptyList()
 
-    /** The preset, graphic EQ, bass tuner, tone dials and loudness compensation together. */
+    /** Everything a preset contributes: its filters and its tone adjustments. */
+    fun presetFilters(preset: Preset): List<Filter> {
+        val tone = preset.tone
+        val scale = tone.strength
+        return preset.filters.map { filter ->
+            if (scale != 1.0 && filter.type.hasGain) filter.copy(gainDb = filter.gainDb * scale) else filter
+        } +
+            GraphicEq.filters(
+                GraphicEq.normalized(tone.graphicDb, tone.graphicBands).map { it * scale },
+                tone.graphicBands,
+            ) +
+            bassTunerFilters(tone.bassTunerDb * scale, tone.bassTunerHz) +
+            toneFilters(tone.bassDb * scale, tone.trebleDb * scale, tone.vocalsDb * scale)
+    }
+
+    /** The preset plus loudness compensation, which follows the volume rather than the preset. */
     fun effectiveFilters(state: AppState, attenuationDb: Double): List<Filter> =
-        state.current.filters +
-            graphicFilters(state.graphicDb) +
-            bassTunerFilters(state.bassTunerDb, state.bassTunerHz) +
-            toneFilters(state.bassDb, state.trebleDb) +
+        presetFilters(state.current) +
             if (state.loudness) loudnessFilters(attenuationDb, state.loudnessStrength) else emptyList()
 
     fun target(state: AppState, attenuationDb: Double): ProcessingTarget {
@@ -76,7 +83,7 @@ object Processing {
             return ProcessingTarget(
                 filters, input, state.limiter, state.nightMode, effectEnabled = true,
                 limiterThresholdDb = state.limiterThresholdDb,
-                surround = state.surround,
+                surround = state.current.tone.surround,
             )
         }
         if (!state.matchBypass) {

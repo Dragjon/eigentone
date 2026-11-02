@@ -32,6 +32,14 @@ Back up `phonons-release.jks` and `keystore.properties`. They are excluded from 
 
 The Liberty 4 NC presets use [AutoEq](https://github.com/jaakkopasanen/AutoEq) results (MIT License) from DHRME and Rtings measurements.
 
+## How the sound is built
+
+A preset holds a whole sound: parametric filters, graphic EQ, tone, surround, strength and preamp. Balance, night mode, loudness compensation and limiter settings stay global.
+
+The graphic EQ defines its curve directly from the faders rather than using overlapping bell filters. Bells of every width measured strayed by up to 3.3 dB between faders. This works because the audio engine takes a curve sampled on 128 bands.
+
+**Find my sound** narrows bass, vocals, treble and space through level-matched A/B choices. Its ranges follow Harman's published headphone preference research. It finds a preference for this music and these headphones, not an objectively best sound.
+
 ## Known limits
 
 - **3D surround** is Android's virtualizer forced to binaural mode. It widens stereo, with no head tracking or real surround channels. On a Galaxy A54 it reads `mode=0` while audibly working.

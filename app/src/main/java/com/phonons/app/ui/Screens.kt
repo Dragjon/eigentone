@@ -37,10 +37,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -132,6 +131,9 @@ private const val MAX_BACKUP_BYTES = 1024 * 1024
 /** Brief feedback for actions, shown by the screen's snackbar. */
 private val LocalSnackbar = compositionLocalOf<SnackbarHostState> { error("No snackbar host") }
 
+/** Opens the guided listening test from anywhere in the main screens. */
+private val LocalOpenFinder = compositionLocalOf<() -> Unit> { error("No finder") }
+
 @Composable
 fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
     val state by Repo.state.collectAsStateWithLifecycle()
@@ -140,8 +142,14 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
     val snackbar = remember { SnackbarHostState() }
     // Each tab keeps its own position, so switching never lands partway down another page.
     val scrolls: Map<Tab, ScrollState> = Tab.entries.associateWith { rememberScrollState() }
+    var finding by rememberSaveable { mutableStateOf(false) }
 
-    CompositionLocalProvider(LocalSnackbar provides snackbar) {
+    if (finding) {
+        FinderScreen(onSetEnabled = onSetEnabled, onClose = { finding = false })
+        return
+    }
+
+    CompositionLocalProvider(LocalSnackbar provides snackbar, LocalOpenFinder provides { finding = true }) {
         Scaffold(
             containerColor = Palette.Background,
             topBar = { TopBar(state, status, onSetEnabled) },
@@ -252,12 +260,36 @@ private fun statusLine(state: AppState, status: EngineStatus): String {
 private fun EqTab(state: AppState) {
     val filters = state.current.filters
     var selectedId by rememberSaveable { mutableStateOf<Int?>(filters.firstOrNull()?.id) }
+    var graphicMode by rememberSaveable { mutableStateOf(true) }
     val canUndo by Repo.canUndo.collectAsStateWithLifecycle()
+    val openFinder = LocalOpenFinder.current
     val selected = filters.firstOrNull { it.id == selectedId }
     val attenuation by Repo.attenuationDb.collectAsStateWithLifecycle()
     val curveFilters = remember(state, attenuation) { Processing.effectiveFilters(state, attenuation) }
     val spectrumState = Repo.spectrum.collectAsStateWithLifecycle()
     AnalyserEffect(state.analyser)
+
+    if (!state.guidedSetupSeen) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Palette.SurfaceHigh)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("New here? Find your sound", style = MaterialTheme.typography.titleMedium, color = Palette.Text)
+            Text(
+                "Compare two versions of a song a few times, and Phonons builds a preset from what you prefer.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Palette.TextDim,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = openFinder) { Text("Start") }
+                TextButton(onClick = { Repo.update { it.copy(guidedSetupSeen = true) } }) { Text("Not now") }
+            }
+        }
+    }
 
     Box(
         Modifier
@@ -266,7 +298,9 @@ private fun EqTab(state: AppState) {
             .background(Palette.Surface),
     ) {
         EqGraph(
-            filters = filters,
+            // Graphic mode has its own faders, so the parametric nodes would only get in the way.
+            filters = if (graphicMode) emptyList() else filters,
+            heightDp = if (graphicMode) 170 else 260,
             curveFilters = curveFilters,
             spectrum = { spectrumState.value },
             selectedId = selectedId,
@@ -277,6 +311,37 @@ private fun EqTab(state: AppState) {
             },
             onDragEnd = Repo::commit,
         )
+    }
+
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        SingleChoiceSegmentedButtonRow(Modifier.weight(1f)) {
+            SegmentedButton(
+                selected = graphicMode,
+                onClick = { graphicMode = true },
+                shape = SegmentedButtonDefaults.itemShape(0, 2),
+                colors = segmentColors(),
+                icon = {},
+            ) { Text("Graphic", maxLines = 1) }
+            SegmentedButton(
+                selected = !graphicMode,
+                onClick = { graphicMode = false },
+                shape = SegmentedButtonDefaults.itemShape(1, 2),
+                colors = segmentColors(),
+                icon = {},
+            ) { Text("Parametric", maxLines = 1) }
+        }
+        InfoButton(Help.eqMode)
+    }
+
+    if (graphicMode) {
+        GraphicEqConsole(state.current.tone)
+        FilledTonalButton(enabled = canUndo, onClick = Repo::undo) {
+            Icon(painterResource(R.drawable.ic_undo), contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.size(8.dp))
+            Text("Undo")
+        }
+        SettingsSection("Display") { AnalyserSetting(state) }
+        return
     }
 
     Row(
@@ -504,6 +569,19 @@ private val toneRange = -Processing.MAX_TONE_DB.toFloat()..Processing.MAX_TONE_D
 @Composable
 private fun SoundTab(state: AppState) {
     val attenuation by Repo.attenuationDb.collectAsStateWithLifecycle()
+    SettingsSection(state.current.name) {
+        SliderSetting(
+            title = "Preset strength",
+            tip = Help.strength,
+            readout = formatPercent(state.current.tone.strength),
+            value = state.current.tone.strength.toFloat(),
+            range = 0f..1.5f,
+            default = 1f,
+            origin = 1f,
+            onChange = { v -> Repo.editTone { it.copy(strength = kotlin.math.round(v * 20.0) / 20.0) } },
+            onFinished = Repo::commit,
+        )
+    }
     ToneSection(state)
     SpaceSection(state)
     DynamicsSection(state, attenuation)
@@ -512,103 +590,51 @@ private fun SoundTab(state: AppState) {
 
 @Composable
 private fun ToneSection(state: AppState) {
-    var showGraphic by rememberSaveable { mutableStateOf(false) }
-    val modified = state.bassDb != 0.0 || state.trebleDb != 0.0 || state.bassTunerDb != 0.0 ||
-        state.graphicDb.any { it != 0.0 }
+    val tone = state.current.tone
+    val modified = tone.bassDb != 0.0 || tone.trebleDb != 0.0 || tone.vocalsDb != 0.0 || tone.bassTunerDb != 0.0
     SettingsSection(
         "Tone",
         trailing = {
             if (modified) {
                 TextButton(onClick = {
-                    Repo.update { it.copy(bassDb = 0.0, trebleDb = 0.0, bassTunerDb = 0.0, graphicDb = emptyList()) }
+                    Repo.editTone { it.copy(bassDb = 0.0, trebleDb = 0.0, vocalsDb = 0.0, bassTunerDb = 0.0) }
+                    Repo.commit()
                 }) { Text("Reset tone") }
             }
         },
     ) {
-        SliderSetting(
-            title = "Bass",
-            tip = Help.bass,
-            readout = formatDb(state.bassDb),
-            value = state.bassDb.toFloat(),
-            range = toneRange,
-            default = 0f,
-            origin = 0f,
-            onChange = { v -> Repo.update { it.copy(bassDb = snapTone(v)) } },
-        )
+        ToneSlider("Bass", Help.bass, tone.bassDb) { v -> Repo.editTone { it.copy(bassDb = v) } }
         RowDivider()
-        SliderSetting(
-            title = "Treble",
-            tip = Help.treble,
-            readout = formatDb(state.trebleDb),
-            value = state.trebleDb.toFloat(),
-            range = toneRange,
-            default = 0f,
-            origin = 0f,
-            onChange = { v -> Repo.update { it.copy(trebleDb = snapTone(v)) } },
-        )
+        ToneSlider("Vocals", Help.vocals, tone.vocalsDb) { v -> Repo.editTone { it.copy(vocalsDb = v) } }
         RowDivider()
-        SliderSetting(
-            title = "Bass tuner",
-            tip = Help.bassTunerAmount,
-            readout = formatDb(state.bassTunerDb),
-            value = state.bassTunerDb.toFloat(),
-            range = toneRange,
-            default = 0f,
-            origin = 0f,
-            onChange = { v -> Repo.update { it.copy(bassTunerDb = snapTone(v)) } },
-        )
+        ToneSlider("Treble", Help.treble, tone.trebleDb) { v -> Repo.editTone { it.copy(trebleDb = v) } }
+        RowDivider()
+        ToneSlider("Bass tuner", Help.bassTunerAmount, tone.bassTunerDb) { v -> Repo.editTone { it.copy(bassTunerDb = v) } }
         SliderSetting(
             title = "Bass tuner frequency",
             tip = Help.bassTunerFrequency,
-            readout = formatHz(state.bassTunerHz),
-            value = state.bassTunerHz.toFloat(),
+            readout = formatHz(tone.bassTunerHz),
+            value = tone.bassTunerHz.toFloat(),
             range = 30f..250f,
             default = 80f,
-            onChange = { v -> Repo.update { it.copy(bassTunerHz = v.toDouble()) } },
+            onChange = { v -> Repo.editTone { it.copy(bassTunerHz = v.toDouble()) } },
+            onFinished = Repo::commit,
         )
-        RowDivider()
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 56.dp)
-                .clickable(role = Role.Button) { showGraphic = !showGraphic }
-                .padding(start = 16.dp, end = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("Graphic EQ", style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
-            InfoButton(Help.graphic)
-            Spacer(Modifier.weight(1f))
-            Icon(
-                if (showGraphic) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                contentDescription = if (showGraphic) "Hide graphic EQ" else "Show graphic EQ",
-                tint = Palette.TextDim,
-            )
-        }
-        if (showGraphic) {
-            Processing.GRAPHIC_BANDS.forEachIndexed { i, freq ->
-                val gain = state.graphicDb.getOrElse(i) { 0.0 }
-                GraphicBand(i, freq, gain)
-            }
-        }
     }
 }
 
 @Composable
-private fun GraphicBand(index: Int, freq: Double, gain: Double) {
+private fun ToneSlider(title: String, tip: Tip, value: Double, onChange: (Double) -> Unit) {
     SliderSetting(
-        title = formatHz(freq),
-        tip = Help.graphic,
-        readout = formatDb(gain),
-        value = gain.toFloat(),
+        title = title,
+        tip = tip,
+        readout = formatDb(value),
+        value = value.toFloat(),
         range = toneRange,
         default = 0f,
         origin = 0f,
-        onChange = { v ->
-            Repo.update { s ->
-                val gains = List(Processing.GRAPHIC_BANDS.size) { s.graphicDb.getOrElse(it) { 0.0 } }
-                s.copy(graphicDb = gains.toMutableList().also { it[index] = snapTone(v) })
-            }
-        },
+        onChange = { onChange(snapTone(it)) },
+        onFinished = Repo::commit,
     )
 }
 
@@ -619,12 +645,13 @@ private fun SpaceSection(state: AppState) {
         SliderSetting(
             title = "Virtual surround",
             tip = Help.surround,
-            readout = if (state.surround <= 0.0) "Off" else formatPercent(state.surround),
-            value = state.surround.toFloat(),
+            readout = if (state.current.tone.surround <= 0.0) "Off" else formatPercent(state.current.tone.surround),
+            value = state.current.tone.surround.toFloat(),
             range = 0f..1f,
             default = 0f,
             detail = status.spatialError,
-            onChange = { v -> Repo.update { it.copy(surround = if (v < 0.02f) 0.0 else v.toDouble()) } },
+            onChange = { v -> Repo.editTone { it.copy(surround = if (v < 0.02f) 0.0 else v.toDouble()) } },
+            onFinished = Repo::commit,
         )
         RowDivider()
         SliderSetting(
@@ -815,7 +842,7 @@ private fun OutputSection(state: AppState, outputKey: String, outputLabel: Strin
 }
 
 @Composable
-private fun segmentColors() = SegmentedButtonDefaults.colors(
+fun segmentColors() = SegmentedButtonDefaults.colors(
     activeContainerColor = Palette.Amber,
     activeContentColor = Palette.OnAmber,
     activeBorderColor = Palette.Amber,
@@ -872,6 +899,17 @@ private fun PresetListSection(state: AppState) {
 
 @Composable
 private fun PresetRow(preset: Preset, selected: Boolean, favorite: Boolean, onDelete: (() -> Unit)?) {
+    var renaming by remember { mutableStateOf(false) }
+    if (renaming) {
+        SaveDialog(
+            title = "Rename preset",
+            initial = preset.name,
+            onDismiss = { renaming = false },
+        ) { name ->
+            Repo.renamePreset(preset.id, name)
+            renaming = false
+        }
+    }
     Row(
         Modifier
             .fillMaxWidth()
@@ -902,6 +940,9 @@ private fun PresetRow(preset: Preset, selected: Boolean, favorite: Boolean, onDe
             )
         }
         if (onDelete != null) {
+            IconButton(onClick = { renaming = true }) {
+                Icon(Icons.Filled.Edit, contentDescription = "Rename ${preset.name}", tint = Palette.TextDim)
+            }
             IconButton(onClick = onDelete) {
                 Icon(Icons.Filled.Delete, contentDescription = "Delete ${preset.name}", tint = Palette.Danger)
             }
@@ -978,6 +1019,8 @@ private fun ManageSection(state: AppState) {
     }
 
     SettingsSection("Add and manage") {
+        ActionRow("Find my sound", Help.finder, detail = "A short guided listening test", onClick = LocalOpenFinder.current)
+        RowDivider()
         ActionRow("Save as new", Help.saveNew) { saving = true }
         if (saved != null && saved != state.current) {
             RowDivider()
@@ -1016,7 +1059,7 @@ private fun ManageSection(state: AppState) {
 
 /** Finds and imports a headphone profile from AutoEq's published results. */
 @Composable
-private fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
+fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var entries by remember { mutableStateOf<List<CatalogEntry>?>(null) }
@@ -1085,12 +1128,17 @@ private fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
 }
 
 @Composable
-private fun SaveDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
-    var name by remember { mutableStateOf("") }
+private fun SaveDialog(
+    title: String = "Save preset",
+    initial: String = "",
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    var name by remember { mutableStateOf(initial) }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Palette.Tooltip,
-        title = { Text("Save preset") },
+        title = { Text(title) },
         text = {
             OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true, label = { Text("Name") })
         },
@@ -1153,6 +1201,30 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
         }
     }
 
+    var showGuide by remember { mutableStateOf(false) }
+    var confirmReset by remember { mutableStateOf(false) }
+    SettingsSection("Help and reset") {
+        ActionRow("Getting the best sound", Help.guide) { showGuide = true }
+        RowDivider()
+        ActionRow("Reset sound settings", Help.reset) { confirmReset = true }
+    }
+    if (showGuide) GuideDialog(onDismiss = { showGuide = false })
+    if (confirmReset) {
+        AlertDialog(
+            onDismissRequest = { confirmReset = false },
+            containerColor = Palette.Tooltip,
+            title = { Text("Reset sound settings?") },
+            text = { Text("The sound goes back to Flat. Your saved presets and output choices are kept.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    Repo.resetSound()
+                    confirmReset = false
+                }) { Text("Reset", color = Palette.Danger) }
+            },
+            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Cancel") } },
+        )
+    }
+
     SettingsSection("Status") {
         Fact("Running", Help.statusRunning, if (status.running) "Yes" else "No")
         RowDivider()
@@ -1186,6 +1258,37 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
             )
         }
     }
+}
+
+@Composable
+private fun GuideDialog(onDismiss: () -> Unit) {
+    val tips = listOf(
+        "Get a good seal" to "With earbuds, fit matters more than any setting. If bass sounds thin, try other ear tips before adding EQ.",
+        "Start with Find my sound" to "It picks a correction for your headphones if one is known, then tunes it to what you prefer.",
+        "Change a little at a time" to "A change of 2 or 3 dB is clearly audible. Very large boosts usually add distortion and lower the overall level.",
+        "Prefer cuts to boosts" to "If something is too loud, cutting it often sounds cleaner than boosting everything else.",
+        "Compare with Bypass" to "Your ears adapt within minutes, so switch back and forth. If you can't hear a benefit, keep the simpler setting.",
+        "Try several songs" to "One track can mislead you. Test with a few you know well before settling on a sound.",
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Palette.Tooltip,
+        title = { Text("Getting the best sound") },
+        text = {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                tips.forEach { (title, body) ->
+                    Column {
+                        Text(title, style = MaterialTheme.typography.titleSmall, color = Palette.Text)
+                        Text(body, style = MaterialTheme.typography.bodyMedium, color = Palette.TextDim)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+    )
 }
 
 @Composable

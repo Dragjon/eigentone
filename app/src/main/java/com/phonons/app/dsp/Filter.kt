@@ -1,6 +1,7 @@
 package com.phonons.app.dsp
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.log10
@@ -17,6 +18,8 @@ enum class FilterType(val label: String, val hasGain: Boolean) {
     HIGH_SHELF("High shelf", true),
     LOW_PASS("Low pass", false),
     HIGH_PASS("High pass", false),
+    /** A response defined by points, used by the graphic EQ. Never part of a saved preset's filters. */
+    CURVE("Curve", false),
 }
 
 @Serializable
@@ -27,7 +30,11 @@ data class Filter(
     val gainDb: Double = 0.0,
     val q: Double = 1.0,
     val enabled: Boolean = true,
-)
+    @Transient val curve: List<Pair<Double, Double>> = emptyList(),
+) {
+    /** Built once, because curves are sampled thousands of times while settings change. */
+    val biquad: Biquad by lazy(LazyThreadSafetyMode.PUBLICATION) { Eq.biquad(this) }
+}
 
 /** Normalised biquad coefficients (a0 == 1), from the RBJ Audio EQ Cookbook. */
 class Biquad(val b0: Double, val b1: Double, val b2: Double, val a1: Double, val a2: Double) {
@@ -92,12 +99,21 @@ object Eq {
                 b0 = (1 + c) / 2; b1 = -(1 + c); b2 = (1 + c) / 2
                 a0 = 1 + alpha; a1 = -2 * c; a2 = 1 - alpha
             }
+            // Handled in filterDb. A unit response here keeps this function total.
+            FilterType.CURVE -> {
+                b0 = 1.0; b1 = 0.0; b2 = 0.0
+                a0 = 1.0; a1 = 0.0; a2 = 0.0
+            }
         }
         return Biquad(b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0)
     }
 
     fun filterDb(f: Filter, freq: Double): Double =
-        if (f.enabled) biquad(f).magnitudeDb(freq, SAMPLE_RATE) else 0.0
+        when {
+            !f.enabled -> 0.0
+            f.type == FilterType.CURVE -> GraphicEq.interpolate(f.curve, freq)
+            else -> f.biquad.magnitudeDb(freq, SAMPLE_RATE)
+        }
 
     /** Combined response of the whole filter stack, excluding preamp. */
     fun curveDb(filters: List<Filter>, freq: Double): Double =

@@ -61,6 +61,7 @@ fun EqGraph(
     onDrag: (id: Int, freq: Double, gainDb: Double) -> Unit,
     onDragEnd: () -> Unit,
     modifier: Modifier = Modifier,
+    heightDp: Int = 260,
 ) {
     val currentFilters by rememberUpdatedState(filters)
     val measurer = rememberTextMeasurer()
@@ -80,7 +81,7 @@ fun EqGraph(
     Canvas(
         modifier
             .fillMaxWidth()
-            .height(260.dp)
+            .height(heightDp.dp)
             .semantics { contentDescription = "Equaliser curve. Use the filter controls below to adjust it." }
             .pointerInput(Unit) {
                 val touchRadius = 32.dp.toPx()

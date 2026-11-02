@@ -2,6 +2,7 @@ package com.phonons.app.data
 
 import com.phonons.app.dsp.Eq
 import com.phonons.app.dsp.Filter
+import com.phonons.app.dsp.GraphicEq
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -56,7 +57,24 @@ object BackupCodec {
         name = preset.name.take(MAX_NAME),
         preampDb = safe(preset.preampDb, 0.0).coerceIn(-MAX_PREAMP, MAX_PREAMP),
         filters = preset.filters.take(MAX_FILTERS).map(::sanitise),
+        tone = sanitise(preset.tone),
     )
+
+    private fun sanitise(tone: Tone): Tone {
+        val toneLimit = Processing.MAX_TONE_DB
+        val bands = tone.graphicBands.takeIf { it in GraphicEq.BAND_OPTIONS } ?: GraphicEq.DEFAULT_BANDS
+        return Tone(
+            bassDb = safe(tone.bassDb, 0.0).coerceIn(-toneLimit, toneLimit),
+            trebleDb = safe(tone.trebleDb, 0.0).coerceIn(-toneLimit, toneLimit),
+            vocalsDb = safe(tone.vocalsDb, 0.0).coerceIn(-toneLimit, toneLimit),
+            bassTunerDb = safe(tone.bassTunerDb, 0.0).coerceIn(-toneLimit, toneLimit),
+            bassTunerHz = safe(tone.bassTunerHz, 80.0).coerceIn(30.0, 250.0),
+            graphicDb = tone.graphicDb.take(bands).map { GraphicEq.snap(safe(it, 0.0)) },
+            graphicBands = bands,
+            surround = safe(tone.surround, 0.0).coerceIn(0.0, 1.0),
+            strength = safe(tone.strength, 1.0).coerceIn(0.0, 1.5),
+        )
+    }
 
     private fun sanitise(f: Filter) = f.copy(
         freq = safe(f.freq, 1000.0).coerceIn(Eq.MIN_FREQ, Eq.MAX_FREQ),

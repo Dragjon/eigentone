@@ -2,7 +2,24 @@ package com.phonons.app.data
 
 import com.phonons.app.dsp.Filter
 import com.phonons.app.dsp.FilterType
+import com.phonons.app.dsp.GraphicEq
 import kotlinx.serialization.Serializable
+
+/** The adjustments layered over a preset's filters. They're saved with it, so a preset is a whole sound. */
+@Serializable
+data class Tone(
+    val bassDb: Double = 0.0,
+    val trebleDb: Double = 0.0,
+    val vocalsDb: Double = 0.0,
+    val bassTunerDb: Double = 0.0,
+    val bassTunerHz: Double = 80.0,
+    val graphicDb: List<Double> = emptyList(),
+    val graphicBands: Int = GraphicEq.DEFAULT_BANDS,
+    /** 0 is off, 1 is the strongest. */
+    val surround: Double = 0.0,
+    /** Scales every EQ change in the preset: 0 is flat, 1 is as designed, 1.5 is stronger. */
+    val strength: Double = 1.0,
+)
 
 @Serializable
 data class Preset(
@@ -10,6 +27,7 @@ data class Preset(
     val name: String,
     val preampDb: Double = 0.0,
     val filters: List<Filter> = emptyList(),
+    val tone: Tone = Tone(),
 )
 
 @Serializable
@@ -35,8 +53,6 @@ data class AppState(
     val autoSwitch: Boolean = true,
     /** Output key to preset id. See [Profiles] for per-mode keys. */
     val outputProfiles: Map<String, String> = emptyMap(),
-    val bassDb: Double = 0.0,
-    val trebleDb: Double = 0.0,
     val matchBypass: Boolean = true,
     val loudness: Boolean = false,
     val loudnessStrength: Double = 0.5,
@@ -44,14 +60,62 @@ data class AppState(
     val favorites: Set<String> = emptySet(),
     val listeningMode: ListeningMode = ListeningMode.NOISE_CANCELLING,
     val analyser: Boolean = false,
-    /** Gains for [Processing.GRAPHIC_BANDS]. */
+    val limiterThresholdDb: Double = -1.0,
+    val guidedSetupSeen: Boolean = false,
+    // Older versions kept these outside the preset. They're only read once, by migrated().
+    val bassDb: Double = 0.0,
+    val trebleDb: Double = 0.0,
     val graphicDb: List<Double> = emptyList(),
     val bassTunerDb: Double = 0.0,
     val bassTunerHz: Double = 80.0,
-    val limiterThresholdDb: Double = -1.0,
-    /** 0 is off, 1 is the strongest. */
     val surround: Double = 0.0,
-)
+) {
+    fun renamedPreset(id: String, name: String): AppState = copy(
+        presets = presets.map { if (it.id == id) it.copy(name = name) else it },
+        current = if (current.id == id) current.copy(name = name) else current,
+    )
+
+    /** Keeps presets, output choices and power, and clears everything that shapes the sound. */
+    fun resetSound(): AppState {
+        val defaults = AppState()
+        return copy(
+            current = BuiltIns.flat,
+            bypass = false,
+            autoHeadroom = defaults.autoHeadroom,
+            limiter = defaults.limiter,
+            limiterThresholdDb = defaults.limiterThresholdDb,
+            nightMode = defaults.nightMode,
+            balance = defaults.balance,
+            loudness = defaults.loudness,
+            loudnessStrength = defaults.loudnessStrength,
+            matchBypass = defaults.matchBypass,
+        )
+    }
+
+    /** Moves settings saved by older versions into the current preset, so nobody's sound changes. */
+    fun migrated(): AppState {
+        val hasLegacy = bassDb != 0.0 || trebleDb != 0.0 || graphicDb.isNotEmpty() || bassTunerDb != 0.0 ||
+            bassTunerHz != 80.0 || surround != 0.0
+        if (!hasLegacy) return this
+        val tone = current.tone.copy(
+            bassDb = bassDb,
+            trebleDb = trebleDb,
+            bassTunerDb = bassTunerDb,
+            bassTunerHz = bassTunerHz,
+            graphicDb = GraphicEq.normalized(graphicDb, GraphicEq.DEFAULT_BANDS).takeIf { graphicDb.isNotEmpty() } ?: emptyList(),
+            surround = surround,
+        )
+        return copy(
+            current = current.copy(tone = tone),
+            bassDb = 0.0,
+            trebleDb = 0.0,
+            graphicDb = emptyList(),
+            bassTunerDb = 0.0,
+            bassTunerHz = 80.0,
+            surround = 0.0,
+        )
+    }
+}
 
 /**
  * The earbuds' noise control mode. Android can't read this from the earbuds, so it is set by hand

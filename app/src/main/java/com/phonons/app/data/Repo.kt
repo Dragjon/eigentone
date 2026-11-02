@@ -50,7 +50,7 @@ object Repo {
         if (file != null) return
         val atomic = AtomicFile(File(context.filesDir, "state.json"))
         file = atomic
-        load(atomic)?.let { _state.value = it }
+        load(atomic)?.let { _state.value = it.migrated() }
         committed = _state.value.current
         _state.drop(1).debounce(400).onEach { save(it) }.launchIn(scope)
     }
@@ -87,6 +87,9 @@ object Repo {
 
     /** Live edit of the working preset, e.g. during a drag. Call [commit] when the gesture ends. */
     fun edit(transform: (Preset) -> Preset) = _state.update { it.copy(current = transform(it.current)) }
+
+    /** Live edit of the tone adjustments saved with the current preset. */
+    fun editTone(transform: (Tone) -> Tone) = edit { it.copy(tone = transform(it.tone)) }
 
     /** Records one undo step for everything edited since the previous commit. */
     @Synchronized
@@ -129,6 +132,18 @@ object Repo {
         _state.update { s ->
             s.copy(presets = s.presets.map { if (it.id == s.current.id) s.current else it })
         }
+    }
+
+    /** Renames a user preset, including the working copy if it's the one in use. */
+    fun renamePreset(id: String, name: String) {
+        _state.update { s -> s.renamedPreset(id, name) }
+    }
+
+    /** Returns the sound to a clean start. Presets and output choices are kept. */
+    fun resetSound() {
+        commit()
+        _state.update { it.resetSound() }
+        commit()
     }
 
     fun deletePreset(id: String) {

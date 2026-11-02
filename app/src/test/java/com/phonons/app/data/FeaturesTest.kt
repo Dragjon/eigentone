@@ -17,7 +17,7 @@ class FeaturesTest {
 
     @Test
     fun toneDialsAddToThePresetWithoutChangingIt() {
-        val state = AppState(current = boost, bassDb = 4.0, trebleDb = -2.0)
+        val state = AppState(current = boost.copy(tone = Tone(bassDb = 4.0, trebleDb = -2.0)))
         val filters = Processing.effectiveFilters(state, 0.0)
         assertEquals(3, filters.size)
         assertEquals(4.0, Eq.curveDb(filters, 20.0), 0.2)
@@ -183,13 +183,13 @@ class FeaturesTest {
     }
 
     @Test
-    fun graphicEqAddsOnlyItsNonZeroBandsAtTheRightFrequencies() {
-        val gains = List(9) { if (it == 4) 6.0 else 0.0 }
-        val filters = Processing.graphicFilters(gains)
-        assertEquals(1, filters.size)
-        assertEquals(6.0, Eq.curveDb(filters, 1000.0), 0.01)
-        assertTrue(Processing.graphicFilters(emptyList()).isEmpty())
-        assertEquals(1, Processing.effectiveFilters(AppState(current = boost, graphicDb = List(9) { 0.0 }), 0.0).size)
+    fun graphicEqHitsItsFaderAndFlatAddsNothing() {
+        val gains = List(10) { if (it == 5) 6.0 else 0.0 }
+        val tone = Tone(graphicDb = gains, graphicBands = 10)
+        val filters = Processing.presetFilters(Preset("user:g", "G", tone = tone))
+        assertEquals(6.0, Eq.curveDb(filters, 1000.0), 0.3)
+        val flat = boost.copy(tone = Tone(graphicDb = List(10) { 0.0 }))
+        assertEquals(1, Processing.effectiveFilters(AppState(current = flat), 0.0).size)
     }
 
     @Test
@@ -202,7 +202,7 @@ class FeaturesTest {
 
     @Test
     fun surroundFollowsItsSettingAndStopsInEitherBypass() {
-        val state = AppState(current = boost, surround = 0.6, limiterThresholdDb = -3.0)
+        val state = AppState(current = boost.copy(tone = Tone(surround = 0.6)), limiterThresholdDb = -3.0)
         val on = Processing.target(state, 0.0)
         assertEquals(0.6, on.surround, 0.0)
         assertEquals(-3.0, on.limiterThresholdDb, 0.0)
