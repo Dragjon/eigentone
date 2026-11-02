@@ -1,7 +1,7 @@
 package com.phonons.app.engine
 
+import android.media.AudioFormat
 import android.media.audiofx.DynamicsProcessing
-import android.media.audiofx.PresetReverb
 import android.media.audiofx.Virtualizer
 import android.util.Log
 import com.phonons.app.data.AppState
@@ -9,7 +9,6 @@ import com.phonons.app.data.EngineMode
 import com.phonons.app.data.EngineStatus
 import com.phonons.app.data.Processing
 import com.phonons.app.data.ProcessingTarget
-import com.phonons.app.data.ReverbChoice
 import com.phonons.app.dsp.CurveMapper
 import kotlin.math.abs
 import kotlin.math.log10
@@ -28,9 +27,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
 
     private class Chain(val dp: DynamicsProcessing, val session: Int, val label: String, bandCount: Int) {
         var virtualizer: Virtualizer? = null
-        var reverb: PresetReverb? = null
         var lastSurround = Double.NaN
-        var lastReverb: ReverbChoice? = null
         var lastLimiterThreshold = Double.NaN
         val lastGains = FloatArray(bandCount) { Float.NaN }
         var lastInput = Float.NaN
@@ -91,7 +88,6 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
             chain.lastEnabled = null
             chain.lastLimiterThreshold = Double.NaN
             chain.lastSurround = Double.NaN
-            chain.lastReverb = null
         }
         latest?.let { apply(it) }
     }
@@ -129,7 +125,6 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
 
     private fun releaseChain(chain: Chain) {
         releaseVirtualizer(chain)
-        releaseReverb(chain)
         runCatching {
             chain.dp.enabled = false
             chain.dp.release()
@@ -246,7 +241,6 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
             error = "Lost connection to ${chain.label}: ${e.message}"
         }
         pushSurround(chain, target)
-        pushReverb(chain, target)
     }
 
     /** Only exists while in use, so turning surround off fully removes it from the audio path. */
@@ -264,38 +258,21 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
             }
             virtualizer.setStrength((target.surround * MAX_EFFECT_STRENGTH).toInt().toShort())
             virtualizer.enabled = true
+            // Automatic mode can leave it inactive on Bluetooth, so ask for headphone processing.
+            val stereo = AudioFormat.CHANNEL_OUT_STEREO
+            val canBinaural = virtualizer.canVirtualize(stereo, Virtualizer.VIRTUALIZATION_MODE_BINAURAL)
+            val forced = virtualizer.forceVirtualizationMode(Virtualizer.VIRTUALIZATION_MODE_BINAURAL)
+            val mode = virtualizer.virtualizationMode
             Log.i(
                 TAG,
-                "Surround on ${chain.label}: strength=${virtualizer.roundedStrength} " +
-                    "supported=${virtualizer.strengthSupported} mode=${virtualizer.virtualizationMode} " +
-                    "enabled=${virtualizer.enabled} control=${virtualizer.hasControl()}",
+                "Surround on ${chain.label}: strength=${virtualizer.roundedStrength} canBinaural=$canBinaural " +
+                    "forced=$forced mode=$mode enabled=${virtualizer.enabled} control=${virtualizer.hasControl()}",
             )
+            // Don't treat mode 0 as failure: on a Galaxy A54 it reads 0 while audibly working.
         } catch (e: Exception) {
             Log.w(TAG, "Surround unavailable on ${chain.label}", e)
             spatialError = "This phone refused 3D surround: ${e.message}"
             releaseVirtualizer(chain)
-        }
-    }
-
-    private fun pushReverb(chain: Chain, target: ProcessingTarget) {
-        if (target.reverb == chain.lastReverb) return
-        chain.lastReverb = target.reverb
-        if (target.reverb == ReverbChoice.OFF) {
-            releaseReverb(chain)
-            return
-        }
-        try {
-            val reverb = chain.reverb ?: PresetReverb(Int.MAX_VALUE, chain.session).also {
-                chain.reverb = it
-                spatialError = null
-            }
-            reverb.preset = target.reverb.androidPreset
-            reverb.enabled = true
-            Log.i(TAG, "Reverb on ${chain.label}: preset=${reverb.preset} enabled=${reverb.enabled} control=${reverb.hasControl()}")
-        } catch (e: Exception) {
-            Log.w(TAG, "Reverb unavailable on ${chain.label}", e)
-            spatialError = "This phone refused reverb: ${e.message}"
-            releaseReverb(chain)
         }
     }
 
@@ -307,16 +284,6 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
             }
         }
         chain.virtualizer = null
-    }
-
-    private fun releaseReverb(chain: Chain) {
-        chain.reverb?.let { r ->
-            runCatching {
-                r.enabled = false
-                r.release()
-            }
-        }
-        chain.reverb = null
     }
 
     /** Reads bands back once, so a device that silently ignores them shows up as a visible error. */

@@ -32,6 +32,12 @@ Back up `phonons-release.jks` and `keystore.properties`. They are excluded from 
 
 The Liberty 4 NC presets use [AutoEq](https://github.com/jaakkopasanen/AutoEq) results (MIT License) from DHRME and Rtings measurements.
 
+## Known limits
+
+- **3D surround** is Android's virtualizer forced to binaural mode. It widens stereo, with no head tracking or real surround channels. On a Galaxy A54 it reads `mode=0` while audibly working.
+- **Reverb** was removed. On session 0 the public API only provides an auxiliary reverb, which receives no audio, and Android 16 blocks the method needed to control the insert version.
+- **Noise-mode profiles** are chosen by hand, because Android can't read the earbuds' mode.
+
 ## Shelved: Studio mode
 
 Playback capture plus custom DSP (convolution, crossfeed). `capturelab/` holds the experiment. On a Galaxy A54 running Android 16, it worked without root by muting the music stream and playing through the alarm stream to a preferred device, but:

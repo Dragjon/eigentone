@@ -201,24 +201,21 @@ class FeaturesTest {
     }
 
     @Test
-    fun surroundAndReverbFollowSettingsAndStopInEitherBypass() {
-        val state = AppState(current = boost, surround = 0.6, reverb = ReverbChoice.LARGE_HALL, limiterThresholdDb = -3.0)
+    fun surroundFollowsItsSettingAndStopsInEitherBypass() {
+        val state = AppState(current = boost, surround = 0.6, limiterThresholdDb = -3.0)
         val on = Processing.target(state, 0.0)
         assertEquals(0.6, on.surround, 0.0)
-        assertEquals(ReverbChoice.LARGE_HALL, on.reverb)
         assertEquals(-3.0, on.limiterThresholdDb, 0.0)
         for (match in listOf(true, false)) {
-            val off = Processing.target(state.copy(bypass = true, matchBypass = match), 0.0)
-            assertEquals(0.0, off.surround, 0.0)
-            assertEquals(ReverbChoice.OFF, off.reverb)
+            assertEquals(0.0, Processing.target(state.copy(bypass = true, matchBypass = match), 0.0).surround, 0.0)
         }
     }
 
     @Test
-    fun reverbChoicesMatchAndroidPresetValues() {
-        assertEquals(0.toShort(), ReverbChoice.OFF.androidPreset)
-        assertEquals(1.toShort(), ReverbChoice.SMALL_ROOM.androidPreset)
-        assertEquals(6.toShort(), ReverbChoice.PLATE.androidPreset)
+    fun stateSavedWithTheRemovedReverbSettingStillLoads() {
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+        val state = json.decodeFromString(AppState.serializer(), "{\"surround\":0.5,\"reverb\":\"LARGE_HALL\"}")
+        assertEquals(0.5, state.surround, 0.0)
     }
 
     @Test

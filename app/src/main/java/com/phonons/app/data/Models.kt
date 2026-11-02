@@ -51,20 +51,7 @@ data class AppState(
     val limiterThresholdDb: Double = -1.0,
     /** 0 is off, 1 is the strongest. */
     val surround: Double = 0.0,
-    val reverb: ReverbChoice = ReverbChoice.OFF,
 )
-
-/** [androidPreset] matches the values of android.media.audiofx.PresetReverb. */
-@Serializable
-enum class ReverbChoice(val label: String, val androidPreset: Short) {
-    OFF("Off", 0),
-    SMALL_ROOM("Small room", 1),
-    MEDIUM_ROOM("Medium room", 2),
-    LARGE_ROOM("Large room", 3),
-    MEDIUM_HALL("Medium hall", 4),
-    LARGE_HALL("Large hall", 5),
-    PLATE("Plate", 6),
-}
 
 /**
  * The earbuds' noise control mode. Android can't read this from the earbuds, so it is set by hand
@@ -108,7 +95,7 @@ data class EngineStatus(
     val hasControl: Boolean = true,
     val sessions: List<String> = emptyList(),
     val error: String? = null,
-    /** Surround and reverb failures are separate, because the EQ keeps working without them. */
+    /** Surround failures are separate, because the EQ keeps working without it. */
     val spatialError: String? = null,
 )
 

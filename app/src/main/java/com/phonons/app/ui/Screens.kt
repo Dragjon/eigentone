@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -84,7 +82,6 @@ import com.phonons.app.data.BackupCodec
 import com.phonons.app.data.BuiltIns
 import com.phonons.app.data.CatalogEntry
 import com.phonons.app.data.EngineMode
-import com.phonons.app.data.ReverbChoice
 import com.phonons.app.data.EngineStatus
 import com.phonons.app.data.ListeningMode
 import com.phonons.app.data.Preset
@@ -569,7 +566,6 @@ private fun SoundTab(state: AppState) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SurroundCard(state: AppState) {
     val status by Repo.status.collectAsStateWithLifecycle()
@@ -583,22 +579,8 @@ private fun SurroundCard(state: AppState) {
             onChange = { v -> Repo.update { it.copy(surround = if (v < 0.02f) 0.0 else v.toDouble()) } },
             commit = false,
         )
-        Text("Room", style = MaterialTheme.typography.bodyMedium)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            ReverbChoice.entries.forEach { choice ->
-                FilterChip(
-                    selected = state.reverb == choice,
-                    onClick = { Repo.update { it.copy(reverb = choice) } },
-                    label = { Text(choice.label, maxLines = 1) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Palette.Amber,
-                        selectedLabelColor = Palette.OnAmber,
-                    ),
-                )
-            }
-        }
         Text(
-            "Widens stereo and adds space. It doesn't track your head or create real surround channels.",
+            "Widens the stereo image. It doesn't track your head or create real surround channels.",
             style = MaterialTheme.typography.bodySmall,
             color = Palette.TextDim,
         )

@@ -16,7 +16,6 @@ data class ProcessingTarget(
     val effectEnabled: Boolean,
     val limiterThresholdDb: Double = -1.0,
     val surround: Double = 0.0,
-    val reverb: ReverbChoice = ReverbChoice.OFF,
 )
 
 /** Turns the user's settings into the final processing. Pure, so it can be unit tested. */
@@ -78,7 +77,6 @@ object Processing {
                 filters, input, state.limiter, state.nightMode, effectEnabled = true,
                 limiterThresholdDb = state.limiterThresholdDb,
                 surround = state.surround,
-                reverb = state.reverb,
             )
         }
         if (!state.matchBypass) {
