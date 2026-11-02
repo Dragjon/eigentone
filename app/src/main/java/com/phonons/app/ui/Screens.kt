@@ -17,6 +17,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -49,6 +54,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,9 +79,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.phonons.app.R
 import com.phonons.app.data.AppState
+import com.phonons.app.data.AutoEqCatalog
 import com.phonons.app.data.BackupCodec
 import com.phonons.app.data.BuiltIns
+import com.phonons.app.data.CatalogEntry
 import com.phonons.app.data.EngineMode
+import com.phonons.app.data.ReverbChoice
 import com.phonons.app.data.EngineStatus
 import com.phonons.app.data.ListeningMode
 import com.phonons.app.data.Preset
@@ -387,6 +396,7 @@ private fun SoundTab(state: AppState) {
     val attenuation by Repo.attenuationDb.collectAsStateWithLifecycle()
     val effective = Processing.effectiveFilters(state, attenuation)
     val input = Eq.inputGainDb(effective, state.current.preampDb, state.autoHeadroom)
+    var showGraphic by rememberSaveable { mutableStateOf(false) }
     Card {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Tone", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
@@ -414,6 +424,53 @@ private fun SoundTab(state: AppState) {
             "Adds to every preset, without changing the preset itself.",
             style = MaterialTheme.typography.bodySmall,
             color = Palette.TextDim,
+        )
+    }
+    SurroundCard(state)
+    Card {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Graphic EQ", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            if (state.graphicDb.any { it != 0.0 }) {
+                TextButton(onClick = { Repo.update { it.copy(graphicDb = emptyList()) } }) { Text("Reset") }
+            }
+            TextButton(onClick = { showGraphic = !showGraphic }) { Text(if (showGraphic) "Hide" else "Show") }
+        }
+        if (showGraphic) {
+            Processing.GRAPHIC_BANDS.forEachIndexed { i, freq ->
+                val gain = state.graphicDb.getOrElse(i) { 0.0 }
+                ValueSlider(
+                    label = formatHz(freq),
+                    readout = formatDb(gain),
+                    value = gain.toFloat(),
+                    range = -Processing.MAX_TONE_DB.toFloat()..Processing.MAX_TONE_DB.toFloat(),
+                    onChange = { v ->
+                        Repo.update { s ->
+                            val gains = List(Processing.GRAPHIC_BANDS.size) { s.graphicDb.getOrElse(it) { 0.0 } }
+                            s.copy(graphicDb = gains.toMutableList().also { it[i] = snapTone(v) })
+                        }
+                    },
+                    commit = false,
+                )
+            }
+        }
+    }
+    Card {
+        Text("Bass tuner", style = MaterialTheme.typography.titleMedium)
+        ValueSlider(
+            label = "Amount",
+            readout = formatDb(state.bassTunerDb),
+            value = state.bassTunerDb.toFloat(),
+            range = -Processing.MAX_TONE_DB.toFloat()..Processing.MAX_TONE_DB.toFloat(),
+            onChange = { v -> Repo.update { it.copy(bassTunerDb = snapTone(v)) } },
+            commit = false,
+        )
+        ValueSlider(
+            label = "Up to",
+            readout = formatHz(state.bassTunerHz),
+            value = state.bassTunerHz.toFloat(),
+            range = 30f..250f,
+            onChange = { v -> Repo.update { it.copy(bassTunerHz = v.toDouble()) } },
+            commit = false,
         )
     }
     Card {
@@ -458,8 +515,20 @@ private fun SoundTab(state: AppState) {
             "Lowers the level by your largest boost to prevent clipping. Applied now: ${formatDb(input)}",
             state.autoHeadroom,
         ) { on -> Repo.update { it.copy(autoHeadroom = on) } }
-        SwitchRow("Limiter", "Catches peaks above -1 dB.", state.limiter) { on ->
-            Repo.update { it.copy(limiter = on) }
+        SwitchRow(
+            "Limiter",
+            "Catches peaks above ${String.format(Locale.US, "%.1f", state.limiterThresholdDb)} dB.",
+            state.limiter,
+        ) { on -> Repo.update { it.copy(limiter = on) } }
+        if (state.limiter) {
+            ValueSlider(
+                label = "Limiter threshold",
+                readout = formatDb(state.limiterThresholdDb),
+                value = state.limiterThresholdDb.toFloat(),
+                range = -12f..0f,
+                onChange = { v -> Repo.update { it.copy(limiterThresholdDb = snapTone(v)) } },
+                commit = false,
+            )
         }
         SwitchRow(
             "Level-matched Bypass",
@@ -500,6 +569,113 @@ private fun SoundTab(state: AppState) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SurroundCard(state: AppState) {
+    val status by Repo.status.collectAsStateWithLifecycle()
+    Card {
+        Text("3D surround", style = MaterialTheme.typography.titleMedium)
+        ValueSlider(
+            label = "Virtual surround",
+            readout = if (state.surround <= 0.0) "Off" else "${(state.surround * 100).toInt()}%",
+            value = state.surround.toFloat(),
+            range = 0f..1f,
+            onChange = { v -> Repo.update { it.copy(surround = if (v < 0.02f) 0.0 else v.toDouble()) } },
+            commit = false,
+        )
+        Text("Room", style = MaterialTheme.typography.bodyMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ReverbChoice.entries.forEach { choice ->
+                FilterChip(
+                    selected = state.reverb == choice,
+                    onClick = { Repo.update { it.copy(reverb = choice) } },
+                    label = { Text(choice.label, maxLines = 1) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Palette.Amber,
+                        selectedLabelColor = Palette.OnAmber,
+                    ),
+                )
+            }
+        }
+        Text(
+            "Widens stereo and adds space. It doesn't track your head or create real surround channels.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Palette.TextDim,
+        )
+        status.spatialError?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = Palette.Danger)
+        }
+    }
+}
+
+/** Finds and imports a headphone profile from AutoEq's published results. */
+@Composable
+private fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var entries by remember { mutableStateOf<List<CatalogEntry>?>(null) }
+    var problem by remember { mutableStateOf<String?>(null) }
+    var query by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val loaded = withContext(Dispatchers.IO) { runCatching { AutoEqCatalog.loadIndex(context.cacheDir) } }
+        entries = loaded.getOrNull()
+        problem = loaded.exceptionOrNull()?.let { "Could not load the headphone list: ${it.message}" }
+    }
+
+    val results = remember(entries, query) { AutoEqCatalog.search(entries.orEmpty(), query) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Find headphones") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    label = { Text("Headphone model") },
+                    enabled = entries != null && !busy,
+                )
+                when {
+                    problem != null -> Text(problem.orEmpty(), color = Palette.Danger, style = MaterialTheme.typography.bodySmall)
+                    entries == null -> Text("Loading the list…", color = Palette.TextDim)
+                    busy -> Text("Downloading…", color = Palette.TextDim)
+                    query.isNotBlank() && results.isEmpty() -> Text("No matches.", color = Palette.TextDim)
+                }
+                LazyColumn(Modifier.heightIn(max = 320.dp)) {
+                    items(results) { entry ->
+                        Text(
+                            entry.title,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = !busy, role = Role.Button) {
+                                    busy = true
+                                    scope.launch {
+                                        val text = withContext(Dispatchers.IO) {
+                                            runCatching { AutoEqCatalog.loadProfile(entry) }
+                                        }
+                                        val parsed = text.getOrNull()?.let(AutoEqParser::parse)
+                                        busy = false
+                                        if (parsed == null) {
+                                            problem = "Could not download that profile. It may have no parametric version."
+                                        } else {
+                                            Repo.importPreset(entry.title, parsed)
+                                            onImported("Added ${entry.title}.")
+                                        }
+                                    }
+                                }
+                                .padding(vertical = 10.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+    )
+}
+
 /** Half-dB steps, which also makes it easy to land on exactly zero. */
 private fun snapTone(value: Float): Double = kotlin.math.round(value * 2.0) / 2.0
 
@@ -509,6 +685,7 @@ private fun PresetsTab(state: AppState) {
     val output by Repo.output.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var saving by remember { mutableStateOf(false) }
+    var finding by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     val isUser = state.presets.any { it.id == state.current.id }
     val isDirty = isUser && state.presets.first { it.id == state.current.id } != state.current
@@ -576,6 +753,7 @@ private fun PresetsTab(state: AppState) {
         OutlinedButton(onClick = { importer.launch(arrayOf("text/*", "application/octet-stream")) }) { Text("Import") }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = { finding = true }) { Text("Find") }
         OutlinedButton(onClick = { exporter.launch("phonons-backup.json") }) { Text("Back up") }
         OutlinedButton(onClick = { restorer.launch(arrayOf("application/json", "text/*", "application/octet-stream")) }) {
             Text("Restore")
@@ -650,6 +828,12 @@ private fun PresetsTab(state: AppState) {
     if (saving) SaveDialog(onDismiss = { saving = false }) { name ->
         Repo.saveCurrentAs(name)
         saving = false
+    }
+    if (finding) {
+        AutoEqDialog(onDismiss = { finding = false }) { result ->
+            message = result
+            finding = false
+        }
     }
 }
 

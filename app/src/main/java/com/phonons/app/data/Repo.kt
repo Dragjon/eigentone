@@ -182,7 +182,7 @@ object Repo {
         if (state.current.id != preset.id) loadPreset(preset)
     }
 
-    /** Returns false if the text was not a valid backup. */
+    /** Returns false if the text was not a valid backup. Tone and effect settings aren't included. */
     fun restoreBackup(text: String): Boolean {
         val backup = BackupCodec.decode(text) ?: return false
         _state.update { BackupCodec.merge(it, backup) }

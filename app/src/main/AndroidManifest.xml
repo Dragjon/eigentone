@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Only used to search and download AutoEq headphone profiles. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- Only requested if the spectrum analyser is turned on. Android's Visualizer requires it. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 

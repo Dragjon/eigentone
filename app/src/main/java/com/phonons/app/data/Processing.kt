@@ -14,11 +14,16 @@ data class ProcessingTarget(
     val limiter: Boolean,
     val nightMode: Double,
     val effectEnabled: Boolean,
+    val limiterThresholdDb: Double = -1.0,
+    val surround: Double = 0.0,
+    val reverb: ReverbChoice = ReverbChoice.OFF,
 )
 
 /** Turns the user's settings into the final processing. Pure, so it can be unit tested. */
 object Processing {
     const val MAX_TONE_DB = 12.0
+    val GRAPHIC_BANDS = listOf(62.5, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0)
+    private const val GRAPHIC_Q = 1.41
 
     // Compensation starts below this much volume attenuation, and is full at REFERENCE + RANGE.
     private const val LOUDNESS_REFERENCE_DB = 10.0
@@ -46,9 +51,22 @@ object Processing {
         )
     }
 
-    /** The preset, tone dials and loudness compensation together. */
+    /** One-octave bells. Missing or zero bands add nothing. */
+    fun graphicFilters(gains: List<Double>): List<Filter> = GRAPHIC_BANDS.mapIndexedNotNull { i, freq ->
+        gains.getOrNull(i)?.takeIf { it != 0.0 }?.let { gain ->
+            Filter(-10 - i, FilterType.BELL, freq, gain, GRAPHIC_Q)
+        }
+    }
+
+    /** A shelf with an adjustable corner, for shaping the low end independently of the preset. */
+    fun bassTunerFilters(gainDb: Double, freqHz: Double): List<Filter> =
+        if (gainDb != 0.0) listOf(Filter(-5, FilterType.LOW_SHELF, freqHz, gainDb, SHELF_Q)) else emptyList()
+
+    /** The preset, graphic EQ, bass tuner, tone dials and loudness compensation together. */
     fun effectiveFilters(state: AppState, attenuationDb: Double): List<Filter> =
         state.current.filters +
+            graphicFilters(state.graphicDb) +
+            bassTunerFilters(state.bassTunerDb, state.bassTunerHz) +
             toneFilters(state.bassDb, state.trebleDb) +
             if (state.loudness) loudnessFilters(attenuationDb, state.loudnessStrength) else emptyList()
 
@@ -56,7 +74,12 @@ object Processing {
         val filters = effectiveFilters(state, attenuationDb)
         val input = Eq.inputGainDb(filters, state.current.preampDb, state.autoHeadroom)
         if (!state.bypass) {
-            return ProcessingTarget(filters, input, state.limiter, state.nightMode, effectEnabled = true)
+            return ProcessingTarget(
+                filters, input, state.limiter, state.nightMode, effectEnabled = true,
+                limiterThresholdDb = state.limiterThresholdDb,
+                surround = state.surround,
+                reverb = state.reverb,
+            )
         }
         if (!state.matchBypass) {
             return ProcessingTarget(emptyList(), 0.0, limiter = false, nightMode = 0.0, effectEnabled = false)
@@ -69,6 +92,7 @@ object Processing {
             limiter = state.limiter,
             nightMode = 0.0,
             effectEnabled = true,
+            limiterThresholdDb = state.limiterThresholdDb,
         )
     }
 

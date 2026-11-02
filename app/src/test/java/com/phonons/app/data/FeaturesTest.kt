@@ -183,6 +183,80 @@ class FeaturesTest {
     }
 
     @Test
+    fun graphicEqAddsOnlyItsNonZeroBandsAtTheRightFrequencies() {
+        val gains = List(9) { if (it == 4) 6.0 else 0.0 }
+        val filters = Processing.graphicFilters(gains)
+        assertEquals(1, filters.size)
+        assertEquals(6.0, Eq.curveDb(filters, 1000.0), 0.01)
+        assertTrue(Processing.graphicFilters(emptyList()).isEmpty())
+        assertEquals(1, Processing.effectiveFilters(AppState(current = boost, graphicDb = List(9) { 0.0 }), 0.0).size)
+    }
+
+    @Test
+    fun bassTunerShapesOnlyTheLowEnd() {
+        val filters = Processing.bassTunerFilters(6.0, 80.0)
+        assertEquals(6.0, Eq.curveDb(filters, 20.0), 0.3)
+        assertEquals(0.0, Eq.curveDb(filters, 5000.0), 0.05)
+        assertTrue(Processing.bassTunerFilters(0.0, 80.0).isEmpty())
+    }
+
+    @Test
+    fun surroundAndReverbFollowSettingsAndStopInEitherBypass() {
+        val state = AppState(current = boost, surround = 0.6, reverb = ReverbChoice.LARGE_HALL, limiterThresholdDb = -3.0)
+        val on = Processing.target(state, 0.0)
+        assertEquals(0.6, on.surround, 0.0)
+        assertEquals(ReverbChoice.LARGE_HALL, on.reverb)
+        assertEquals(-3.0, on.limiterThresholdDb, 0.0)
+        for (match in listOf(true, false)) {
+            val off = Processing.target(state.copy(bypass = true, matchBypass = match), 0.0)
+            assertEquals(0.0, off.surround, 0.0)
+            assertEquals(ReverbChoice.OFF, off.reverb)
+        }
+    }
+
+    @Test
+    fun reverbChoicesMatchAndroidPresetValues() {
+        assertEquals(0.toShort(), ReverbChoice.OFF.androidPreset)
+        assertEquals(1.toShort(), ReverbChoice.SMALL_ROOM.androidPreset)
+        assertEquals(6.toShort(), ReverbChoice.PLATE.androidPreset)
+    }
+
+    @Test
+    fun catalogParsesRealIndexLinesAndRejectsPathEscapes() {
+        val entries = AutoEqCatalog.parseIndex(
+            """
+            # Index
+            - [Anker Soundcore Liberty 4 NC](./DHRME/in-ear/Anker%20Soundcore%20Liberty%204%20NC) by DHRME
+            - [Anker Soundcore Liberty 4 NC](./Rtings/Bruel%20&%20Kjaer%205128%20in-ear/Anker%20Soundcore%20Liberty%204%20NC) by Rtings on Bruel & Kjaer 5128
+            - [Sony (Rev 2)](./oratory1990/over-ear/Sony%20(Rev%202)) by oratory1990
+            - [Bad](./../../secrets) by Nobody
+            not a list line
+            """.trimIndent(),
+        )
+        assertEquals(3, entries.size)
+        assertEquals("Rtings on Bruel & Kjaer 5128", entries[1].source)
+        assertEquals("oratory1990/over-ear/Sony%20(Rev%202)", entries[2].path)
+        assertEquals(
+            "https://raw.githubusercontent.com/jaakkopasanen/AutoEq/master/results/" +
+                "DHRME/in-ear/Anker%20Soundcore%20Liberty%204%20NC/Anker%20Soundcore%20Liberty%204%20NC%20ParametricEQ.txt",
+            AutoEqCatalog.profileUrl(entries[0]),
+        )
+    }
+
+    @Test
+    fun catalogSearchMatchesAllWordsInAnyOrder() {
+        val entries = listOf(
+            CatalogEntry("Anker Soundcore Liberty 4 NC", "DHRME", "a"),
+            CatalogEntry("Anker Soundcore Liberty 4", "Rtings", "b"),
+            CatalogEntry("Sony WH-1000XM5", "oratory1990", "c"),
+        )
+        assertEquals(listOf("a"), AutoEqCatalog.search(entries, "nc liberty").map { it.path })
+        assertEquals(2, AutoEqCatalog.search(entries, "LIBERTY 4").size)
+        assertTrue(AutoEqCatalog.search(entries, "   ").isEmpty())
+        assertEquals(1, AutoEqCatalog.search(entries, "anker", limit = 1).size)
+    }
+
+    @Test
     fun spectrumFindsAToneInTheRightBand() {
         val size = 1024
         val fft = ByteArray(size)

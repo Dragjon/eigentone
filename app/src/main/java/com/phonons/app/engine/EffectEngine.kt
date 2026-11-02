@@ -1,11 +1,15 @@
 package com.phonons.app.engine
 
 import android.media.audiofx.DynamicsProcessing
+import android.media.audiofx.PresetReverb
+import android.media.audiofx.Virtualizer
 import android.util.Log
 import com.phonons.app.data.AppState
 import com.phonons.app.data.EngineMode
 import com.phonons.app.data.EngineStatus
 import com.phonons.app.data.Processing
+import com.phonons.app.data.ProcessingTarget
+import com.phonons.app.data.ReverbChoice
 import com.phonons.app.dsp.CurveMapper
 import kotlin.math.abs
 import kotlin.math.log10
@@ -22,7 +26,12 @@ import kotlin.math.max
  */
 class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
 
-    private class Chain(val dp: DynamicsProcessing, val label: String, bandCount: Int) {
+    private class Chain(val dp: DynamicsProcessing, val session: Int, val label: String, bandCount: Int) {
+        var virtualizer: Virtualizer? = null
+        var reverb: PresetReverb? = null
+        var lastSurround = Double.NaN
+        var lastReverb: ReverbChoice? = null
+        var lastLimiterThreshold = Double.NaN
         val lastGains = FloatArray(bandCount) { Float.NaN }
         var lastInput = Float.NaN
         var lastBalance = Double.NaN
@@ -39,6 +48,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
     private var builtLowLatency: Boolean? = null
     private var builtMode: EngineMode? = null
     private var error: String? = null
+    private var spatialError: String? = null
     private var latest: AppState? = null
 
     /** Set by the service before [apply]. */
@@ -79,6 +89,9 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
             chain.lastNight = Double.NaN
             chain.lastLimiter = null
             chain.lastEnabled = null
+            chain.lastLimiterThreshold = Double.NaN
+            chain.lastSurround = Double.NaN
+            chain.lastReverb = null
         }
         latest?.let { apply(it) }
     }
@@ -115,6 +128,8 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
     }
 
     private fun releaseChain(chain: Chain) {
+        releaseVirtualizer(chain)
+        releaseReverb(chain)
         runCatching {
             chain.dp.enabled = false
             chain.dp.release()
@@ -160,7 +175,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
                 val dp = DynamicsProcessing(Int.MAX_VALUE, session, config)
                 dp.setControlStatusListener { _, _ -> refreshRequested?.invoke() }
                 if (mapper?.bandCount != count) mapper = CurveMapper(count)
-                chains[session] = Chain(dp, label, count)
+                chains[session] = Chain(dp, session, label, count)
                 Log.i(TAG, "Attached to session $session with $count bands")
                 return true
             } catch (e: Exception) {
@@ -179,8 +194,8 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
     private fun push(chain: Chain, state: AppState) {
         val map = mapper ?: return
         val dp = chain.dp
+        val target = Processing.target(state, attenuationDb)
         try {
-            val target = Processing.target(state, attenuationDb)
             val gains = map.gains(target.filters)
             for (i in gains.indices) {
                 val last = chain.lastGains[i]
@@ -205,14 +220,15 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
                 chain.lastBalance = state.balance
             }
 
-            if (target.limiter != chain.lastLimiter) {
+            if (target.limiter != chain.lastLimiter || target.limiterThresholdDb != chain.lastLimiterThreshold) {
                 dp.setLimiterAllChannelsTo(
                     DynamicsProcessing.Limiter(
                         true, target.limiter, /* linkGroup = */ 0,
-                        LIMITER_ATTACK_MS, LIMITER_RELEASE_MS, LIMITER_RATIO, LIMITER_THRESHOLD_DB, 0f,
+                        LIMITER_ATTACK_MS, LIMITER_RELEASE_MS, LIMITER_RATIO, target.limiterThresholdDb.toFloat(), 0f,
                     ),
                 )
                 chain.lastLimiter = target.limiter
+                chain.lastLimiterThreshold = target.limiterThresholdDb
             }
 
             if (target.nightMode != chain.lastNight) {
@@ -229,6 +245,78 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
             Log.w(TAG, "Could not update ${chain.label}", e)
             error = "Lost connection to ${chain.label}: ${e.message}"
         }
+        pushSurround(chain, target)
+        pushReverb(chain, target)
+    }
+
+    /** Only exists while in use, so turning surround off fully removes it from the audio path. */
+    private fun pushSurround(chain: Chain, target: ProcessingTarget) {
+        if (target.surround == chain.lastSurround) return
+        chain.lastSurround = target.surround
+        if (target.surround <= 0.0) {
+            releaseVirtualizer(chain)
+            return
+        }
+        try {
+            val virtualizer = chain.virtualizer ?: Virtualizer(Int.MAX_VALUE, chain.session).also {
+                chain.virtualizer = it
+                spatialError = null
+            }
+            virtualizer.setStrength((target.surround * MAX_EFFECT_STRENGTH).toInt().toShort())
+            virtualizer.enabled = true
+            Log.i(
+                TAG,
+                "Surround on ${chain.label}: strength=${virtualizer.roundedStrength} " +
+                    "supported=${virtualizer.strengthSupported} mode=${virtualizer.virtualizationMode} " +
+                    "enabled=${virtualizer.enabled} control=${virtualizer.hasControl()}",
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Surround unavailable on ${chain.label}", e)
+            spatialError = "This phone refused 3D surround: ${e.message}"
+            releaseVirtualizer(chain)
+        }
+    }
+
+    private fun pushReverb(chain: Chain, target: ProcessingTarget) {
+        if (target.reverb == chain.lastReverb) return
+        chain.lastReverb = target.reverb
+        if (target.reverb == ReverbChoice.OFF) {
+            releaseReverb(chain)
+            return
+        }
+        try {
+            val reverb = chain.reverb ?: PresetReverb(Int.MAX_VALUE, chain.session).also {
+                chain.reverb = it
+                spatialError = null
+            }
+            reverb.preset = target.reverb.androidPreset
+            reverb.enabled = true
+            Log.i(TAG, "Reverb on ${chain.label}: preset=${reverb.preset} enabled=${reverb.enabled} control=${reverb.hasControl()}")
+        } catch (e: Exception) {
+            Log.w(TAG, "Reverb unavailable on ${chain.label}", e)
+            spatialError = "This phone refused reverb: ${e.message}"
+            releaseReverb(chain)
+        }
+    }
+
+    private fun releaseVirtualizer(chain: Chain) {
+        chain.virtualizer?.let { v ->
+            runCatching {
+                v.enabled = false
+                v.release()
+            }
+        }
+        chain.virtualizer = null
+    }
+
+    private fun releaseReverb(chain: Chain) {
+        chain.reverb?.let { r ->
+            runCatching {
+                r.enabled = false
+                r.release()
+            }
+        }
+        chain.reverb = null
     }
 
     /** Reads bands back once, so a device that silently ignores them shows up as a visible error. */
@@ -279,6 +367,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
                 hasControl = control,
                 sessions = if (activeMode == EngineMode.SESSIONS) chains.values.map { it.label } else emptyList(),
                 error = error,
+                spatialError = spatialError,
             ),
         )
     }
@@ -294,7 +383,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         private const val LIMITER_ATTACK_MS = 1f
         private const val LIMITER_RELEASE_MS = 60f
         private const val LIMITER_RATIO = 10f
-        private const val LIMITER_THRESHOLD_DB = -1f
+        private const val MAX_EFFECT_STRENGTH = 1000
         private val BAND_COUNTS = listOf(128, 64, 32, 16)
         private val MBC_CUTOFFS = floatArrayOf(200f, 2500f, 24000f)
     }

@@ -1,0 +1,87 @@
+package com.phonons.app.data
+
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URL
+
+data class CatalogEntry(val name: String, val source: String, val path: String) {
+    val title: String get() = "$name ($source)"
+}
+
+/** Searches AutoEq's published headphone profiles, downloaded from its GitHub repository. */
+object AutoEqCatalog {
+    private const val BASE = "https://raw.githubusercontent.com/jaakkopasanen/AutoEq/master/results/"
+    private const val MAX_INDEX_BYTES = 8 * 1024 * 1024
+    private const val MAX_PROFILE_BYTES = 256 * 1024
+    private const val CACHE_MAX_AGE_MS = 30L * 24 * 60 * 60 * 1000
+    private const val TIMEOUT_MS = 20_000
+
+    private val line = Regex("""^- \[(.+?)]\((\./.+)\) by (.+)$""")
+
+    /** Parses INDEX.md. Lines that aren't profile links, or that try to leave the results, are skipped. */
+    fun parseIndex(text: String): List<CatalogEntry> = text.lineSequence().mapNotNull { raw ->
+        val m = line.find(raw.trim()) ?: return@mapNotNull null
+        val path = m.groupValues[2]
+        if (".." in path) return@mapNotNull null
+        CatalogEntry(m.groupValues[1], m.groupValues[3], path.removePrefix("./"))
+    }.toList()
+
+    /** Every word must match, in any order, so "liberty 4 nc" finds "Anker Soundcore Liberty 4 NC". */
+    fun search(entries: List<CatalogEntry>, query: String, limit: Int = 50): List<CatalogEntry> {
+        val words = query.trim().lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        if (words.isEmpty()) return emptyList()
+        return entries.asSequence()
+            .filter { entry -> words.all { it in entry.title.lowercase() } }
+            .take(limit)
+            .toList()
+    }
+
+    fun profileUrl(entry: CatalogEntry): String =
+        BASE + entry.path + "/" + entry.path.substringAfterLast('/') + "%20ParametricEQ.txt"
+
+    /** Blocking. Uses a local copy of the index for a month, and falls back to it when offline. */
+    @Throws(IOException::class)
+    fun loadIndex(cacheDir: File): List<CatalogEntry> {
+        val cache = File(cacheDir, "autoeq-index.md")
+        val fresh = cache.exists() && System.currentTimeMillis() - cache.lastModified() < CACHE_MAX_AGE_MS
+        if (!fresh) {
+            try {
+                val bytes = download(BASE + "INDEX.md", MAX_INDEX_BYTES)
+                cache.writeBytes(bytes)
+            } catch (e: IOException) {
+                if (!cache.exists()) throw e
+            }
+        }
+        return parseIndex(cache.readText())
+    }
+
+    /** Blocking. */
+    @Throws(IOException::class)
+    fun loadProfile(entry: CatalogEntry): String = download(profileUrl(entry), MAX_PROFILE_BYTES).decodeToString()
+
+    private fun download(url: String, maxBytes: Int): ByteArray {
+        val connection = URL(url).openConnection() as HttpURLConnection
+        try {
+            connection.connectTimeout = TIMEOUT_MS
+            connection.readTimeout = TIMEOUT_MS
+            if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                throw IOException("Server replied ${connection.responseCode}")
+            }
+            val out = ByteArrayOutputStream()
+            connection.inputStream.use { input ->
+                val buffer = ByteArray(16 * 1024)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    out.write(buffer, 0, read)
+                    if (out.size() > maxBytes) throw IOException("Download was larger than expected")
+                }
+            }
+            return out.toByteArray()
+        } finally {
+            connection.disconnect()
+        }
+    }
+}
