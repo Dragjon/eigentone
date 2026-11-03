@@ -174,7 +174,7 @@ class GraphicAndFinderTest {
     fun aPresetSavesItsWholeSound() {
         val tone = Tone(bassDb = 3.0, graphicDb = List(10) { 1.0 }, surround = 0.5)
         val preset = Preset("user:a", "A", tone = tone)
-        val target = Processing.target(AppState(current = preset), 0.0)
+        val target = Processing.target(AppState(current = preset, useSystemSurround = true), 0.0)
         assertEquals(0.5, target.surround, 0.0)
         // The +1 dB graphic curve and the +3 dB bass both reach the final sound at 20 Hz.
         assertEquals(4.0, Eq.curveDb(Processing.presetFilters(preset), 20.0), 0.2)

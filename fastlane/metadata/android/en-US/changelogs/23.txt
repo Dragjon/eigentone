@@ -1,0 +1,1 @@
+Adds a stereo width effect as a backup for phones that refuse virtual surround. Virtual surround stays the default, and the app warns you when Android's own spatial audio adds to it.

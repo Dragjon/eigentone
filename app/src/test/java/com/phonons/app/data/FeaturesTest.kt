@@ -202,7 +202,7 @@ class FeaturesTest {
 
     @Test
     fun surroundFollowsItsSettingAndStopsInEitherBypass() {
-        val state = AppState(current = boost.copy(tone = Tone(surround = 0.6)), limiterThresholdDb = -3.0)
+        val state = AppState(useSystemSurround = true, current = boost.copy(tone = Tone(surround = 0.6)), limiterThresholdDb = -3.0)
         val on = Processing.target(state, 0.0)
         assertEquals(0.6, on.surround, 0.0)
         assertEquals(-3.0, on.limiterThresholdDb, 0.0)

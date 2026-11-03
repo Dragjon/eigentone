@@ -1,0 +1,1 @@
+A new stereo width effect that works wherever the EQ does. The phone's own virtual surround is still available as an option.

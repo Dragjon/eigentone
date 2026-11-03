@@ -361,6 +361,14 @@ private fun ValueTrack(
 }
 
 /** Names of the connected audio outputs, kept current as devices come and go, even while Eigentone is off. */
+/** Whether Android's own spatial audio is on. It can only be read, because only system apps can change it. */
+@Composable
+fun rememberSystemSpatialAudio(): Boolean {
+    val context = LocalContext.current
+    val spatializer = remember { context.getSystemService(AudioManager::class.java).spatializer }
+    return remember { spatializer.isAvailable && spatializer.isEnabled }
+}
+
 @Composable
 fun rememberConnectedOutputNames(): List<String> {
     val context = LocalContext.current

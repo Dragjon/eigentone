@@ -487,6 +487,93 @@ class NewFeaturesTest {
         }
     }
 
+    private val widePreset = Preset("user:w", "Wide", tone = Tone(surround = 1.0))
+
+    @Test
+    fun widthKeepsBassCentredAndLeansTheRest() {
+        for (hz in listOf(20.0, 60.0, 100.0, 250.0)) assertEquals(0.0, StereoWidth.leanDb(hz), 0.0)
+        assertEquals(0.0, StereoWidth.leanDb(16000.0), 0.0)
+        val leans = (500..9000 step 50).map { StereoWidth.leanDb(it.toDouble()) }
+        assertTrue(leans.any { it > 2.0 })
+        assertTrue(leans.any { it < -2.0 })
+        assertTrue(leans.all { abs(it) <= StereoWidth.MAX_LEAN_DB })
+    }
+
+    @Test
+    fun widthMirrorsTheChannelsAndFollowsTheAmount() {
+        val (left, right) = StereoWidth.curves(0.5)
+        assertEquals(left.size, right.size)
+        for (i in left.indices) {
+            assertEquals(left[i].hz, right[i].hz, 0.0)
+            assertEquals(-left[i].db, right[i].db, 0.0)
+            assertTrue(abs(left[i].db) <= StereoWidth.MAX_LEAN_DB / 2 + 0.0001)
+        }
+        assertEquals(left.map { it.hz }.sorted(), left.map { it.hz })
+        // Asking for another amount doesn't get the remembered one.
+        assertEquals(left[10].db * 2, StereoWidth.curves(1.0).first[10].db, 0.0001)
+    }
+
+    @Test
+    fun widthGoesThroughTheChannelsNotThePhonesEffect() {
+        val target = Processing.target(AppState(useSystemSurround = false, current = widePreset), 0.0)
+        assertEquals(0.0, target.surround, 0.0)
+        assertTrue(target.filters !== target.rightFilters)
+        // Somewhere between the fades, the two channels really do differ.
+        val leaning = listOf(600.0, 800.0, 1200.0, 3000.0).maxOf {
+            abs(Eq.curveDb(target.filters, it) - Eq.curveDb(target.rightFilters, it))
+        }
+        assertTrue(leaning > 2.0)
+    }
+
+    @Test
+    fun thePhonesEffectReplacesWidthWhenChosen() {
+        val target = Processing.target(AppState(current = widePreset, useSystemSurround = true), 0.0)
+        assertEquals(1.0, target.surround, 0.0)
+        assertTrue(target.filters === target.rightFilters)
+    }
+
+    @Test
+    fun widthStepsAsideInBypassAndAtZero() {
+        for (match in listOf(true, false)) {
+            val target = Processing.target(AppState(useSystemSurround = false, current = widePreset, bypass = true, matchBypass = match), 0.0)
+            assertTrue(target.rightFilters.isEmpty())
+        }
+        val off = Processing.target(AppState(useSystemSurround = false, current = widePreset.copy(tone = Tone(surround = 0.0))), 0.0)
+        assertTrue(off.filters === off.rightFilters)
+    }
+
+    @Test
+    fun widthAndEarCorrectionAddTogether() {
+        val state = AppState(useSystemSurround = false, current = widePreset, earCorrections = mapOf(BUDS to ears))
+        val target = Processing.target(state, 0.0, outputKey = BUDS)
+        val (lean, _) = StereoWidth.curves(1.0)
+        val point = lean.first { it.hz > 900 }
+        assertEquals(point.db - 3.0, Eq.curveDb(target.filters, point.hz), 0.01)
+        assertEquals(-point.db + 3.0, Eq.curveDb(target.rightFilters, point.hz), 0.01)
+    }
+
+    @Test
+    fun widthLeavesRoomSoNeitherChannelClips() {
+        val target = Processing.target(AppState(useSystemSurround = false, current = widePreset, autoHeadroom = true), 0.0)
+        assertTrue(Eq.peakDb(target.filters) + target.inputDb <= 0.001)
+        assertTrue(Eq.peakDb(target.rightFilters) + target.inputDb <= 0.001)
+    }
+
+    @Test
+    fun widthBarelyChangesTheOverallTone() {
+        val target = Processing.target(AppState(useSystemSurround = false, current = widePreset), 0.0)
+        for (hz in listOf(600.0, 1000.0, 2000.0, 5000.0)) {
+            val sum = Eq.curveDb(target.filters, hz) + Eq.curveDb(target.rightFilters, hz)
+            assertEquals(0.0, sum, 0.001)
+        }
+    }
+
+    @Test
+    fun thePhonesEffectIsTheDefaultAndResetReturnsToIt() {
+        assertTrue(AppState().useSystemSurround)
+        assertTrue(AppState(useSystemSurround = false).resetSound().useSystemSurround)
+    }
+
     @Test
     fun shareCodesFromTheOldNameStillWork() {
         val preset = Preset("user:x", "Mine", tone = Tone(bassDb = 3.0))

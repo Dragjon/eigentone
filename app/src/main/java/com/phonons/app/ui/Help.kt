@@ -113,9 +113,17 @@ object Help {
     val crashReport = Tip("Crash report", "A technical record of the last crash, kept only on this phone. You choose whether to share it, and deleting it removes it.")
     val graphicSmooth = Tip("Smooth", "Softens sharp steps between neighbouring faders, which often sounds more natural. Tap it again for a stronger effect.")
 
+    val stereoWidth = Tip(
+        "Stereo width",
+        "Makes the sound feel wider by leaning small frequency ranges left and right in turn, while keeping bass centred. It's subtle by design, with no head tracking or surround channels. Higher values can make vocals feel less centred. This is saved with the preset.",
+    )
     val surround = Tip(
         "Virtual surround",
-        "Makes the sound feel wider than your head. It doesn't track head movement or create real surround channels. Higher values can make vocals feel less centred. This is saved with the preset.",
+        "Makes the sound feel wider than your head, using your phone's own effect. It doesn't track head movement or create real surround channels. Higher values can make vocals feel less centred. This is saved with the preset.",
+    )
+    val systemSurround = Tip(
+        "Use the phone's virtual surround",
+        "Uses the effect built into your phone, which is much stronger than Eigentone's own stereo width but varies by phone. Android has deprecated it, so a future update could remove it. If your phone refuses it, stereo width takes over. Turn this off to use stereo width, a gentler effect that works wherever the EQ does.",
     )
     val balance = Tip("Balance", "Shifts sound towards the left or right ear. Useful if one side sounds quieter to you.")
 

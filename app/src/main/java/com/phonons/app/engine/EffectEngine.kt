@@ -42,6 +42,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         var lastLimiter: Boolean? = null
         var lastEnabled: Boolean? = null
         var verified = false
+        var verifiedSeparately = false
     }
 
     private val chains = LinkedHashMap<Int, Chain>()
@@ -65,6 +66,9 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
 
     /** Set by the service before [apply]. Takes the sound out of the path during the hearing check. */
     var suspended = false
+
+    /** The phone refused its surround effect, so stereo width stands in until the service next starts. */
+    private var systemSurroundRefused = false
 
     /** Set by the service before [apply]. Which output is in use, since ear correction belongs to one. */
     var outputKey = ""
@@ -216,8 +220,9 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
     private fun push(chain: Chain, state: AppState) {
         val map = mapper ?: return
         val dp = chain.dp
+        val allowed = if (systemSurroundRefused) state.copy(useSystemSurround = false) else state
         val target = Processing.target(
-            if (suspended) state.copy(bypass = true, matchBypass = false) else state,
+            if (suspended) allowed.copy(bypass = true, matchBypass = false) else allowed,
             attenuationDb,
             scheduledNight,
             outputKey,
@@ -248,6 +253,11 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
 
             if (!chain.verified) {
                 chain.verified = true
+                verifyBands(chain, map, gains, rightGains)
+            }
+            // Checked again the first time the channels differ, which a phone could handle differently.
+            if (step.done && !chain.verifiedSeparately && !gains.contentEquals(rightGains)) {
+                chain.verifiedSeparately = true
                 verifyBands(chain, map, gains, rightGains)
             }
 
@@ -334,8 +344,10 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
             // Don't treat mode 0 as failure: on a Galaxy A54 it reads 0 while audibly working.
         } catch (e: Exception) {
             Log.w(TAG, "Surround unavailable on ${chain.label}", e)
-            spatialError = "This phone refused 3D surround: ${e.message}"
+            spatialError = "This phone refused its virtual surround, so stereo width is being used instead."
             releaseVirtualizer(chain)
+            systemSurroundRefused = true
+            latest?.let { push(chain, it) }
         }
     }
 

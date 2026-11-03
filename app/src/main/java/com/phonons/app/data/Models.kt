@@ -156,6 +156,8 @@ data class AppState(
     val earCorrection: EarCorrection? = null,
     val hearing: HearingRecord? = null,
     val compressor: Compressor = Compressor(),
+    /** Uses the phone's own Virtualizer for the Space amount, which is much stronger than stereo width. */
+    val useSystemSurround: Boolean = true,
     /** Which one-time updates this saved state has had. A fresh install starts at the latest. */
     val stateVersion: Int = 0,
     val listeningMode: ListeningMode = ListeningMode.NOISE_CANCELLING,
@@ -212,6 +214,7 @@ data class AppState(
             earCorrections = defaults.earCorrections,
             earCorrection = defaults.earCorrection,
             compressor = defaults.compressor,
+            useSystemSurround = defaults.useSystemSurround,
             loudness = defaults.loudness,
             loudnessStrength = defaults.loudnessStrength,
             matchBypass = defaults.matchBypass,

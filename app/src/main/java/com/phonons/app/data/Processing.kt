@@ -110,6 +110,20 @@ object Processing {
         }
     }
 
+    /**
+     * Each channel's filters, when they differ: ear correction for this output and stereo width. Null
+     * when both channels get the same sound.
+     */
+    fun channelFilters(state: AppState, outputKey: String, filters: List<Filter>): Pair<List<Filter>, List<Filter>>? {
+        val ears = state.earsFor(outputKey)?.takeIf { it.enabled }
+        val width = state.current.tone.surround.takeIf { it > 0.0 && !state.useSystemSurround }
+        if (ears == null && width == null) return null
+        val (left, right) = if (ears == null) filters to filters else earCurves(filters, ears)
+        if (width == null) return left to right
+        val (leanLeft, leanRight) = StereoWidth.curves(width)
+        return (left + curveFilter(WIDTH_CURVE_ID, leanLeft)) to (right + curveFilter(WIDTH_CURVE_ID, leanRight))
+    }
+
     /** Each ear's filters: the same sound, plus that ear's own correction. */
     fun earCurves(filters: List<Filter>, ears: EarCorrection): Pair<List<Filter>, List<Filter>> =
         (filters + curveFilter(EAR_CURVE_ID, ears.left)) to (filters + curveFilter(EAR_CURVE_ID, ears.right))
@@ -123,10 +137,10 @@ object Processing {
         val filters = effectiveFilters(state, attenuationDb)
         val input = inputOf(state.current, filters, state.autoHeadroom)
         if (!state.bypass) {
-            val ears = state.earsFor(outputKey)?.takeIf { it.enabled }
-            val (left, right) = if (ears == null) filters to filters else earCurves(filters, ears)
+            val channels = channelFilters(state, outputKey, filters)
+            val (left, right) = channels ?: (filters to filters)
             // One level for both ears. Separate levels would shift the balance across every frequency.
-            val shared = if (ears == null) {
+            val shared = if (channels == null) {
                 input
             } else {
                 min(inputOf(state.current, left, state.autoHeadroom), inputOf(state.current, right, state.autoHeadroom))
@@ -137,7 +151,8 @@ object Processing {
                 nightMode = night,
                 effectEnabled = true,
                 limiterThresholdDb = state.limiterThresholdDb,
-                surround = state.current.tone.surround,
+                // Only the phone's own effect needs this. Stereo width is already in the channels' filters.
+                surround = if (state.useSystemSurround) state.current.tone.surround else 0.0,
                 leveller = state.leveller,
                 rightFilters = right,
                 dynamics = Dynamics.resolve(night, state.leveller, state.compressor),
@@ -184,4 +199,5 @@ object Processing {
     private const val EXPORT_POINTS = 127
     private const val IMPORTED_CURVE_ID = -101
     private const val EAR_CURVE_ID = -102
+    private const val WIDTH_CURVE_ID = -103
 }

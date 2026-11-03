@@ -298,8 +298,9 @@ private fun EqTab(state: AppState) {
     val attenuation by Repo.attenuationDb.collectAsStateWithLifecycle()
     val curveFilters = remember(state, attenuation) { Processing.effectiveFilters(state, attenuation) }
     val graphOutput by Repo.output.collectAsStateWithLifecycle()
-    val graphEars = state.earsFor(graphOutput.key)?.takeIf { it.enabled && !state.bypass }
-    val earCurves = remember(curveFilters, graphEars) { graphEars?.let { Processing.earCurves(curveFilters, it) } }
+    val earCurves = remember(curveFilters, state.earCorrections, graphOutput.key, state.useSystemSurround, state.bypass) {
+        if (state.bypass) null else Processing.channelFilters(state, graphOutput.key, curveFilters)
+    }
     val spectrumState = Repo.spectrum.collectAsStateWithLifecycle()
     AnalyserEffect(state.analyser)
 
@@ -692,18 +693,27 @@ private fun ToneSlider(title: String, tip: Tip, value: Double, onChange: (Double
 @Composable
 private fun SpaceSection(state: AppState) {
     val status by Repo.status.collectAsStateWithLifecycle()
+    val systemSpatialAudio = rememberSystemSpatialAudio()
     SettingsSection("Space") {
         SliderSetting(
-            title = "Virtual surround",
-            tip = Help.surround,
+            title = if (state.useSystemSurround) "Virtual surround" else "Stereo width",
+            tip = if (state.useSystemSurround) Help.surround else Help.stereoWidth,
             readout = if (state.current.tone.surround <= 0.0) "Off" else formatPercent(state.current.tone.surround),
             value = state.current.tone.surround.toFloat(),
             range = 0f..1f,
             default = 0f,
-            detail = status.spatialError,
+            detail = when {
+                state.useSystemSurround && status.spatialError != null -> status.spatialError
+                state.current.tone.surround > 0.0 && systemSpatialAudio ->
+                    "Android's own spatial audio is on, and adds to this. Try one at a time."
+                else -> null
+            },
             onChange = { v -> Repo.editTone { it.copy(surround = if (v < 0.02f) 0.0 else v.toDouble()) } },
             onFinished = Repo::commit,
         )
+        SwitchSetting("Use the phone's virtual surround", Help.systemSurround, state.useSystemSurround) { on ->
+            Repo.update { it.copy(useSystemSurround = on) }
+        }
         RowDivider()
         SliderSetting(
             title = "Balance",
