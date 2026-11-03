@@ -1,0 +1,1 @@
+Adds redo, a faint saved curve on the graph while you edit, a warning when settings could clip, and export of filters as a ParametricEQ file. The notification now ranks with ordinary notifications.

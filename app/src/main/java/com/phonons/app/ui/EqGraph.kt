@@ -32,6 +32,7 @@ import com.phonons.app.dsp.Filter
 import kotlin.math.hypot
 
 private const val RANGE_DB = 18.0
+private const val GHOST_MIN_DIFFERENCE_DB = 0.05
 private const val CURVE_POINTS = 300
 private val GRID_FREQS = listOf(20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000)
 private val LABEL_FREQS = setOf(100, 1000, 10000)
@@ -58,6 +59,8 @@ fun EqGraph(
     curveFilters: List<Filter>,
     /** The right ear's curve while each ear differs, when [curveFilters] is then the left ear's. */
     rightCurveFilters: List<Filter>? = null,
+    /** The preset as saved, drawn faintly behind the current sound while it's being edited. */
+    ghostFilters: List<Filter>? = null,
     /** Read while drawing, so spectrum frames redraw the canvas without recomposing the screen. */
     spectrum: () -> FloatArray?,
     selectedId: Int?,
@@ -83,6 +86,17 @@ fun EqGraph(
         }
     }
     val rightColour = if (dimmed) Palette.TextDim else Palette.RightEar
+    // Some edits don't change the curve, such as the compressor, and then there's nothing to show.
+    val ghost = remember(ghostFilters, curve, rightCurve) {
+        ghostFilters?.let { saved ->
+            DoubleArray(CURVE_POINTS + 1) { i -> Eq.curveDb(saved, Eq.logFreq(i.toDouble() / CURVE_POINTS)) }
+        }?.takeIf { saved ->
+            saved.indices.any { i ->
+                kotlin.math.abs(saved[i] - curve[i]) > GHOST_MIN_DIFFERENCE_DB ||
+                    (rightCurve != null && kotlin.math.abs(saved[i] - rightCurve[i]) > GHOST_MIN_DIFFERENCE_DB)
+            }
+        }
+    }
     val selectedFilter = filters.firstOrNull { it.id == selectedId && it.enabled }
     val selectedCurve = remember(selectedFilter) {
         selectedFilter?.let { f ->
@@ -191,6 +205,16 @@ fun EqGraph(
             )
         }
 
+        ghost?.let { points ->
+            val saved = Path()
+            points.forEachIndexed { i, db ->
+                val x = w * i / CURVE_POINTS
+                val y = yOf(db, h, rangeDb)
+                if (i == 0) saved.moveTo(x, y) else saved.lineTo(x, y)
+            }
+            drawPath(saved, Palette.Outline, style = Stroke(width = 1.5.dp.toPx()))
+        }
+
         selectedCurve?.let { points ->
             val single = Path()
             points.forEachIndexed { i, db ->
@@ -238,6 +262,7 @@ fun EqGraph(
         gridDb.filter { it != 0 }.forEach { db ->
             label(if (db > 0) "+$db" else "$db", 4f, yOf(db.toDouble(), h, rangeDb) + 2f)
         }
+        if (ghost != null) label("Saved", w * 0.42f, 4f)
         if (rightCurve != null) {
             val rightStyle = labelStyle.copy(color = rightColour)
             val rightLabel = measurer.measure("Right ear", rightStyle).size.width + 8.dp.toPx()

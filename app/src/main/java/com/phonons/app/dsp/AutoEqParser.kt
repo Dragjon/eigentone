@@ -1,5 +1,7 @@
 package com.phonons.app.dsp
 
+import java.util.Locale
+
 data class ParsedEq(val preampDb: Double, val filters: List<Filter>)
 
 /** Parses the Equalizer APO / AutoEq "ParametricEQ.txt" format. */
@@ -12,6 +14,28 @@ object AutoEqParser {
             """(?:\s+Gain\s+([-+]?[\d.]+)\s*dB)?(?:\s+Q\s+([\d.]+))?""",
         RegexOption.IGNORE_CASE,
     )
+
+    /** Writes filters in the same format, which AutoEq-compatible apps and Equalizer APO can read. */
+    fun format(preampDb: Double, filters: List<Filter>): String = buildString {
+        appendLine(String.format(Locale.US, "Preamp: %.1f dB", preampDb))
+        filters.forEachIndexed { i, f ->
+            val type = when (f.type) {
+                FilterType.BELL -> "PK"
+                FilterType.LOW_SHELF -> "LSC"
+                FilterType.HIGH_SHELF -> "HSC"
+                FilterType.LOW_PASS -> "LPQ"
+                FilterType.HIGH_PASS -> "HPQ"
+                FilterType.CURVE -> error("A curve can't be written as a filter")
+            }
+            val gain = if (f.type.hasGain) String.format(Locale.US, " Gain %.2f dB", f.gainDb) else ""
+            appendLine(
+                String.format(
+                    Locale.US, "Filter %d: %s %s Fc %.1f Hz%s Q %.3f",
+                    i + 1, if (f.enabled) "ON" else "OFF", type, f.freq, gain, f.q,
+                ),
+            )
+        }
+    }
 
     /** Returns null when the text holds no recognisable filters. */
     fun parse(text: String): ParsedEq? {

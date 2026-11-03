@@ -202,6 +202,10 @@ object Help {
         "Import EQ file",
         "Adds a preset from an AutoEq or Equalizer APO file, either ParametricEQ or GraphicEQ. A GraphicEQ file keeps every point, with no rounding to faders.",
     )
+    val exportParametric = Tip(
+        "Export filters file",
+        "Saves this preset's filters as a ParametricEQ text file, for AutoEq-compatible apps and Equalizer APO. It only works for presets made of filters, because faders and imported curves can't be written that way.",
+    )
     val exportFile = Tip(
         "Export EQ file",
         "Saves this preset's sound as a GraphicEQ text file, which AutoEq-compatible apps and Equalizer APO can read. Surround and settings outside the preset aren't included.",

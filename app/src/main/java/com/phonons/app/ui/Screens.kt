@@ -81,6 +81,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import com.phonons.app.data.NightSchedule
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material3.FilledTonalIconButton
+import com.phonons.app.data.ClipRisk
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.graphics.Brush
@@ -319,12 +322,51 @@ private fun statusLine(state: AppState, status: EngineStatus): String {
     }
 }
 
+/** Redo is the undo arrow mirrored. Without labels they fit beside other buttons. */
+@Composable
+private fun UndoRedoButtons(labels: Boolean) {
+    val canUndo by Repo.canUndo.collectAsStateWithLifecycle()
+    val canRedo by Repo.canRedo.collectAsStateWithLifecycle()
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (labels) {
+            FilledTonalButton(enabled = canUndo, onClick = Repo::undo) {
+                Icon(painterResource(R.drawable.ic_undo), contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(8.dp))
+                Text("Undo")
+            }
+            FilledTonalButton(enabled = canRedo, onClick = Repo::redo) {
+                Icon(
+                    painterResource(R.drawable.ic_undo),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(18.dp)
+                        .graphicsLayer(scaleX = -1f),
+                )
+                Spacer(Modifier.size(8.dp))
+                Text("Redo")
+            }
+        } else {
+            FilledTonalIconButton(enabled = canUndo, onClick = Repo::undo) {
+                Icon(painterResource(R.drawable.ic_undo), contentDescription = "Undo", modifier = Modifier.size(18.dp))
+            }
+            FilledTonalIconButton(enabled = canRedo, onClick = Repo::redo) {
+                Icon(
+                    painterResource(R.drawable.ic_undo),
+                    contentDescription = "Redo",
+                    modifier = Modifier
+                        .size(18.dp)
+                        .graphicsLayer(scaleX = -1f),
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun EqTab(state: AppState) {
     val filters = state.current.filters
     var selectedId by rememberSaveable { mutableStateOf<Int?>(filters.firstOrNull()?.id) }
     var graphicMode by rememberSaveable { mutableStateOf(true) }
-    val canUndo by Repo.canUndo.collectAsStateWithLifecycle()
     val openFinder = LocalOpenFinder.current
     val selected = filters.firstOrNull { it.id == selectedId }
     val attenuation by Repo.attenuationDb.collectAsStateWithLifecycle()
@@ -332,6 +374,11 @@ private fun EqTab(state: AppState) {
     val graphOutput by Repo.output.collectAsStateWithLifecycle()
     val earCurves = remember(curveFilters, state.earCorrections, graphOutput.key, state.useSystemSurround, state.bypass) {
         if (state.bypass) null else Processing.channelFilters(state, graphOutput.key, curveFilters)
+    }
+    val savedPreset = Repo.allPresets(state).firstOrNull { it.id == state.current.id }
+    val savedCurve = remember(savedPreset, state.current, state.loudness, state.loudnessStrength, attenuation, state.bypass) {
+        savedPreset?.takeIf { it != state.current && !state.bypass }
+            ?.let { Processing.effectiveFilters(state.copy(current = it), attenuation) }
     }
     val spectrumState = Repo.spectrum.collectAsStateWithLifecycle()
 
@@ -371,6 +418,7 @@ private fun EqTab(state: AppState) {
             heightDp = if (graphicMode) 170 else 260,
             curveFilters = earCurves?.first ?: curveFilters,
             rightCurveFilters = earCurves?.second,
+            ghostFilters = savedCurve,
             spectrum = { spectrumState.value },
             selectedId = selectedId,
             dimmed = !state.enabled || state.bypass,
@@ -404,11 +452,7 @@ private fun EqTab(state: AppState) {
 
     if (graphicMode) {
         GraphicEqConsole(state.current.tone, onBrowseShapes = LocalOpenShapes.current)
-        FilledTonalButton(enabled = canUndo, onClick = Repo::undo) {
-            Icon(painterResource(R.drawable.ic_undo), contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.size(8.dp))
-            Text("Undo")
-        }
+        UndoRedoButtons(labels = true)
         SettingsSection("Display") { AnalyserSetting(state) }
         return
     }
@@ -432,11 +476,7 @@ private fun EqTab(state: AppState) {
             Spacer(Modifier.size(8.dp))
             Text("Add filter")
         }
-        FilledTonalButton(enabled = canUndo, onClick = Repo::undo) {
-            Icon(painterResource(R.drawable.ic_undo), contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.size(8.dp))
-            Text("Undo")
-        }
+        UndoRedoButtons(labels = false)
     }
 
     if (selected == null) {
@@ -930,6 +970,28 @@ private fun TimeSetting(title: String, tip: Tip, minute: Int, onChange: (Int) ->
     }
 }
 
+/** Says when these settings could push peaks over, which they can't do while automatic headroom has room. */
+@Composable
+private fun ClipWarning(state: AppState, attenuation: Double) {
+    val output by Repo.output.collectAsStateWithLifecycle()
+    val scheduledNight by Repo.scheduledNight.collectAsStateWithLifecycle()
+    val estimate = remember(state, attenuation, output.key, scheduledNight) {
+        Processing.peakEstimate(state, attenuation, output.key, scheduledNight)
+    }
+    if (estimate.risk == ClipRisk.NONE) return
+    val peak = formatDb(estimate.peakDb)
+    Text(
+        if (estimate.risk == ClipRisk.CLIPPING) {
+            "Loud music could reach $peak, which can distort. Turn on the limiter, or lower the preamp or compressor makeup."
+        } else {
+            "Loud music could reach $peak. The limiter is holding it back, which can flatten peaks. Lowering the preamp or compressor makeup avoids that."
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = if (estimate.risk == ClipRisk.CLIPPING) Palette.Danger else Palette.TextDim,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
+    )
+}
+
 @Composable
 private fun LevelSection(state: AppState, attenuation: Double) {
     val effective = Processing.effectiveFilters(state, attenuation)
@@ -954,6 +1016,7 @@ private fun LevelSection(state: AppState, attenuation: Double) {
             detail = "Level going into the EQ: ${formatDb(input)}",
         ) { on -> Repo.update { it.copy(autoHeadroom = on) } }
         RowDivider()
+        ClipWarning(state, attenuation)
         SwitchSetting("Limiter", Help.limiter, state.limiter) { on -> Repo.update { it.copy(limiter = on) } }
         if (state.limiter) {
             SliderSetting(
@@ -1241,6 +1304,20 @@ private fun ManageSection(state: AppState) {
             notify(snackbar, if (written.isSuccess) "EQ file saved." else "Could not save the file: ${written.exceptionOrNull()?.message}")
         }
     }
+    val parametricExporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain"),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val preset = Repo.state.value.current
+        val filters = Processing.exportFilters(preset) ?: return@rememberLauncherForActivityResult
+        val text = AutoEqParser.format(Processing.preampOf(preset), filters)
+        scope.launch {
+            val written = withContext(Dispatchers.IO) {
+                runCatching { context.contentResolver.openOutputStream(uri)!!.use { it.write(text.encodeToByteArray()) } }
+            }
+            notify(snackbar, if (written.isSuccess) "EQ file saved." else "Could not save the file: ${written.exceptionOrNull()?.message}")
+        }
+    }
     val restorer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
@@ -1283,6 +1360,14 @@ private fun ManageSection(state: AppState) {
         }
         RowDivider()
         ActionRow("Export EQ file", Help.exportFile) { eqExporter.launch("${state.current.name} GraphicEQ.txt") }
+        RowDivider()
+        val canExportFilters = remember(state.current) { Processing.exportFilters(state.current) != null }
+        ActionRow(
+            "Export filters file",
+            Help.exportParametric,
+            detail = if (canExportFilters) null else "This preset uses faders or a curve, so use Export EQ file instead.",
+            enabled = canExportFilters,
+        ) { parametricExporter.launch("${state.current.name} ParametricEQ.txt") }
         RowDivider()
         ActionRow("Back up presets", Help.backup) { exporter.launch("eigentone-backup.json") }
         RowDivider()

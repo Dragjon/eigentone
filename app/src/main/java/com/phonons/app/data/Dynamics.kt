@@ -103,13 +103,15 @@ object Dynamics {
      */
     fun gainDb(compressor: Compressor, hz: Double, levelDb: Double): Double {
         if (!compressor.enabled) return 0.0
-        val band = when {
-            hz <= compressor.lowCrossoverHz -> compressor.low
-            hz <= compressor.highCrossoverHz -> compressor.mid
-            else -> compressor.high
-        }
+        val band = bandAt(compressor, hz)
         val input = TYPICAL_LEVEL_DB + levelDb
         return band.outputDb(input) - input
+    }
+
+    fun bandAt(compressor: Compressor, hz: Double): CompressorBand = when {
+        hz <= compressor.lowCrossoverHz -> compressor.low
+        hz <= compressor.highCrossoverHz -> compressor.mid
+        else -> compressor.high
     }
 
     class Step(val compressor: Compressor, val done: Boolean)

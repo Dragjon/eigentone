@@ -18,6 +18,7 @@ A free system-wide equaliser for Android 14 and newer. No ads, no account, and n
 - **Presets** that load automatically per output, per earbud noise mode and per app.
 - **Multiband compressor**, free and fully adjustable and saved per preset, with three bands, adjustable crossovers, a live response curve and starting styles.
 - **Volume leveller**, night mode with a schedule, loudness compensation, limiter, balance, stereo width and virtual surround.
+- **Undo and redo**, a saved-curve overlay while editing and a warning when settings could clip.
 - **Share codes**, backups, a Quick Settings tile and a home-screen widget.
 
 ## Privacy
@@ -38,7 +39,7 @@ Crash reports stay on the phone. You choose whether to share one from the System
 Copy the latest `Eigentone-<version>.apk` to the phone and open it, or use USB debugging:
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.17.3.apk
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.18.0.apk
 ```
 
 ## Build

@@ -250,9 +250,15 @@ class AudioService : Service() {
     }
 
     private fun createChannel() {
-        val channel = NotificationChannel(CHANNEL_ID, "Equaliser running", NotificationManager.IMPORTANCE_LOW)
+        // Low importance files it under silent notifications at the bottom. This ranks it with ordinary
+        // ones, and it still makes no sound. A channel's importance can't be raised later, hence a new one.
+        val channel = NotificationChannel(CHANNEL_ID, "Equaliser running", NotificationManager.IMPORTANCE_DEFAULT)
         channel.setShowBadge(false)
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        channel.setSound(null, null)
+        channel.enableVibration(false)
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.deleteNotificationChannel(OLD_CHANNEL_ID)
+        manager.createNotificationChannel(channel)
     }
 
     private fun startInForeground(state: AppState) {
@@ -280,6 +286,8 @@ class AudioService : Service() {
             .setContentIntent(open)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .setCategory(Notification.CATEGORY_SERVICE)
+            .setColor(NOTIFICATION_COLOUR)
             .addAction(Notification.Action.Builder(null, "Next preset", servicePending(ACTION_NEXT_PRESET, 3)).build())
             .addAction(Notification.Action.Builder(null, bypassLabel, servicePending(ACTION_TOGGLE_BYPASS, 1)).build())
             .addAction(Notification.Action.Builder(null, "Turn off", servicePending(ACTION_TURN_OFF, 2)).build())
@@ -293,8 +301,10 @@ class AudioService : Service() {
     )
 
     companion object {
-        private const val CHANNEL_ID = "engine"
+        private const val CHANNEL_ID = "engine_status"
+        private const val OLD_CHANNEL_ID = "engine"
         private const val NOTIFICATION_ID = 1
+        private const val NOTIFICATION_COLOUR = 0xFFFFB454.toInt()
         private const val APPLY_INTERVAL_MS = 30L
         private const val WATCHDOG_INTERVAL_MS = 10_000L
         private const val VOLUME_POLL_MS = 1_000L

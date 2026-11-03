@@ -54,6 +54,10 @@ object Repo {
     val canUndo: StateFlow<Boolean> = _canUndo.asStateFlow()
 
     private val undoStack = ArrayDeque<Preset>()
+    private val redoStack = ArrayDeque<Preset>()
+
+    private val _canRedo = MutableStateFlow(false)
+    val canRedo: StateFlow<Boolean> = _canRedo.asStateFlow()
     private var committed: Preset = BuiltIns.flat
     private var file: AtomicFile? = null
 
@@ -113,15 +117,32 @@ object Repo {
         if (undoStack.size > MAX_UNDO) undoStack.removeFirst()
         committed = now
         _canUndo.value = true
+        // A new change starts a new history, so what was undone can no longer be brought back.
+        redoStack.clear()
+        _canRedo.value = false
     }
 
     @Synchronized
     fun undo() {
         commit()
         val previous = undoStack.removeLastOrNull() ?: return
+        redoStack.addLast(committed)
         committed = previous
         _state.update { it.copy(current = previous) }
         _canUndo.value = undoStack.isNotEmpty()
+        _canRedo.value = true
+    }
+
+    @Synchronized
+    fun redo() {
+        // Anything edited since the undo starts a new history, which clears what could be redone.
+        commit()
+        val next = redoStack.removeLastOrNull() ?: return
+        undoStack.addLast(committed)
+        committed = next
+        _state.update { it.copy(current = next) }
+        _canUndo.value = true
+        _canRedo.value = redoStack.isNotEmpty()
     }
 
     fun loadPreset(preset: Preset) {

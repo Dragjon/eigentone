@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.phonons.app.R
 import com.phonons.app.data.AppState
+import com.phonons.app.data.ClipRisk
 import com.phonons.app.data.OutputInfo
 import com.phonons.app.data.Processing
 import com.phonons.app.data.Repo
@@ -63,6 +64,10 @@ fun LiveStrip(state: AppState) {
     val scheduledNight by Repo.scheduledNight.collectAsStateWithLifecycle()
     val effects = remember(state, output.key, scheduledNight) { Processing.activeEffects(state, output.key, scheduledNight) }
     val working = state.enabled && !state.bypass
+    val attenuationNow by Repo.attenuationDb.collectAsStateWithLifecycle()
+    val clipping = remember(state, attenuationNow, output.key, scheduledNight) {
+        state.enabled && Processing.peakEstimate(state, attenuationNow, output.key, scheduledNight).risk == ClipRisk.CLIPPING
+    }
 
     Row(
         Modifier
@@ -85,6 +90,7 @@ fun LiveStrip(state: AppState) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+        if (clipping) EffectPill("Clip", Palette.Danger)
         effects.forEach { EffectPill(it) }
         PlayingDot()
         MiniCurve(state, output.key, working)
@@ -92,12 +98,12 @@ fun LiveStrip(state: AppState) {
 }
 
 @Composable
-private fun EffectPill(name: String) {
+private fun EffectPill(name: String, colour: androidx.compose.ui.graphics.Color = Palette.Text) {
     Text(
         name,
         fontSize = 11.sp,
         lineHeight = 14.sp,
-        color = Palette.Text,
+        color = colour,
         maxLines = 1,
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))

@@ -8,6 +8,19 @@ import kotlin.math.log10
 import kotlin.math.min
 import kotlin.math.pow
 
+/** What full-scale music could do with these settings. */
+enum class ClipRisk {
+    NONE,
+
+    /** Peaks go over, and the limiter holds them back, which can flatten them slightly. */
+    HELD,
+
+    /** Peaks go over with nothing to stop them, so they can distort. */
+    CLIPPING,
+}
+
+data class PeakEstimate(val peakDb: Double, val risk: ClipRisk)
+
 /** What the audio effect should do right now. */
 data class ProcessingTarget(
     val filters: List<Filter>,
@@ -142,6 +155,35 @@ object Processing {
         }
     }
 
+    /**
+     * The highest level these settings could reach with music at full scale. It's worked out from the
+     * settings, because Android doesn't report levels from inside the effect, so it's a worst case
+     * rather than a measurement of what's playing.
+     */
+    fun peakEstimate(state: AppState, attenuationDb: Double, outputKey: String, scheduledNight: Boolean): PeakEstimate {
+        val target = target(state, attenuationDb, scheduledNight, outputKey)
+        if (state.bypass || !target.effectEnabled) return PeakEstimate(Double.NEGATIVE_INFINITY, ClipRisk.NONE)
+        var peak = Double.NEGATIVE_INFINITY
+        for (filters in listOf(target.filters, target.rightFilters)) {
+            for (i in 0..PEAK_STEPS) {
+                val hz = Eq.logFreq(i.toDouble() / PEAK_STEPS)
+                val level = Eq.curveDb(filters, hz) + target.inputDb
+                val out = if (target.dynamics.enabled) Dynamics.bandAt(target.dynamics, hz).outputDb(level) else level
+                peak = maxOf(peak, out)
+            }
+        }
+        val risk = when {
+            peak <= OVER_MARGIN_DB -> ClipRisk.NONE
+            target.limiter -> ClipRisk.HELD
+            else -> ClipRisk.CLIPPING
+        }
+        return PeakEstimate(peak, risk)
+    }
+
+    /** The preset as ordinary filters, or null if it uses faders or a curve, which filters can't express. */
+    fun exportFilters(preset: Preset): List<Filter>? =
+        presetFilters(preset).takeIf { list -> list.isNotEmpty() && list.none { it.type == FilterType.CURVE } }
+
     /** Each ear's filters: the same sound, plus that ear's own correction. */
     fun earCurves(filters: List<Filter>, ears: EarCorrection): Pair<List<Filter>, List<Filter>> =
         (filters + curveFilter(EAR_CURVE_ID, ears.left)) to (filters + curveFilter(EAR_CURVE_ID, ears.right))
@@ -217,6 +259,8 @@ object Processing {
 
     private const val LOUDNESS_STEPS = 120
     private const val EXPORT_POINTS = 127
+    private const val PEAK_STEPS = 240
+    private const val OVER_MARGIN_DB = 0.5
     private const val IMPORTED_CURVE_ID = -101
     private const val EAR_CURVE_ID = -102
     private const val WIDTH_CURVE_ID = -103

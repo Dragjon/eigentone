@@ -144,6 +144,95 @@ class NewFeaturesTest {
         assertEquals(1.0, decoded.tone.correction, 0.0)
     }
 
+    private val boosted = Preset("user:b", "Boost", tone = Tone(bassDb = 6.0))
+
+    @Test
+    fun peaksAreFlaggedOnlyWhenTheyCanGoOver() {
+        val noRoom = AppState(current = boosted, autoHeadroom = false, limiter = false)
+        val clipping = Processing.peakEstimate(noRoom, 0.0, BUDS, false)
+        assertEquals(ClipRisk.CLIPPING, clipping.risk)
+        assertTrue(clipping.peakDb > 4.0)
+
+        assertEquals(ClipRisk.HELD, Processing.peakEstimate(noRoom.copy(limiter = true), 0.0, BUDS, false).risk)
+        assertEquals(ClipRisk.NONE, Processing.peakEstimate(noRoom.copy(autoHeadroom = true), 0.0, BUDS, false).risk)
+        assertEquals(ClipRisk.NONE, Processing.peakEstimate(noRoom.copy(bypass = true), 0.0, BUDS, false).risk)
+    }
+
+    @Test
+    fun compressorMakeupCanGoOverDespiteAutomaticHeadroom() {
+        val makeup = CompressorBand(ratio = 1.0, makeupDb = 6.0)
+        val preset = Preset("user:m", "M", tone = Tone(compressor = Compressor(enabled = true, low = makeup, mid = makeup, high = makeup)))
+        val estimate = Processing.peakEstimate(AppState(current = preset, autoHeadroom = true, limiter = false), 0.0, BUDS, false)
+        assertEquals(ClipRisk.CLIPPING, estimate.risk)
+        assertEquals(6.0, estimate.peakDb, 0.1)
+    }
+
+    @Test
+    fun compressionThatLowersPeaksIsAllowedFor() {
+        val hard = CompressorBand(thresholdDb = -30.0, ratio = 8.0, makeupDb = 3.0)
+        val preset = boosted.copy(tone = boosted.tone.copy(compressor = Compressor(enabled = true, low = hard, mid = hard, high = hard)))
+        val estimate = Processing.peakEstimate(AppState(current = preset, autoHeadroom = false, limiter = false), 0.0, BUDS, false)
+        assertEquals(ClipRisk.NONE, estimate.risk)
+    }
+
+    @Test
+    fun peaksAreCheckedInBothEars() {
+        val loudRight = EarCorrection(left = listOf(ShapePoint(1000.0, 0.0)), right = listOf(ShapePoint(1000.0, 6.0)))
+        val state = AppState(earCorrections = mapOf(BUDS to loudRight), autoHeadroom = false, limiter = false)
+        assertEquals(ClipRisk.CLIPPING, Processing.peakEstimate(state, 0.0, BUDS, false).risk)
+    }
+
+    @Test
+    fun filtersExportAndReadBackTheSame() {
+        val filters = listOf(
+            com.phonons.app.dsp.Filter(1, com.phonons.app.dsp.FilterType.BELL, 1000.0, -3.5, 1.41),
+            com.phonons.app.dsp.Filter(2, com.phonons.app.dsp.FilterType.LOW_SHELF, 105.0, 4.0, 0.7),
+            com.phonons.app.dsp.Filter(3, com.phonons.app.dsp.FilterType.HIGH_SHELF, 9000.0, -2.0, 0.7, enabled = false),
+            com.phonons.app.dsp.Filter(4, com.phonons.app.dsp.FilterType.HIGH_PASS, 30.0, 0.0, 0.71),
+        )
+        val text = com.phonons.app.dsp.AutoEqParser.format(-4.5, filters)
+        val parsed = com.phonons.app.dsp.AutoEqParser.parse(text)!!
+        assertEquals(-4.5, parsed.preampDb, 0.0)
+        assertEquals(filters.map { it.type }, parsed.filters.map { it.type })
+        assertEquals(filters.map { it.enabled }, parsed.filters.map { it.enabled })
+        for ((a, b) in filters.zip(parsed.filters)) {
+            assertEquals(a.freq, b.freq, 0.01)
+            assertEquals(a.gainDb, b.gainDb, 0.01)
+            assertEquals(a.q, b.q, 0.001)
+        }
+    }
+
+    @Test
+    fun onlyPresetsMadeOfFiltersCanExportThem() {
+        assertNull(Processing.exportFilters(Preset("user:g", "G", tone = Tone(graphicDb = List(10) { 2.0 }, graphicBands = 10))))
+        assertNull(Processing.exportFilters(Preset("user:c", "C", tone = Tone(importedCurve = listOf(ShapePoint(100.0, 2.0))))))
+        assertNotNull(Processing.exportFilters(libertyBass.copy(tone = Tone())))
+    }
+
+    @Test
+    fun undoAndRedoWalkThroughHistory() {
+        val a = Preset("user:ha", "A")
+        val b = Preset("user:hb", "B")
+        val c = Preset("user:hc", "C")
+        Repo.loadPreset(a)
+        Repo.loadPreset(b)
+        Repo.undo()
+        assertEquals(a, Repo.state.value.current)
+        assertTrue(Repo.canRedo.value)
+        Repo.redo()
+        assertEquals(b, Repo.state.value.current)
+        assertFalse(Repo.canRedo.value)
+
+        // A new change after undoing means the undone step can't come back.
+        Repo.undo()
+        Repo.loadPreset(c)
+        assertFalse(Repo.canRedo.value)
+        Repo.redo()
+        assertEquals(c, Repo.state.value.current)
+        Repo.undo()
+        assertEquals(a, Repo.state.value.current)
+    }
+
     @Test
     fun theTopStripListsWhatsActuallyRunning() {
         val comp = Dynamics.styles.first().compressor
