@@ -89,6 +89,84 @@ object Dynamics {
 
     private const val ACTIVE = 0.001
 
+    /** A typical level for music in a band, used to estimate what compression does to loudness. */
+    private const val TYPICAL_LEVEL_DB = -18.0
+
+    private const val MAX_MAKEUP_STEP_DB = 1.5
+    private const val MAX_THRESHOLD_STEP_DB = 6.0
+    private const val MAX_RATIO_STEP = 1.5
+    private const val MAX_CROSSOVER_STEP = 1.5
+
+    /**
+     * Roughly how much the compressor changes the level at this frequency, for music at a typical level.
+     * Real music varies, so this is only good enough for matching loudness, not for measuring it.
+     */
+    fun gainDb(compressor: Compressor, hz: Double, levelDb: Double): Double {
+        if (!compressor.enabled) return 0.0
+        val band = when {
+            hz <= compressor.lowCrossoverHz -> compressor.low
+            hz <= compressor.highCrossoverHz -> compressor.mid
+            else -> compressor.high
+        }
+        val input = TYPICAL_LEVEL_DB + levelDb
+        return band.outputDb(input) - input
+    }
+
+    class Step(val compressor: Compressor, val done: Boolean)
+
+    /**
+     * The next settings to send when moving to [target], so a change is a quick fade rather than a jump
+     * in level. Works from what was last sent, so a new target simply continues from where the sound is.
+     * Timing settings change at once, because they make no sound by themselves.
+     */
+    fun next(sent: Compressor?, target: Compressor, instant: Boolean = false): Step {
+        if (instant || sent == null || sent == target) return Step(target, done = true)
+
+        // A band that's off behaves like one that changes nothing, which gives it something to fade from.
+        fun active(compressor: Compressor, band: CompressorBand) = compressor.enabled && band.enabled
+        val pairs = sent.bands.zip(target.bands)
+        fun ratioOf(compressor: Compressor, band: CompressorBand) = if (active(compressor, band)) band.ratio else 1.0
+        fun makeupOf(compressor: Compressor, band: CompressorBand) = if (active(compressor, band)) band.makeupDb else 0.0
+
+        var steps = 1.0
+        fun need(value: Double) {
+            steps = maxOf(steps, kotlin.math.ceil(value))
+        }
+        fun logSteps(from: Double, to: Double, limit: Double) = kotlin.math.abs(kotlin.math.ln(to / from)) / kotlin.math.ln(limit)
+        for ((a, b) in pairs) {
+            need(kotlin.math.abs(makeupOf(target, b) - makeupOf(sent, a)) / MAX_MAKEUP_STEP_DB)
+            need(logSteps(ratioOf(sent, a), ratioOf(target, b), MAX_RATIO_STEP))
+            if (active(sent, a) && active(target, b)) need(kotlin.math.abs(b.thresholdDb - a.thresholdDb) / MAX_THRESHOLD_STEP_DB)
+        }
+        need(logSteps(sent.lowCrossoverHz, target.lowCrossoverHz, MAX_CROSSOVER_STEP))
+        need(logSteps(sent.highCrossoverHz, target.highCrossoverHz, MAX_CROSSOVER_STEP))
+        if (steps <= 1.0) return Step(target, done = true)
+
+        fun move(from: Double, to: Double) = from + (to - from) / steps
+        fun moveLog(from: Double, to: Double) = from * Math.pow(to / from, 1 / steps)
+        val moved = pairs.map { (a, b) ->
+            val on = active(target, b)
+            val shape = if (on) b else a
+            shape.copy(
+                enabled = true,
+                ratio = moveLog(ratioOf(sent, a), ratioOf(target, b)),
+                makeupDb = move(makeupOf(sent, a), makeupOf(target, b)),
+                thresholdDb = if (on && active(sent, a)) move(a.thresholdDb, b.thresholdDb) else shape.thresholdDb,
+            )
+        }
+        return Step(
+            Compressor(
+                enabled = true,
+                lowCrossoverHz = moveLog(sent.lowCrossoverHz, target.lowCrossoverHz),
+                highCrossoverHz = moveLog(sent.highCrossoverHz, target.highCrossoverHz),
+                low = moved[0],
+                mid = moved[1],
+                high = moved[2],
+            ),
+            done = false,
+        )
+    }
+
     /**
      * What the phone's single compressor should do. Night mode wins, because it protects against
      * sudden loud moments, then the manual compressor, then the leveller.

@@ -101,6 +101,17 @@ data class NightSchedule(
         startMinute < endMinute -> minuteOfDay in startMinute until endMinute
         else -> minuteOfDay >= startMinute || minuteOfDay < endMinute
     }
+
+    companion object {
+        /** Shows minutes after midnight as a time, such as 22:00 or 10:00 PM. */
+        fun formatTime(minuteOfDay: Int, is24Hour: Boolean): String {
+            val hour = minuteOfDay / 60
+            val minute = (minuteOfDay % 60).toString().padStart(2, '0')
+            if (is24Hour) return "${hour.toString().padStart(2, '0')}:$minute"
+            val hour12 = if (hour % 12 == 0) 12 else hour % 12
+            return "$hour12:$minute ${if (hour < 12) "AM" else "PM"}"
+        }
+    }
 }
 
 @Serializable

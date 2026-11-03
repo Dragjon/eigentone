@@ -5,8 +5,8 @@ import android.util.Log
 import com.phonons.app.dsp.Spectrum
 
 /**
- * Reads the output mix through Android's Visualizer. It only runs while the graph is on screen, so
- * it costs nothing in the background. Android requires the record permission for this, even though
+ * Reads the output mix through Android's Visualizer. It only runs while the app is on screen, so it
+ * costs nothing in the background. Android requires the record permission for this, even though
  * only frequency levels are read and nothing is stored.
  */
 class SpectrumAnalyser(private val onBands: (FloatArray) -> Unit) {

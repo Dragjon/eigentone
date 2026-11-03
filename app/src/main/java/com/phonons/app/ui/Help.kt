@@ -85,7 +85,7 @@ object Help {
         "Turns night mode on at the times you choose. It only works while Eigentone is running, and it won't lower a stronger setting you've chosen above.",
     )
     val nightScheduleAmount = Tip("Scheduled strength", "How strong night mode is during the scheduled hours.")
-    val nightScheduleStart = Tip("Starts at", "The time night mode turns on. Move this in half-hour steps.")
+    val nightScheduleStart = Tip("Starts at", "The time night mode turns on.")
     val nightScheduleEnd = Tip("Ends at", "The time night mode turns off. It can be after midnight.")
     val share = Tip("Share this sound", "Creates a text code holding this whole sound, which you can send to someone. It contains EQ settings only, and nothing about you.")
     val addShared = Tip("Add a shared sound", "Paste a code someone shared with you. It's added as a new preset, and your others are kept.")

@@ -145,6 +145,59 @@ class NewFeaturesTest {
     }
 
     @Test
+    fun theTopStripListsWhatsActuallyRunning() {
+        val comp = Dynamics.styles.first().compressor
+        val full = AppState(
+            enabled = true,
+            current = Preset("user:a", "A", tone = Tone(surround = 0.3, compressor = comp)),
+            earCorrections = mapOf(BUDS to ears),
+        )
+        assertEquals(listOf("Comp", "Width", "Ears"), Processing.activeEffects(full, BUDS))
+        assertEquals(listOf("Comp", "Surround", "Ears"), Processing.activeEffects(full.copy(useSystemSurround = true), BUDS))
+        // Ear correction belongs to its own headphones.
+        assertEquals(listOf("Comp", "Width"), Processing.activeEffects(full, "Bluetooth:Other"))
+        assertEquals(listOf("Comp", "Width"), Processing.activeEffects(full.copy(earCorrections = mapOf(BUDS to ears.copy(enabled = false))), BUDS))
+    }
+
+    @Test
+    fun theTopStripOnlyShowsTheCompressorEffectThatWon() {
+        val comp = Dynamics.styles.first().compressor
+        val state = AppState(enabled = true, current = Preset("user:a", "A", tone = Tone(compressor = comp)), leveller = 0.5)
+        assertEquals(listOf("Comp"), Processing.activeEffects(state, BUDS))
+        assertEquals(listOf("Night"), Processing.activeEffects(state, BUDS, scheduledNight = true))
+        assertEquals(listOf("Night"), Processing.activeEffects(state.copy(nightMode = 0.4), BUDS))
+        assertEquals(listOf("Level"), Processing.activeEffects(state.copy(current = quiet), BUDS))
+    }
+
+    @Test
+    fun theTopStripIsEmptyWhenNothingIsChangingTheSound() {
+        val state = AppState(enabled = true, nightMode = 0.5, current = Preset("user:a", "A", tone = Tone(surround = 0.3)))
+        assertTrue(Processing.activeEffects(state.copy(enabled = false), BUDS).isEmpty())
+        assertTrue(Processing.activeEffects(state.copy(bypass = true), BUDS).isEmpty())
+        assertTrue(Processing.activeEffects(AppState(enabled = true), BUDS).isEmpty())
+    }
+
+    @Test
+    fun scheduleTimesReadLikeAClock() {
+        assertEquals("22:00", NightSchedule.formatTime(22 * 60, is24Hour = true))
+        assertEquals("07:05", NightSchedule.formatTime(7 * 60 + 5, is24Hour = true))
+        assertEquals("00:00", NightSchedule.formatTime(0, is24Hour = true))
+        assertEquals("10:00 PM", NightSchedule.formatTime(22 * 60, is24Hour = false))
+        assertEquals("7:05 AM", NightSchedule.formatTime(7 * 60 + 5, is24Hour = false))
+        assertEquals("12:00 AM", NightSchedule.formatTime(0, is24Hour = false))
+        assertEquals("12:30 PM", NightSchedule.formatTime(12 * 60 + 30, is24Hour = false))
+    }
+
+    @Test
+    fun anyMinuteWorksInTheSchedule() {
+        val schedule = NightSchedule(enabled = true, startMinute = 22 * 60 + 17, endMinute = 6 * 60 + 43)
+        assertFalse(schedule.isActive(22 * 60 + 16))
+        assertTrue(schedule.isActive(22 * 60 + 17))
+        assertTrue(schedule.isActive(6 * 60 + 42))
+        assertFalse(schedule.isActive(6 * 60 + 43))
+    }
+
+    @Test
     fun nightScheduleHandlesMidnight() {
         val overnight = NightSchedule(enabled = true, startMinute = 22 * 60, endMinute = 7 * 60)
         assertTrue(overnight.isActive(23 * 60))
@@ -622,6 +675,131 @@ class NewFeaturesTest {
     fun widthIsTheDefaultAndResetReturnsToIt() {
         assertFalse(AppState().useSystemSurround)
         assertFalse(AppState(useSystemSurround = true).resetSound().useSystemSurround)
+    }
+
+    private val punchyBand = CompressorBand(thresholdDb = -24.0, ratio = 3.0, makeupDb = 6.0)
+    private val loudCompressor = Compressor(enabled = true, low = punchyBand, mid = punchyBand, high = punchyBand)
+
+    private fun fullLoudness(preset: Preset): Double {
+        val filters = Processing.presetFilters(preset)
+        return Processing.estimatedLoudnessDb(filters, Processing.inputOf(preset, filters, true), preset.tone.compressor)
+    }
+
+    @Test
+    fun makeupRaisesAndCompressionLowersTheEstimate() {
+        val plain = Preset("user:p", "Plain")
+        val base = fullLoudness(plain)
+        val makeupOnly = CompressorBand(ratio = 1.0, makeupDb = 6.0)
+        assertEquals(
+            base + 6.0,
+            fullLoudness(plain.copy(tone = Tone(compressor = Compressor(enabled = true, low = makeupOnly, mid = makeupOnly, high = makeupOnly)))),
+            0.01,
+        )
+        val hard = CompressorBand(thresholdDb = -40.0, ratio = 8.0, makeupDb = 0.0)
+        assertTrue(fullLoudness(plain.copy(tone = Tone(compressor = Compressor(enabled = true, low = hard, mid = hard, high = hard)))) < base)
+    }
+
+    @Test
+    fun anOffCompressorDoesntAffectTheEstimate() {
+        val plain = Preset("user:p", "Plain", tone = Tone(bassDb = 3.0))
+        assertEquals(fullLoudness(plain), fullLoudness(plain.copy(tone = plain.tone.copy(compressor = loudCompressor.copy(enabled = false)))), 0.0)
+    }
+
+    @Test
+    fun aCompressedPresetIsMatchedInAComparison() {
+        val compressedSound = Preset("user:c", "C", tone = Tone(compressor = loudCompressor))
+        for ((a, b) in listOf(quiet to compressedSound, compressedSound to quiet)) {
+            val comparison = AbComparison(a, b)
+            assertEquals(fullLoudness(comparison.soundFor(0, true)), fullLoudness(comparison.soundFor(1, true)), 0.05)
+        }
+        // What's kept is still the saved sound, with no temporary level.
+        assertEquals(0.0, AbComparison(quiet, compressedSound).presetFor(1).tone.trimDb, 0.0)
+    }
+
+    @Test
+    fun bypassMatchesACompressorThatLowersTheLevel() {
+        val hard = CompressorBand(thresholdDb = -40.0, ratio = 8.0, makeupDb = 0.0)
+        val preset = Preset("user:h", "H", tone = Tone(compressor = Compressor(enabled = true, low = hard, mid = hard, high = hard)))
+        val bypassed = Processing.target(AppState(current = preset, bypass = true, matchBypass = true), 0.0)
+        assertTrue(bypassed.inputDb < -3.0)
+        assertFalse(bypassed.dynamics.enabled)
+    }
+
+    private fun fadeSteps(from: Compressor?, to: Compressor): List<Dynamics.Step> {
+        val steps = mutableListOf<Dynamics.Step>()
+        var sent = from
+        do {
+            val step = Dynamics.next(sent, to)
+            steps += step
+            sent = step.compressor
+            assertTrue("A fade must finish", steps.size < 100)
+        } while (!step.done)
+        return steps
+    }
+
+    @Test
+    fun theCompressorFadesInWithoutALevelJump() {
+        val steps = fadeSteps(Compressor(), loudCompressor)
+        assertTrue(steps.size > 2)
+        assertEquals(loudCompressor, steps.last().compressor)
+        var makeup = 0.0
+        for (step in steps) {
+            assertTrue(step.compressor.enabled)
+            assertTrue(step.compressor.low.makeupDb - makeup <= 1.5001)
+            makeup = step.compressor.low.makeupDb
+        }
+        // The first step barely compresses at all.
+        assertTrue(steps.first().compressor.low.ratio < 1.6)
+    }
+
+    @Test
+    fun theCompressorFadesOutThenSwitchesOff() {
+        val steps = fadeSteps(loudCompressor, Compressor())
+        assertEquals(Compressor(), steps.last().compressor)
+        assertTrue(steps.dropLast(1).all { it.compressor.enabled })
+        assertTrue(steps.dropLast(1).last().compressor.low.makeupDb <= 1.5001)
+    }
+
+    @Test
+    fun aBandSwitchedOffFadesWhileTheOthersStay() {
+        val target = loudCompressor.copy(mid = loudCompressor.mid.copy(enabled = false))
+        val steps = fadeSteps(loudCompressor, target)
+        assertTrue(steps.size > 1)
+        assertEquals(punchyBand.makeupDb, steps.first().compressor.low.makeupDb, 0.0001)
+        assertTrue(steps.first().compressor.mid.makeupDb < punchyBand.makeupDb)
+        assertEquals(target, steps.last().compressor)
+    }
+
+    @Test
+    fun smallCompressorChangesGoStraightThrough() {
+        val target = loudCompressor.copy(low = punchyBand.copy(thresholdDb = -22.0))
+        val step = Dynamics.next(loudCompressor, target)
+        assertTrue(step.done)
+        assertEquals(target, step.compressor)
+    }
+
+    @Test
+    fun comparisonsAndAFreshStartSkipTheFade() {
+        assertTrue(Dynamics.next(Compressor(), loudCompressor, instant = true).done)
+        assertEquals(loudCompressor, Dynamics.next(null, loudCompressor).compressor)
+        assertTrue(Dynamics.next(loudCompressor, loudCompressor).done)
+    }
+
+    @Test
+    fun crossoversStayInOrderThroughAFade() {
+        val target = loudCompressor.copy(lowCrossoverHz = 800.0, highCrossoverHz = 1000.0)
+        for (start in listOf(loudCompressor.copy(lowCrossoverHz = 40.0, highCrossoverHz = 12000.0), loudCompressor)) {
+            for (step in fadeSteps(start, target)) {
+                assertTrue(step.compressor.lowCrossoverHz < step.compressor.highCrossoverHz)
+            }
+        }
+    }
+
+    @Test
+    fun aNewCompressorTargetContinuesFromWhereTheSoundIs() {
+        val first = Dynamics.next(Compressor(), loudCompressor).compressor
+        val back = Dynamics.next(first, Compressor())
+        assertTrue(back.compressor.low.makeupDb <= first.low.makeupDb)
     }
 
     @Test

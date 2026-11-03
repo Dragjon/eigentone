@@ -6,6 +6,7 @@ import android.media.audiofx.Virtualizer
 import android.util.Log
 import com.phonons.app.data.AppState
 import com.phonons.app.data.Compressor
+import com.phonons.app.data.Dynamics
 import com.phonons.app.data.EngineMode
 import com.phonons.app.data.EngineStatus
 import com.phonons.app.data.GainRamp
@@ -232,11 +233,13 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
             val rightGains = if (target.rightFilters === target.filters) gains else map.gains(target.rightFilters)
             // Comparing with Bypass needs a clean switch, and the hearing check needs the EQ gone at once.
             val off = suspended || state.bypass
+            val instant = suspended || comparing || chain.lastOff != off
             val step = GainRamp.next(
                 chain.lastGains, chain.lastRightGains, chain.lastInput,
                 gains, rightGains, target.inputDb.toFloat(),
-                instant = suspended || comparing || chain.lastOff != off,
+                instant = instant,
             )
+            val dynamicsStep = Dynamics.next(chain.lastDynamics, target.dynamics, instant)
             chain.lastOff = off
 
             // Each band is a separate call, so a boost could be heard before the level comes down for it.
@@ -247,7 +250,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
             pushBands(dp, map, /* channel = */ 0, step.left, chain.lastGains)
             pushBands(dp, map, /* channel = */ 1, step.right, chain.lastRightGains)
             if (!goingDown) pushInput(chain, step.inputDb, state.balance)
-            logMove(chain, step.done)
+            logMove(chain, step.done && dynamicsStep.done)
             val tookMs = (System.nanoTime() - started) / 1_000_000
             if (comparing && tookMs >= LOG_SWITCH_MS) Log.i(TAG, "Compare switch on ${chain.label} took $tookMs ms")
 
@@ -272,9 +275,9 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
                 chain.lastLimiterThreshold = target.limiterThresholdDb
             }
 
-            if (target.dynamics != chain.lastDynamics) {
-                pushDynamics(chain, target.dynamics)
-                chain.lastDynamics = target.dynamics
+            if (dynamicsStep.compressor != chain.lastDynamics) {
+                pushDynamics(chain, dynamicsStep.compressor, dynamicsStep.done)
+                chain.lastDynamics = dynamicsStep.compressor
             }
 
             val wanted = target.effectEnabled
@@ -374,7 +377,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         if (rejected > 0) error = "${chain.label} did not accept $rejected of $total EQ bands"
     }
 
-    private fun pushDynamics(chain: Chain, dynamics: Compressor) {
+    private fun pushDynamics(chain: Chain, dynamics: Compressor, finished: Boolean) {
         val cutoffs = floatArrayOf(dynamics.lowCrossoverHz.toFloat(), dynamics.highCrossoverHz.toFloat(), MBC_TOP_HZ)
         val mbc = DynamicsProcessing.Mbc(true, dynamics.enabled, MBC_BANDS)
         dynamics.bands.forEachIndexed { i, band ->
@@ -388,7 +391,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
             )
         }
         chain.dp.setMbcAllChannelsTo(mbc)
-        if (dynamics.enabled) logDynamics(chain)
+        if (dynamics.enabled && finished) logDynamics(chain)
     }
 
     /** Reads back what the phone kept, so a device that changes these values shows up in the log. */

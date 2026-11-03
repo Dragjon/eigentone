@@ -142,13 +142,31 @@ class SoundFinder(private val base: Tone) {
             val candidate = preset.copy(tone = tone.copy(trimDb = 0.0))
             fun loudness(p: Preset): Double {
                 val filters = Processing.presetFilters(p)
-                return Processing.estimatedLoudnessDb(filters, Processing.inputOf(p, filters, autoHeadroom))
+                return Processing.estimatedLoudnessDb(filters, Processing.inputOf(p, filters, autoHeadroom), p.tone.compressor)
             }
-            val difference = loudness(candidate) - loudness(reference)
-            return candidate.copy(tone = candidate.tone.copy(trimDb = (-difference).coerceAtMost(MAX_TRIM_UP_DB)))
+            val goal = loudness(reference)
+            val filters = Processing.presetFilters(candidate)
+            val input = Processing.inputOf(candidate, filters, autoHeadroom)
+            fun at(trim: Double) = Processing.estimatedLoudnessDb(filters, input + trim, candidate.tone.compressor)
+
+            val trim = if (candidate.tone.compressor.enabled) {
+                // A compressor makes level changes come out smaller, so the answer has to be searched for.
+                var low = MIN_TRIM_DB
+                var high = MAX_TRIM_UP_DB
+                repeat(TRIM_SEARCH_STEPS) {
+                    val middle = (low + high) / 2
+                    if (at(middle) < goal) low = middle else high = middle
+                }
+                (low + high) / 2
+            } else {
+                (goal - at(0.0)).coerceAtMost(MAX_TRIM_UP_DB)
+            }
+            return candidate.copy(tone = candidate.tone.copy(trimDb = trim))
         }
 
         /** A match usually only undoes what headroom took away, and the limiter covers anything beyond. */
         private const val MAX_TRIM_UP_DB = 12.0
+        private const val MIN_TRIM_DB = -48.0
+        private const val TRIM_SEARCH_STEPS = 14
     }
 }

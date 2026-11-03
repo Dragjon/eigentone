@@ -124,6 +124,24 @@ object Processing {
         return (left + curveFilter(WIDTH_CURVE_ID, leanLeft)) to (right + curveFilter(WIDTH_CURVE_ID, leanRight))
     }
 
+    /**
+     * Short names for what's changing the sound right now, for the top of the screen. The compressor
+     * entries follow [Dynamics.resolve], so something that's on but overridden isn't listed.
+     */
+    fun activeEffects(state: AppState, outputKey: String, scheduledNight: Boolean = false): List<String> {
+        if (!state.enabled || state.bypass) return emptyList()
+        val tone = state.current.tone
+        return buildList {
+            when {
+                state.nightMode > 0.001 || scheduledNight -> add("Night")
+                tone.compressor.enabled -> add("Comp")
+                state.leveller > 0.001 -> add("Level")
+            }
+            if (tone.surround > 0.0) add(if (state.useSystemSurround) "Surround" else "Width")
+            if (state.earsFor(outputKey)?.enabled == true) add("Ears")
+        }
+    }
+
     /** Each ear's filters: the same sound, plus that ear's own correction. */
     fun earCurves(filters: List<Filter>, ears: EarCorrection): Pair<List<Filter>, List<Filter>> =
         (filters + curveFilter(EAR_CURVE_ID, ears.left)) to (filters + curveFilter(EAR_CURVE_ID, ears.right))
@@ -136,6 +154,8 @@ object Processing {
     ): ProcessingTarget {
         val filters = effectiveFilters(state, attenuationDb)
         val input = inputOf(state.current, filters, state.autoHeadroom)
+        val night = if (scheduledNight) maxOf(state.nightMode, state.nightSchedule.amount) else state.nightMode
+        val dynamics = Dynamics.resolve(night, state.leveller, state.current.tone.compressor)
         if (!state.bypass) {
             val channels = channelFilters(state, outputKey, filters)
             val (left, right) = channels ?: (filters to filters)
@@ -145,7 +165,6 @@ object Processing {
             } else {
                 min(inputOf(state.current, left, state.autoHeadroom), inputOf(state.current, right, state.autoHeadroom))
             }
-            val night = if (scheduledNight) maxOf(state.nightMode, state.nightSchedule.amount) else state.nightMode
             return ProcessingTarget(
                 left, shared, state.limiter,
                 nightMode = night,
@@ -155,7 +174,7 @@ object Processing {
                 surround = if (state.useSystemSurround) state.current.tone.surround else 0.0,
                 leveller = state.leveller,
                 rightFilters = right,
-                dynamics = Dynamics.resolve(night, state.leveller, state.current.tone.compressor),
+                dynamics = dynamics,
             )
         }
         if (!state.matchBypass) {
@@ -165,7 +184,7 @@ object Processing {
         // Never boosted, because a flat signal already peaks at full scale.
         return ProcessingTarget(
             filters = emptyList(),
-            inputDb = min(0.0, estimatedLoudnessDb(filters, input)),
+            inputDb = min(0.0, estimatedLoudnessDb(filters, input, dynamics)),
             limiter = state.limiter,
             nightMode = 0.0,
             effectEnabled = true,
@@ -174,13 +193,14 @@ object Processing {
     }
 
     /** Approximate perceived level change, using A-weighted pink noise as a stand-in for music. */
-    fun estimatedLoudnessDb(filters: List<Filter>, inputDb: Double): Double {
+    fun estimatedLoudnessDb(filters: List<Filter>, inputDb: Double, compressor: Compressor = Compressor()): Double {
         var weighted = 0.0
         var total = 0.0
         for (i in 0..LOUDNESS_STEPS) {
             val freq = Eq.logFreq(i.toDouble() / LOUDNESS_STEPS)
             val weight = 10.0.pow(aWeightDb(freq) / 10)
-            weighted += weight * 10.0.pow((Eq.curveDb(filters, freq) + inputDb) / 10)
+            val level = Eq.curveDb(filters, freq) + inputDb
+            weighted += weight * 10.0.pow((level + Dynamics.gainDb(compressor, freq, level)) / 10)
             total += weight
         }
         return 10 * log10(weighted / total)

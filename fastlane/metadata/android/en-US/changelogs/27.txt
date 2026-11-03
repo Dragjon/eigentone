@@ -1,0 +1,1 @@
+A live strip at the top shows your output, what's playing, active effects and your curve. Night mode times are now set with a clock. Comparisons allow for the compressor, and the bars blend into the background.

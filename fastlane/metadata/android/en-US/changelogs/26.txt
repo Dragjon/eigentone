@@ -1,0 +1,1 @@
+Comparisons now allow for the compressor, so a compressed preset doesn't win just for being louder, and the compressor fades smoothly when presets change. The top and bottom bars now blend into the background.

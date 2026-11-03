@@ -77,7 +77,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
+import com.phonons.app.data.NightSchedule
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -137,6 +143,8 @@ private val LocalOpenFinder = compositionLocalOf<() -> Unit> { error("No finder"
 
 private val LocalOpenHearing = compositionLocalOf<() -> Unit> { error("No hearing check") }
 
+private const val SCROLL_FADE_DP = 28
+
 private val LocalOpenCompare = compositionLocalOf<() -> Unit> { error("No comparison") }
 
 /** Opens the shape library from the graphic EQ. */
@@ -186,7 +194,7 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
             topBar = { TopBar(state, status, onSetEnabled) },
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = {
-                NavigationBar(containerColor = Palette.Surface) {
+                NavigationBar(containerColor = Palette.Background, tonalElevation = 0.dp) {
                     Tab.entries.forEach { t ->
                         NavigationBarItem(
                             selected = tab == t,
@@ -227,20 +235,42 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
                         Tab.SYSTEM -> SystemTab(state, status)
                     }
                 }
+                // The page fades out under each bar, but only where there's more of it to scroll to.
+                val scroll = scrolls.getValue(tab)
+                if (scroll.canScrollBackward) ScrollFade(Modifier.align(Alignment.TopCenter), fromTop = true)
+                if (scroll.canScrollForward) ScrollFade(Modifier.align(Alignment.BottomCenter), fromTop = false)
             }
         }
     }
 }
 
+/** Blends scrolling content into the background. It only draws, so touches pass straight through it. */
+@Composable
+private fun ScrollFade(modifier: Modifier, fromTop: Boolean) {
+    val colours = listOf(Palette.Background, Palette.Background.copy(alpha = 0f))
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(SCROLL_FADE_DP.dp)
+            .background(Brush.verticalGradient(if (fromTop) colours else colours.reversed())),
+    )
+}
+
 /** Stays on screen, so power and Bypass are always one tap away. */
 @Composable
 private fun TopBar(state: AppState, status: EngineStatus, onSetEnabled: (Boolean) -> Unit) {
-    Row(
+    // Here because the strip below always shows the live spectrum. It still stops when the app is closed.
+    AnalyserEffect(state.analyser)
+    Column(
         Modifier
             .fillMaxWidth()
             .background(Palette.Background)
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
+            .windowInsetsPadding(WindowInsets.statusBars),
+    ) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -261,6 +291,8 @@ private fun TopBar(state: AppState, status: EngineStatus, onSetEnabled: (Boolean
             onCheckedChange = onSetEnabled,
             modifier = Modifier.semantics { contentDescription = "Eigentone" },
         )
+    }
+    LiveStrip(state)
     }
 }
 
@@ -302,7 +334,6 @@ private fun EqTab(state: AppState) {
         if (state.bypass) null else Processing.channelFilters(state, graphOutput.key, curveFilters)
     }
     val spectrumState = Repo.spectrum.collectAsStateWithLifecycle()
-    AnalyserEffect(state.analyser)
 
     if (!state.guidedSetupSeen) {
         Column(
@@ -852,6 +883,14 @@ private fun DynamicsSection(state: AppState, attenuation: Double) {
         if (schedule.enabled) {
             TimeSetting("Starts at", Help.nightScheduleStart, schedule.startMinute) { m -> updateSchedule { it.copy(startMinute = m) } }
             TimeSetting("Ends at", Help.nightScheduleEnd, schedule.endMinute) { m -> updateSchedule { it.copy(endMinute = m) } }
+            if (schedule.startMinute == schedule.endMinute) {
+                Text(
+                    "The start and end are the same, so night mode won't turn on.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Palette.Danger,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
             SliderSetting(
                 title = "Scheduled strength",
                 tip = Help.nightScheduleAmount,
@@ -865,18 +904,30 @@ private fun DynamicsSection(state: AppState, attenuation: Double) {
     }
 }
 
-/** Half-hour steps, which is plenty for a schedule and easy to set by finger. */
+/** Opens a clock, which follows the phone's 12 or 24 hour setting. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TimeSetting(title: String, tip: Tip, minute: Int, onChange: (Int) -> Unit) {
-    SliderSetting(
-        title = title,
-        tip = tip,
-        readout = String.format(Locale.US, "%02d:%02d", minute / 60, minute % 60),
-        value = minute.toFloat(),
-        range = 0f..1410f,
-        default = minute.toFloat(),
-        onChange = { v -> onChange((kotlin.math.round(v / 30f) * 30f).toInt()) },
-    )
+    val context = LocalContext.current
+    val is24Hour = android.text.format.DateFormat.is24HourFormat(context)
+    var picking by remember { mutableStateOf(false) }
+    ActionRow(title, tip, detail = NightSchedule.formatTime(minute, is24Hour)) { picking = true }
+    if (picking) {
+        val clock = rememberTimePickerState(initialHour = minute / 60, initialMinute = minute % 60, is24Hour = is24Hour)
+        AlertDialog(
+            onDismissRequest = { picking = false },
+            containerColor = Palette.Tooltip,
+            title = { Text(title) },
+            text = { TimePicker(state = clock) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onChange(clock.hour * 60 + clock.minute)
+                    picking = false
+                }) { Text("Set") }
+            },
+            dismissButton = { TextButton(onClick = { picking = false }) { Text("Cancel") } },
+        )
+    }
 }
 
 @Composable
