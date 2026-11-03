@@ -112,7 +112,8 @@ fun FinderScreen(onSetEnabled: (Boolean) -> Unit, onClose: () -> Unit) {
             when (step) {
                 FinderStep.INTRO -> Intro(
                     outputLabel = output.label,
-                    correction = BuiltIns.correctionFor(output.key),
+                    // Read directly, because the service's output isn't known while Phonons is off.
+                    correction = rememberConnectedOutputNames().firstNotNullOfOrNull(BuiltIns::correctionFor),
                     current = before.current,
                     onStart = ::begin,
                     onFind = { finding = true },
@@ -243,9 +244,11 @@ private fun Compare(
         style = MaterialTheme.typography.bodyMedium,
         color = Palette.TextDim,
     )
+    NothingPlayingHint()
+    val musicActive = rememberMusicActive()
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        SideCard("A", side == Choice.A, Modifier.weight(1f)) { play(Choice.A) }
-        SideCard("B", side == Choice.B, Modifier.weight(1f)) { play(Choice.B) }
+        SideCard("A", side == Choice.A, musicActive, Modifier.weight(1f)) { play(Choice.A) }
+        SideCard("B", side == Choice.B, musicActive, Modifier.weight(1f)) { play(Choice.B) }
     }
     val pick = side
     Button(
@@ -271,7 +274,7 @@ private fun Compare(
 }
 
 @Composable
-private fun SideCard(label: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+private fun SideCard(label: String, selected: Boolean, musicActive: Boolean, modifier: Modifier, onClick: () -> Unit) {
     Box(
         modifier
             .height(140.dp)
@@ -290,7 +293,11 @@ private fun SideCard(label: String, selected: Boolean, modifier: Modifier, onCli
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                if (selected) "Playing" else "Tap to hear",
+                when {
+                    !selected -> "Tap to hear"
+                    musicActive -> "Playing"
+                    else -> "Selected"
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = if (selected) Palette.OnAmber else Palette.TextDim,
             )
@@ -352,9 +359,11 @@ private fun Result(
         }
     }
     Text("Compare", style = MaterialTheme.typography.titleSmall, color = Palette.TextDim)
+    NothingPlayingHint()
+    val musicActive = rememberMusicActive()
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        SideCard("Before", comparingOriginal, Modifier.weight(1f)) { compare(true) }
-        SideCard("After", !comparingOriginal, Modifier.weight(1f)) { compare(false) }
+        SideCard("Before", comparingOriginal, musicActive, Modifier.weight(1f)) { compare(true) }
+        SideCard("After", !comparingOriginal, musicActive, Modifier.weight(1f)) { compare(false) }
     }
     OutlinedTextField(
         value = name,

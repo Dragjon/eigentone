@@ -172,6 +172,21 @@ class EqTest {
     }
 
     @Test
+    fun libertyPresetsOnlyAppearWhenThoseEarbudsAreConnected() {
+        val builtIns = com.phonons.app.data.BuiltIns
+        fun libertyCount(names: List<String>) = builtIns.availableFor(names).count { "Liberty" in it.name }
+
+        assertEquals(3, libertyCount(listOf("SM-A546E", "soundcore Liberty 4 NC")))
+        assertEquals(3, libertyCount(listOf("Bluetooth:soundcore Liberty 4 NC")))
+        assertEquals(0, libertyCount(listOf("SM-A546E", "Other Buds")))
+        assertEquals(0, libertyCount(listOf("speaker")))
+        assertEquals(0, libertyCount(emptyList()))
+        assertEquals(builtIns.all.size - 3, builtIns.availableFor(emptyList()).size)
+        // Hidden isn't deleted, so an output already assigned to one can still load it.
+        assertEquals(3, builtIns.all.count { "Liberty" in it.name })
+    }
+
+    @Test
     fun outputNamesFindTheirCorrectionPreset() {
         val find = com.phonons.app.data.BuiltIns::correctionFor
         assertEquals("builtin:liberty4nc", find("Bluetooth:soundcore Liberty 4 NC")?.id)

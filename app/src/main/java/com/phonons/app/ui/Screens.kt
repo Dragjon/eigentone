@@ -134,6 +134,9 @@ private val LocalSnackbar = compositionLocalOf<SnackbarHostState> { error("No sn
 /** Opens the guided listening test from anywhere in the main screens. */
 private val LocalOpenFinder = compositionLocalOf<() -> Unit> { error("No finder") }
 
+/** Opens the shape library from the graphic EQ. */
+private val LocalOpenShapes = compositionLocalOf<() -> Unit> { error("No shape library") }
+
 @Composable
 fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
     val state by Repo.state.collectAsStateWithLifecycle()
@@ -143,13 +146,22 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
     // Each tab keeps its own position, so switching never lands partway down another page.
     val scrolls: Map<Tab, ScrollState> = Tab.entries.associateWith { rememberScrollState() }
     var finding by rememberSaveable { mutableStateOf(false) }
+    var browsingShapes by rememberSaveable { mutableStateOf(false) }
 
     if (finding) {
         FinderScreen(onSetEnabled = onSetEnabled, onClose = { finding = false })
         return
     }
+    if (browsingShapes) {
+        ShapeBrowser(onClose = { browsingShapes = false })
+        return
+    }
 
-    CompositionLocalProvider(LocalSnackbar provides snackbar, LocalOpenFinder provides { finding = true }) {
+    CompositionLocalProvider(
+        LocalSnackbar provides snackbar,
+        LocalOpenFinder provides { finding = true },
+        LocalOpenShapes provides { browsingShapes = true },
+    ) {
         Scaffold(
             containerColor = Palette.Background,
             topBar = { TopBar(state, status, onSetEnabled) },
@@ -334,7 +346,7 @@ private fun EqTab(state: AppState) {
     }
 
     if (graphicMode) {
-        GraphicEqConsole(state.current.tone)
+        GraphicEqConsole(state.current.tone, onBrowseShapes = LocalOpenShapes.current)
         FilledTonalButton(enabled = canUndo, onClick = Repo::undo) {
             Icon(painterResource(R.drawable.ic_undo), contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.size(8.dp))
@@ -855,7 +867,8 @@ fun segmentColors() = SegmentedButtonDefaults.colors(
 private fun PresetListSection(state: AppState) {
     val snackbar = LocalSnackbar.current
     val scope = rememberCoroutineScope()
-    val (headphones, general) = BuiltIns.all.partition { it.id.startsWith("builtin:liberty") }
+    val connected = rememberConnectedOutputNames()
+    val (headphones, general) = BuiltIns.availableFor(connected).partition(BuiltIns::isForSpecificHeadphones)
 
     @Composable
     fun Group(title: String, presets: List<Preset>, deletable: Boolean, tip: Tip? = null) {

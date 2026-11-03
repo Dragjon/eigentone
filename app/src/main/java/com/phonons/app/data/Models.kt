@@ -58,6 +58,7 @@ data class AppState(
     val loudnessStrength: Double = 0.5,
     val startOnBoot: Boolean = true,
     val favorites: Set<String> = emptySet(),
+    val favoriteShapes: Set<String> = emptySet(),
     val listeningMode: ListeningMode = ListeningMode.NOISE_CANCELLING,
     val analyser: Boolean = false,
     val limiterThresholdDb: Double = -1.0,
@@ -222,6 +223,15 @@ object BuiltIns {
     /** Finds a correction preset for a connected output, matched on its name. */
     fun correctionFor(outputKey: String): Preset? =
         if (outputKey.contains("Liberty 4 NC", ignoreCase = true)) liberty4Nc else null
+
+    fun isForSpecificHeadphones(preset: Preset): Boolean = preset.id.startsWith("builtin:liberty")
+
+    /**
+     * The built-ins worth offering given what's connected. Corrections only suit their own headphones,
+     * so they're left out otherwise. They still exist, so an output assigned to one keeps working.
+     */
+    fun availableFor(connectedNames: List<String>): List<Preset> =
+        if (connectedNames.any { correctionFor(it) != null }) all else all.filterNot(::isForSpecificHeadphones)
 
     val all = listOf(
         flat,

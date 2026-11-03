@@ -87,8 +87,8 @@ object GraphicEq {
         else -> resample(gains, gains.size, bandCount)
     }
 
-    fun apply(shape: GraphicShape, bandCount: Int): List<Double> =
-        frequencies(bandCount).map { snap(interpolate(shape.points, it)) }
+    fun apply(shape: GraphicShape, bandCount: Int, amount: Double = 1.0): List<Double> =
+        frequencies(bandCount).map { snap(interpolate(shape.points, it) * amount) }
 
     /** Softens sharp steps between neighbouring faders. */
     fun smooth(gains: List<Double>): List<Double> = gains.indices.map { i ->

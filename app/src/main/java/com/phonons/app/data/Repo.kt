@@ -180,10 +180,16 @@ object Repo {
         }
     }
 
+    fun toggleFavoriteShape(id: String) {
+        _state.update { s ->
+            s.copy(favoriteShapes = if (id in s.favoriteShapes) s.favoriteShapes - id else s.favoriteShapes + id)
+        }
+    }
+
     /** Moves through favourites, or every preset when there are none. */
     fun nextPreset() {
         val state = _state.value
-        val all = allPresets(state)
+        val all = BuiltIns.availableFor(listOf(output.value.key)) + state.presets
         val cycle = all.filter { it.id in state.favorites }.ifEmpty { all }
         val index = cycle.indexOfFirst { it.id == state.current.id }
         loadPreset(cycle[(index + 1) % cycle.size])

@@ -1,5 +1,8 @@
 package com.phonons.app.ui
 
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -33,9 +36,14 @@ import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,6 +52,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -52,10 +61,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 private const val DOUBLE_TAP_MS = 300L
+private const val MUSIC_CHECK_MS = 1000L
 
 /** A heading above a group of settings on one surface. */
 @Composable
@@ -347,6 +358,56 @@ private fun ValueTrack(
         drawCircle(Palette.Amber, thumbRadius - 1.dp.toPx(), Offset(to, centre))
         drawCircle(Palette.OnAmber, 2.5.dp.toPx(), Offset(to, centre))
     }
+}
+
+/** Names of the connected audio outputs, kept current as devices come and go, even while Phonons is off. */
+@Composable
+fun rememberConnectedOutputNames(): List<String> {
+    val context = LocalContext.current
+    val audio = remember { context.getSystemService(AudioManager::class.java) }
+    fun read() = audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS).map { it.productName?.toString().orEmpty() }
+    var names by remember { mutableStateOf(read()) }
+    DisposableEffect(audio) {
+        val callback = object : AudioDeviceCallback() {
+            override fun onAudioDevicesAdded(added: Array<out AudioDeviceInfo>?) {
+                names = read()
+            }
+
+            override fun onAudioDevicesRemoved(removed: Array<out AudioDeviceInfo>?) {
+                names = read()
+            }
+        }
+        audio.registerAudioDeviceCallback(callback, null)
+        onDispose { audio.unregisterAudioDeviceCallback(callback) }
+    }
+    return names
+}
+
+/** Whether any app is playing music right now, checked once a second. */
+@Composable
+fun rememberMusicActive(): Boolean {
+    val context = LocalContext.current
+    var active by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        val audio = context.getSystemService(AudioManager::class.java)
+        while (true) {
+            active = audio.isMusicActive
+            delay(MUSIC_CHECK_MS)
+        }
+    }
+    return active
+}
+
+/** Phonons changes another app's sound and plays nothing itself, which isn't obvious in a listening test. */
+@Composable
+fun NothingPlayingHint(modifier: Modifier = Modifier) {
+    if (rememberMusicActive()) return
+    Text(
+        "Nothing is playing. Start your music app to hear this, because Phonons only changes its sound.",
+        style = MaterialTheme.typography.bodySmall,
+        color = Palette.Text,
+        modifier = modifier,
+    )
 }
 
 /** The gaps between sections, kept in one place. */

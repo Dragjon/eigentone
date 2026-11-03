@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -52,6 +53,7 @@ import com.phonons.app.R
 import com.phonons.app.data.Repo
 import com.phonons.app.data.Tone
 import com.phonons.app.dsp.GraphicEq
+import com.phonons.app.dsp.ShapeLibrary
 import java.util.Locale
 
 private const val STEP_DB = 0.5
@@ -61,7 +63,7 @@ private const val STEP_DB = 0.5
  * band readout and buttons below offer the same control for precise changes and screen readers.
  */
 @Composable
-fun GraphicEqConsole(tone: Tone) {
+fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
     val bands = tone.graphicBands
     val gains = GraphicEq.normalized(tone.graphicDb, bands)
     var selected by rememberSaveable(bands) { mutableIntStateOf(bands / 2) }
@@ -86,7 +88,9 @@ fun GraphicEqConsole(tone: Tone) {
             gains = gains,
             selected = band,
             onSelect = { selected = it },
-            onChange = ::setGains,
+            // Takes the band count from the faders themselves. A reference to setGains can be remembered
+            // across recompositions, which kept the first band count and reset the layout to it.
+            onChange = { new -> Repo.editTone { it.copy(graphicDb = new, graphicBands = new.size) } },
             onFinished = Repo::commit,
         )
 
@@ -183,6 +187,12 @@ fun GraphicEqConsole(tone: Tone) {
                     )
                 }
             }
+            FilledTonalButton(
+                onClick = onBrowseShapes,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, top = 8.dp),
+            ) { Text("Browse all ${ShapeLibrary.all.size} shapes") }
         }
     }
 }
@@ -251,6 +261,9 @@ private fun Faders(
         val height = size.height - bottomLabels
         val slot = size.width / bands
         val barWidth = (slot * 0.5f).coerceIn(3.dp.toPx(), 12.dp.toPx())
+        // Knobs fill their slot on dense layouts, and the selected one stands out on top of its neighbours.
+        val knobRadius = (slot / 2).coerceAtMost(9.dp.toPx())
+        val selectedKnobRadius = knobRadius.coerceAtLeast(8.dp.toPx()) + 2.dp.toPx()
         val yOf = { db: Double -> ((1 - db / GraphicEq.MAX_DB) / 2 * height).toFloat() }
         val zero = yOf(0.0)
 
@@ -279,11 +292,12 @@ private fun Faders(
                     cornerRadius = corner,
                 )
             }
-            drawCircle(
-                if (isSelected) Palette.Text else Palette.Amber,
-                radius = (barWidth / 2 + 1.dp.toPx()).coerceAtMost(7.dp.toPx()),
-                center = Offset(x + barWidth / 2, yOf(gain)),
-            )
+            if (!isSelected) drawCircle(Palette.Amber, knobRadius, Offset(x + barWidth / 2, yOf(gain)))
+        }
+        gains.getOrNull(selected)?.let { gain ->
+            val centre = Offset(slot * selected + slot / 2, yOf(gain))
+            drawCircle(Palette.Surface, selectedKnobRadius + 1.dp.toPx(), centre)
+            drawCircle(Palette.Text, selectedKnobRadius, centre)
         }
 
         labelledBands.forEach { i ->

@@ -62,7 +62,12 @@ object Help {
         "Bands",
         "More bands allow finer changes. 10 is quickest, and 31 is the most precise but harder to set by finger. Switching keeps your curve's overall shape.",
     )
-    val graphicShapes = Tip("Shapes", "Ready-made curves to start from. Tap one, then adjust it to taste. It replaces the current faders.")
+    val graphicShapes = Tip("Shapes", "Ready-made curves to start from. Tap one, then adjust it to taste. It replaces the current faders, and leaves your preset's headphone correction alone.")
+    val shapeLibrary = Tip(
+        "Shape library",
+        "Search by genre, instrument, situation or problem, or filter by what a curve does, such as More bass. Tap a shape to hear it on your music, and nothing is kept until you choose Use this. These are designed starting points, not measurements. Thumbnails run from 20 Hz on the left to 20 kHz on the right.",
+    )
+    val shapeAmount = Tip("Amount", "How strongly the shape is applied. 100% is as designed, lower is more subtle, and higher is stronger. Double-tap to return to 100%.")
     val graphicSmooth = Tip("Smooth", "Softens sharp steps between neighbouring faders, which often sounds more natural. Tap it again for a stronger effect.")
 
     val surround = Tip(
