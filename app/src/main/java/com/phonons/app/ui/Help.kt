@@ -89,6 +89,14 @@ object Help {
     val nightScheduleEnd = Tip("Ends at", "The time night mode turns off. It can be after midnight.")
     val share = Tip("Share this sound", "Creates a text code holding this whole sound, which you can send to someone. It contains EQ settings only, and nothing about you.")
     val addShared = Tip("Add a shared sound", "Paste a code someone shared with you. It's added as a new preset, and your others are kept.")
+    val compare = Tip(
+        "Compare two sounds",
+        "Switch instantly between two presets, or a preset and your current sound, at about the same loudness. Nothing changes unless you choose one.",
+    )
+    val compareBlind = Tip(
+        "Blind comparison",
+        "Hides which sound is which until you've chosen, in a random order, so a name can't sway you. Your choice is revealed at the end.",
+    )
     val hearing = Tip(
         "Hearing check",
         "Plays quiet tones in each ear to build a gentle curve for what you hear least well, and can correct each ear separately. It takes about 3 minutes. It isn't a medical test.",
@@ -192,15 +200,15 @@ object Help {
     )
     val earCorrection = Tip(
         "Ear correction",
-        "A separate EQ for each ear, from the hearing check. It closes half of the gap between your ears at each frequency, and stays on when you change preset. Fit can affect the result, so repeat the check if it sounds off.",
+        "A separate EQ for each ear, from the hearing check. It closes half of the gap between your ears at each frequency, and stays on when you change preset. Fit can affect the result, so repeat the check if it sounds off. Your latest check is kept, so you can turn this on later or again after removing it.",
     )
     val backup = Tip(
         "Back up presets",
-        "Saves your presets, your shapes, output and per-app choices, and favourites to a file. Ear correction and compressor settings are included. Other settings that aren't part of a preset, such as balance and night mode, aren't.",
+        "Saves your presets, your shapes, output and per-app choices, and favourites to a file. Ear correction, your latest hearing check and compressor settings are included. Other settings that aren't part of a preset, such as balance and night mode, aren't.",
     )
     val restore = Tip(
         "Restore presets",
-        "Adds presets, your shapes, per-app choices, ear correction and compressor settings from a backup file. Anything with the same identity is replaced, and the rest is kept.",
+        "Adds presets, your shapes, per-app choices, ear correction, your latest hearing check and compressor settings from a backup file. Anything with the same identity is replaced, and the rest is kept.",
     )
 
     val engineMode = Tip(

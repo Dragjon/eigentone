@@ -146,6 +146,8 @@ data class AppState(
     /** Evens out loud and quiet tracks, from 0 to 1. Night mode takes priority when both are on. */
     val leveller: Double = 0.0,
     val earCorrection: EarCorrection? = null,
+    /** The latest finished hearing check, so ear correction can still be turned on after leaving it. */
+    val hearing: HearingRecord? = null,
     val compressor: Compressor = Compressor(),
     /** Which one-time updates this saved state has had. A fresh install starts at the latest. */
     val stateVersion: Int = 0,

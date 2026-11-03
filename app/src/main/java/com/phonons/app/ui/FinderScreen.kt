@@ -301,7 +301,7 @@ private fun Compare(
 }
 
 @Composable
-private fun SideCard(label: String, selected: Boolean, musicActive: Boolean, modifier: Modifier, onClick: () -> Unit) {
+fun SideCard(label: String, selected: Boolean, musicActive: Boolean, modifier: Modifier, onClick: () -> Unit) {
     Box(
         modifier
             .height(140.dp)

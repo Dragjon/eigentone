@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.phonons.app.data.CustomShape
+import com.phonons.app.data.HearingRecord
 import com.phonons.app.data.HearingResult
 import com.phonons.app.data.HearingTest
 import com.phonons.app.data.Repo
@@ -44,6 +45,9 @@ import com.phonons.app.engine.TonePlayer
 import java.util.Locale
 
 private enum class HearingStep { INTRO, TONES, RESULT }
+
+/** Where the current tone is up to. Shown on screen, because a quiet tone can be impossible to hear. */
+private enum class TonePhase { WAITING, PLAYING, ASKING, FAILED }
 
 /**
  * A listening check that builds a gentle curve from which frequencies are heard least well. The EQ
@@ -56,6 +60,8 @@ fun HearingScreen(onClose: () -> Unit) {
     var step by remember { mutableStateOf(HearingStep.INTRO) }
     val test = remember { HearingTest() }
     var answers by remember { mutableIntStateOf(0) }
+    var replays by remember { mutableIntStateOf(0) }
+    var phase by remember { mutableStateOf(TonePhase.WAITING) }
     var result by remember { mutableStateOf<HearingResult?>(null) }
 
     DisposableEffect(step) {
@@ -90,20 +96,37 @@ fun HearingScreen(onClose: () -> Unit) {
             when (step) {
                 HearingStep.INTRO -> Intro(onStart = { step = HearingStep.TONES }, onCancel = onClose)
                 HearingStep.TONES -> {
-                    LaunchedEffect(answers) {
+                    LaunchedEffect(answers, replays) {
+                        phase = TonePhase.WAITING
                         // A short pause, so a tone can't be mistaken for the sound of the tap.
                         kotlinx.coroutines.delay(TONE_GAP_MS)
-                        test.hz?.let { hz -> player.play(hz, test.levelDb, test.ear!!) }
+                        val hz = test.hz ?: return@LaunchedEffect
+                        if (!player.play(hz, test.levelDb, test.ear!!)) {
+                            phase = TonePhase.FAILED
+                            return@LaunchedEffect
+                        }
+                        phase = TonePhase.PLAYING
+                        kotlinx.coroutines.delay(TonePlayer.TONE_MS)
+                        phase = TonePhase.ASKING
                     }
                     Tones(
                         test = test,
-                        onPlayAgain = { test.hz?.let { hz -> player.play(hz, test.levelDb, test.ear!!) } },
+                        answers = answers,
+                        phase = phase,
+                        onPlayAgain = {
+                            player.stop()
+                            replays++
+                        },
                         onAnswer = { heard ->
                             player.stop()
                             test.answer(heard)
                             answers++
                             if (test.isDone) {
-                                result = test.result()
+                                val finished = test.result()
+                                result = finished
+                                // Saved now, so ear correction can still be chosen after leaving this screen.
+                                val record = HearingRecord.of(finished, Repo.output.value.label, System.currentTimeMillis())
+                                Repo.update { it.copy(hearing = record) }
                                 step = HearingStep.RESULT
                             }
                         },
@@ -144,23 +167,61 @@ private fun Intro(onStart: () -> Unit, onCancel: () -> Unit) {
 }
 
 @Composable
-private fun Tones(test: HearingTest, onPlayAgain: () -> Unit, onAnswer: (Boolean) -> Unit, onCancel: () -> Unit) {
+private fun Tones(
+    test: HearingTest,
+    answers: Int,
+    phase: TonePhase,
+    onPlayAgain: () -> Unit,
+    onAnswer: (Boolean) -> Unit,
+    onCancel: () -> Unit,
+) {
     val ear = test.ear ?: return
+    val hz = test.hz ?: return
+    // HearingTest isn't observable, so everything shown is read here, where each answer redraws it.
+    val progress = test.progress
     Text("Listen with your ${ear.label} ear", style = MaterialTheme.typography.titleLarge, color = Palette.Text)
     LinearProgressIndicator(
-        progress = { test.progress },
+        progress = { progress },
         modifier = Modifier.fillMaxWidth(),
         color = Palette.Amber,
         trackColor = Palette.Track,
         drawStopIndicator = {},
     )
     Text(
-        "Three short beeps just played. They can be very faint, and it's normal to miss many of them. Answer honestly rather than guessing.",
+        "${GraphicEq.formatFrequency(hz)}, tone ${test.attempt}. Part ${test.stepNumber} of ${test.stepCount}, after $answers ${if (answers == 1) "answer" else "answers"}.",
         style = MaterialTheme.typography.bodyMedium,
         color = Palette.TextDim,
     )
-    Button(onClick = { onAnswer(true) }, modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp)) { Text("I heard it") }
-    FilledTonalButton(onClick = { onAnswer(false) }, modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp)) { Text("I didn't hear it") }
+    Text(
+        when (phase) {
+            TonePhase.WAITING -> "Next tone coming…"
+            TonePhase.PLAYING -> "Listen now: three short beeps…"
+            TonePhase.ASKING -> "Did you hear it?"
+            TonePhase.FAILED -> "This phone wouldn't play the tone. Try Play again."
+        },
+        style = MaterialTheme.typography.titleMedium,
+        color = when (phase) {
+            TonePhase.PLAYING -> Palette.Amber
+            TonePhase.FAILED -> Palette.Danger
+            else -> Palette.Text
+        },
+    )
+    Text(
+        "After you hear one, the next is quieter, so it's normal for tones to become very faint or vanish. Answer honestly rather than guessing.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = Palette.TextDim,
+    )
+    // Hearing it can be answered as soon as it starts, but not hearing it only once it has finished.
+    Button(
+        enabled = phase == TonePhase.PLAYING || phase == TonePhase.ASKING,
+        onClick = { onAnswer(true) },
+        modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp),
+    ) { Text("I heard it") }
+    FilledTonalButton(
+        enabled = phase == TonePhase.ASKING,
+        onClick = { onAnswer(false) },
+        modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp),
+    ) { Text("I didn't hear it") }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         TextButton(onClick = onPlayAgain, modifier = Modifier.heightIn(min = 48.dp)) { Text("Play again") }
         TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text("Stop") }
@@ -245,7 +306,7 @@ private fun Result(result: HearingResult, onClose: () -> Unit) {
     }
     if (ears != null) {
         Text(
-            "Your ears differed by up to ${result.largestEarDifferenceDb().toInt()} dB at some frequencies, which can also come from fit. Phonons can close half of that gap, frequency by frequency, with a separate EQ for each ear.",
+            "Your ears differed by up to ${result.largestEarDifferenceDb().toInt()} dB at some frequencies, which can also come from fit. Phonons can close half of that gap, frequency by frequency, with a separate EQ for each ear. You can also do this later from the Sound tab, under Space.",
             style = MaterialTheme.typography.bodyMedium,
             color = Palette.Text,
         )

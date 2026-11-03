@@ -1,0 +1,1 @@
+Your latest hearing check is now kept, so you can turn on ear correction any time from the Sound tab. The hearing check also shows its progress after every answer.

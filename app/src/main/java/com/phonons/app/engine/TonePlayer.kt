@@ -5,6 +5,7 @@ import android.media.AudioFocusRequest
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
+import android.util.Log
 import com.phonons.app.data.Ear
 import com.phonons.app.data.HearingTest
 import kotlin.math.PI
@@ -43,8 +44,19 @@ class TonePlayer(context: android.content.Context) {
         track = null
     }
 
-    /** Three short pulses, which are easier to notice at low level than one steady tone. */
-    fun play(hz: Double, levelDb: Double, ear: Ear) {
+    /**
+     * Three short pulses, which are easier to notice at low level than one steady tone. Returns false
+     * if the phone wouldn't play it, so the listener isn't asked about a tone that never happened.
+     */
+    fun play(hz: Double, levelDb: Double, ear: Ear): Boolean = try {
+        start(hz, levelDb, ear)
+        true
+    } catch (e: Exception) {
+        Log.w(TAG, "Could not play a tone", e)
+        false
+    }
+
+    private fun start(hz: Double, levelDb: Double, ear: Ear) {
         stop()
         val samples = pulses(hz, levelDb.coerceAtMost(HearingTest.CEILING_DB), ear)
         val format = AudioFormat.Builder()
@@ -81,11 +93,15 @@ class TonePlayer(context: android.content.Context) {
         return out
     }
 
-    private companion object {
-        const val SAMPLE_RATE = 48000
-        const val PULSES = 3
-        const val PULSE_MS = 300
-        const val GAP_MS = 150
-        const val FADE_MS = 20
+    companion object {
+        private const val TAG = "PhononsTone"
+        private const val SAMPLE_RATE = 48000
+        private const val PULSES = 3
+        private const val PULSE_MS = 300
+        private const val GAP_MS = 150
+        private const val FADE_MS = 20
+
+        /** How long one tone takes to play. */
+        const val TONE_MS = PULSES * (PULSE_MS + GAP_MS).toLong()
     }
 }

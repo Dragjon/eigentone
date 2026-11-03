@@ -137,6 +137,8 @@ private val LocalOpenFinder = compositionLocalOf<() -> Unit> { error("No finder"
 
 private val LocalOpenHearing = compositionLocalOf<() -> Unit> { error("No hearing check") }
 
+private val LocalOpenCompare = compositionLocalOf<() -> Unit> { error("No comparison") }
+
 /** Opens the shape library from the graphic EQ. */
 private val LocalOpenShapes = compositionLocalOf<() -> Unit> { error("No shape library") }
 
@@ -151,6 +153,12 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
     var finding by rememberSaveable { mutableStateOf(false) }
     var browsingShapes by rememberSaveable { mutableStateOf(false) }
     var checkingHearing by rememberSaveable { mutableStateOf(false) }
+    var comparing by rememberSaveable { mutableStateOf(false) }
+
+    if (comparing) {
+        CompareScreen(onClose = { comparing = false })
+        return
+    }
 
     if (checkingHearing) {
         HearingScreen(onClose = { checkingHearing = false })
@@ -171,6 +179,7 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
         LocalOpenFinder provides { finding = true },
         LocalOpenShapes provides { browsingShapes = true },
         LocalOpenHearing provides { checkingHearing = true },
+        LocalOpenCompare provides { comparing = true },
     ) {
         Scaffold(
             containerColor = Palette.Background,
@@ -706,6 +715,19 @@ private fun SpaceSection(state: AppState) {
             origin = 0f,
             onChange = { v -> Repo.update { it.copy(balance = v.toDouble()) } },
         )
+        // Offered until it's used, so leaving the hearing check without choosing doesn't lose it.
+        val available = remember(state.hearing) { state.hearing?.result()?.earCorrection() }
+        if (state.earCorrection == null && available != null) {
+            val record = state.hearing
+            RowDivider()
+            ActionRow(
+                "Correct each ear",
+                Help.earCorrection,
+                detail = "From your hearing check with ${record?.headphones} on " +
+                    java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(record?.measuredAt ?: 0L)) +
+                    ". Best with the same headphones.",
+            ) { Repo.update { it.copy(earCorrection = available) } }
+        }
         state.earCorrection?.let { ears ->
             RowDivider()
             SwitchSetting("Ear correction", Help.earCorrection, ears.enabled, detail = "A separate EQ for each ear") { on ->
@@ -1133,6 +1155,8 @@ private fun ManageSection(state: AppState) {
     }
 
     SettingsSection("Add and manage") {
+        ActionRow("Compare two sounds", Help.compare, detail = "Switch instantly, with an optional blind test", onClick = LocalOpenCompare.current)
+        RowDivider()
         ActionRow("Find my sound", Help.finder, detail = "A short guided listening test", onClick = LocalOpenFinder.current)
         RowDivider()
         ActionRow("Hearing check", Help.hearing, detail = "Builds a curve for how you hear", onClick = LocalOpenHearing.current)

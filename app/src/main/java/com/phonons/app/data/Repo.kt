@@ -41,6 +41,9 @@ object Repo {
     /** The hearing check is running, so the EQ steps aside. Never saved, so it can't get stuck on. */
     val hearingCheckRunning = MutableStateFlow(false)
 
+    /** Two sounds are being compared, so switching between them skips the morph. Never saved. */
+    val comparing = MutableStateFlow(false)
+
     /** Whether the time of day is inside the night mode schedule. Set by the service. */
     val scheduledNight = MutableStateFlow(false)
 

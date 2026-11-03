@@ -41,7 +41,13 @@ import kotlinx.coroutines.launch
 /** Keeps the effect alive in the background and reacts to players and output changes. */
 class AudioService : Service() {
 
-    private data class Inputs(val state: AppState, val attenuation: Double, val night: Boolean, val suspended: Boolean)
+    private data class Inputs(
+        val state: AppState,
+        val attenuation: Double,
+        val night: Boolean,
+        val suspended: Boolean,
+        val comparing: Boolean,
+    )
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val engineDispatcher = Dispatchers.Default.limitedParallelism(1)
@@ -123,10 +129,10 @@ class AudioService : Service() {
         }
         scope.launch {
             combine(
-                Repo.state, Repo.attenuationDb, Repo.scheduledNight, Repo.hearingCheckRunning,
-            ) { state, attenuation, night, suspended -> Inputs(state, attenuation, night, suspended) }
+                Repo.state, Repo.attenuationDb, Repo.scheduledNight, Repo.hearingCheckRunning, Repo.comparing,
+            ) { state, attenuation, night, suspended, comparing -> Inputs(state, attenuation, night, suspended, comparing) }
                 .conflate()
-                .collect { (state, attenuation, night, suspended) ->
+                .collect { (state, attenuation, night, suspended, comparing) ->
                     if (!state.enabled) {
                         stopSelf()
                         return@collect
@@ -134,6 +140,7 @@ class AudioService : Service() {
                     engine.attenuationDb = attenuation
                     engine.scheduledNight = night
                     engine.suspended = suspended
+                    engine.comparing = comparing
                     engine.apply(state)
                     keepSettling()
                     updateNotification(state)

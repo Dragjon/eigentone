@@ -9,6 +9,7 @@ A free system-wide equaliser for Android 14 and newer. No ads, no account, and n
 - **Shape library** of 595 curves, searchable by genre, instrument, situation or problem. Hear each on your music before keeping it, and layer them.
 - **Your own shapes**, typed in from any other app's EQ.
 - **Headphone correction** from AutoEq's published measurements, with a strength control. Phonons offers one when headphones connect.
+- **Compare two sounds**, switching instantly at matched loudness, with an optional blind test.
 - **Find my sound**, a guided A/B listening test that has to beat your current sound before you keep it.
 - **Hearing check** that builds a gentle curve for how you hear, with a separate EQ for each ear if they differ. It isn't a medical test.
 - **EQ files**: import ParametricEQ and GraphicEQ files, and export any sound as a 127-point GraphicEQ file. Imported GraphicEQ curves keep every point rather than being rounded to faders.
@@ -35,7 +36,7 @@ Crash reports stay on the phone. You choose whether to share one from the System
 Copy the latest `Phonons-<version>.apk` to the phone and open it, or use USB debugging:
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Phonons-0.13.0.apk
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Phonons-0.14.1.apk
 ```
 
 ## Build
@@ -64,7 +65,7 @@ The Liberty 4 NC presets and headphone corrections use [AutoEq](https://github.c
 
 A preset holds a whole sound: parametric filters, graphic EQ, tone, surround, strength, correction amount and preamp. Balance, ear correction, night mode, the leveller, the compressor, loudness compensation and limiter settings stay global.
 
-Preset changes morph rather than jump (`data/GainRamp.kt`). Bands and the input level move together in steps of at most 4 dB, so if the old and new sounds are each safe from clipping, so is every step between them. Bypass and the hearing check still switch at once.
+Preset changes morph rather than jump (`data/GainRamp.kt`). Bands and the input level move together in steps of at most 4 dB, so if the old and new sounds are each safe from clipping, so is every step between them. Bypass, comparisons and the hearing check still switch at once.
 
 The phone has one compressor, so night mode, manual settings and the leveller share it, in that order of priority (`data/Dynamics.kt`).
 
@@ -76,7 +77,7 @@ The **shape library** (`dsp/ShapeLibrary.kt`, `dsp/ShapeData.kt`) has 595 graphi
 
 The **hearing check** finds a threshold per frequency and ear with a "down 10, up 5" method, capped at -15 dBFS. Levels are relative to the phone's volume, so only the differences between them are used, and the curve corrects half of those.
 
-**Ear correction** uses the same results. If the ears differ by 10 dB or more at any frequency, it can add a separate curve to each audio channel that closes half of the gap. Both ears share one input level, because separate levels would shift the balance across every frequency. It belongs to the listener rather than the sound, so it stays on across presets.
+**Ear correction** uses the same results. If the ears differ by 10 dB or more at any frequency, it can add a separate curve to each audio channel that closes half of the gap. Both ears share one input level, because separate levels would shift the balance across every frequency. It belongs to the listener rather than the sound, so it stays on across presets. The latest check's results are saved, so it can be turned on later from the Space settings.
 
 ## Known limits
 

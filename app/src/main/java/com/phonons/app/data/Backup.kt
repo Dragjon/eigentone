@@ -16,6 +16,7 @@ data class Backup(
     val favoriteShapes: Set<String> = emptySet(),
     val appProfiles: Map<String, String> = emptyMap(),
     val earCorrection: EarCorrection? = null,
+    val hearing: HearingRecord? = null,
     val compressor: Compressor? = null,
 )
 
@@ -26,6 +27,7 @@ object BackupCodec {
     private const val MAX_IMPORT_GAIN = 30.0
     private const val MAX_PREAMP = 30.0
     private const val MAX_EAR_DB = 6.0
+    private const val MAX_HEARING_DB = 120.0
 
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; prettyPrint = true }
 
@@ -39,6 +41,7 @@ object BackupCodec {
             favoriteShapes = state.favoriteShapes,
             appProfiles = state.appProfiles,
             earCorrection = state.earCorrection,
+            hearing = state.hearing,
             compressor = state.compressor,
         ),
     )
@@ -52,6 +55,13 @@ object BackupCodec {
                 .filter { it.id.startsWith("user:") && it.name.isNotBlank() }
                 .map(::sanitise),
             customShapes = backup.customShapes.mapNotNull(::sanitise),
+            hearing = backup.hearing?.let { record ->
+                record.copy(
+                    left = ShapeText.cleanCurve(record.left, MAX_HEARING_DB),
+                    right = ShapeText.cleanCurve(record.right, MAX_HEARING_DB),
+                    headphones = record.headphones.take(MAX_NAME),
+                )
+            },
             compressor = backup.compressor?.clamped(),
             earCorrection = backup.earCorrection?.let { ears ->
                 ears.copy(left = ShapeText.cleanCurve(ears.left, MAX_EAR_DB), right = ShapeText.cleanCurve(ears.right, MAX_EAR_DB))
@@ -75,6 +85,7 @@ object BackupCodec {
             favoriteShapes = state.favoriteShapes + backup.favoriteShapes,
             appProfiles = state.appProfiles + backup.appProfiles.filterValues { it in known },
             earCorrection = backup.earCorrection ?: state.earCorrection,
+            hearing = backup.hearing ?: state.hearing,
             compressor = backup.compressor ?: state.compressor,
         )
     }

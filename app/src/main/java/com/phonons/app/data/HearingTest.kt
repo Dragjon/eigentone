@@ -1,6 +1,7 @@
 package com.phonons.app.data
 
 import kotlin.math.abs
+import kotlinx.serialization.Serializable
 
 enum class Ear(val label: String) { LEFT("left"), RIGHT("right") }
 
@@ -29,6 +30,13 @@ class HearingTest(
     /** The level to play, which can never go above [CEILING_DB]. */
     val levelDb: Double get() = level
     val progress: Float get() = stepIndex.toFloat() / steps.size
+
+    /** Which ear and frequency this is, counting from 1, out of [stepCount]. */
+    val stepNumber: Int get() = (stepIndex + 1).coerceAtMost(steps.size)
+    val stepCount: Int get() = steps.size
+
+    /** Which tone this is for the current ear and frequency, counting from 1. */
+    val attempt: Int get() = answersThisStep + 1
 
     fun answer(heard: Boolean) {
         val step = steps.getOrNull(stepIndex) ?: return
@@ -70,6 +78,36 @@ class HearingTest(
         private const val MISSES_TO_FINISH = 2
         private const val MISSES_TO_GIVE_UP = 6
         private const val MAX_ANSWERS = 14
+    }
+}
+
+/**
+ * A finished check, kept because the curve saved from one only holds the average of both ears. Each
+ * point's level is the quietest tone heard at that frequency, not a change to the sound.
+ */
+@Serializable
+data class HearingRecord(
+    val left: List<ShapePoint> = emptyList(),
+    val right: List<ShapePoint> = emptyList(),
+    val headphones: String = "",
+    val measuredAt: Long = 0,
+) {
+    /** Null if the two ears don't cover the same frequencies, which could only come from an edited backup. */
+    fun result(): HearingResult? {
+        if (left.isEmpty() || left.map { it.hz }.toSet() != right.map { it.hz }.toSet()) return null
+        return HearingResult(
+            mapOf(
+                Ear.LEFT to left.associate { it.hz to it.db },
+                Ear.RIGHT to right.associate { it.hz to it.db },
+            ),
+        )
+    }
+
+    companion object {
+        fun of(result: HearingResult, headphones: String, measuredAt: Long): HearingRecord {
+            fun points(ear: Ear) = result.thresholds[ear].orEmpty().map { (hz, level) -> ShapePoint(hz, level) }
+            return HearingRecord(points(Ear.LEFT), points(Ear.RIGHT), headphones, measuredAt)
+        }
     }
 }
 

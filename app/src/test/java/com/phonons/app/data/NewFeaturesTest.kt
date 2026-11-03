@@ -359,6 +359,157 @@ class NewFeaturesTest {
         assertFalse(AppState(compressor = Dynamics.styles.first().compressor).resetSound().compressor.enabled)
     }
 
+    private val unevenEars = HearingResult(
+        mapOf(
+            Ear.LEFT to mapOf(1000.0 to -60.0, 4000.0 to -60.0),
+            Ear.RIGHT to mapOf(1000.0 to -60.0, 4000.0 to -40.0),
+        ),
+    )
+
+    @Test
+    fun aSavedHearingCheckGivesTheSameEarCorrectionLater() {
+        val record = HearingRecord.of(unevenEars, "Liberty 4 NC", 1234L)
+        assertEquals(unevenEars.earCorrection(), record.result()!!.earCorrection())
+        assertEquals("Liberty 4 NC", record.headphones)
+    }
+
+    @Test
+    fun aSavedHearingCheckSurvivesRestarts() {
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+        val state = AppState(hearing = HearingRecord.of(unevenEars, "Buds", 1L))
+        val loaded = json.decodeFromString(AppState.serializer(), json.encodeToString(AppState.serializer(), state))
+        assertNotNull(loaded.hearing!!.result()!!.earCorrection())
+        assertNull(json.decodeFromString(AppState.serializer(), "{}").hearing)
+    }
+
+    @Test
+    fun evenEarsOfferNoCorrectionFromASavedCheck() {
+        val even = HearingResult(Ear.entries.associateWith { mapOf(1000.0 to -60.0) })
+        assertNull(HearingRecord.of(even, "Buds", 1L).result()!!.earCorrection())
+    }
+
+    @Test
+    fun resettingTheSoundKeepsTheMeasurement() {
+        val record = HearingRecord.of(unevenEars, "Buds", 1L)
+        assertEquals(record, AppState(hearing = record).resetSound().hearing)
+    }
+
+    @Test
+    fun aBackupKeepsTheHearingCheckAndCantBreakIt() {
+        val record = HearingRecord.of(unevenEars, "Buds", 5L)
+        val restored = BackupCodec.merge(AppState(), BackupCodec.decode(BackupCodec.encode(AppState(hearing = record)))!!)
+        assertEquals(record, restored.hearing)
+
+        // Ears that don't match would otherwise crash when the correction is worked out.
+        val edited = """{"hearing":{"left":[{"hz":1000.0,"db":-60.0}],"right":[{"hz":2000.0,"db":-40.0}]}}"""
+        assertNull(BackupCodec.decode(edited)!!.hearing!!.result())
+        val empty = """{"hearing":{"left":[],"right":[]}}"""
+        assertNull(BackupCodec.decode(empty)!!.hearing!!.result())
+    }
+
+    @Test
+    fun hearingCheckCountsEveryAnswerSoTheScreenCanShowIt() {
+        val test = HearingTest(listOf(1000.0, 2000.0))
+        assertEquals(4, test.stepCount)
+        assertEquals(1, test.stepNumber)
+        assertEquals(1, test.attempt)
+
+        test.answer(heard = true)
+        assertEquals(2, test.attempt)
+        assertEquals(1, test.stepNumber)
+        test.answer(heard = false)
+        assertEquals(3, test.attempt)
+
+        // Two misses in a row after hearing one finishes this frequency, and counting starts again.
+        test.answer(heard = false)
+        assertEquals(2, test.stepNumber)
+        assertEquals(1, test.attempt)
+    }
+
+    @Test
+    fun hearingCheckFinishesWithoutTheCountsOverrunning() {
+        val test = HearingTest(listOf(1000.0))
+        repeat(500) { if (!test.isDone) test.answer(heard = true) }
+        assertTrue(test.isDone)
+        assertEquals(test.stepCount, test.stepNumber)
+    }
+
+    private val quiet = Preset("user:quiet", "Quiet", tone = Tone(trebleDb = -3.0))
+    private val boomy = Preset("user:boomy", "Boomy", tone = Tone(bassDb = 8.0, vocalsDb = 3.0))
+
+    private fun comparedLoudness(preset: Preset): Double {
+        val filters = Processing.presetFilters(preset)
+        return Processing.estimatedLoudnessDb(filters, Processing.inputOf(preset, filters, true))
+    }
+
+    @Test
+    fun comparedSoundsPlayAtMatchedLoudness() {
+        val comparison = AbComparison(quiet, boomy)
+        assertEquals(
+            comparedLoudness(comparison.soundFor(0, true)),
+            comparedLoudness(comparison.soundFor(1, true)),
+            0.05,
+        )
+    }
+
+    @Test
+    fun theFirstSoundPlaysUntouchedAndChoicesStayClean() {
+        val comparison = AbComparison(quiet, boomy)
+        assertEquals(quiet, comparison.soundFor(0, true))
+        assertTrue(comparison.soundFor(1, true).tone.trimDb != 0.0)
+        // What gets kept is the saved sound, not the temporary level change.
+        assertEquals(boomy, comparison.presetFor(1))
+    }
+
+    @Test
+    fun openComparisonsNameBothSounds() {
+        val comparison = AbComparison(quiet, boomy, blind = false, flipped = true)
+        assertEquals(quiet, comparison.presetFor(0))
+        assertEquals("A", comparison.label(0))
+        assertEquals("B", comparison.label(1))
+        assertEquals("Quiet", comparison.nameFor(0))
+        assertEquals("Boomy", comparison.nameFor(1))
+    }
+
+    @Test
+    fun blindComparisonsHideWhichIsWhich() {
+        for (flipped in listOf(false, true)) {
+            val comparison = AbComparison(quiet, boomy, blind = true, flipped = flipped)
+            assertEquals("1", comparison.label(0))
+            assertEquals("2", comparison.label(1))
+            assertNull(comparison.nameFor(0))
+            assertNull(comparison.nameFor(1))
+            assertEquals(if (flipped) boomy else quiet, comparison.presetFor(0))
+            assertEquals(if (flipped) quiet else boomy, comparison.presetFor(1))
+        }
+    }
+
+    @Test
+    fun anEditedPresetAndItsSavedVersionAreToldApart() {
+        val saved = Preset("user:main", "Main", tone = Tone(bassDb = 2.0))
+        val edited = saved.copy(tone = Tone(bassDb = 6.0))
+        val comparison = AbComparison(edited, saved, edited = edited)
+        assertEquals("Main (edited)", comparison.nameFor(0))
+        assertEquals("Main (saved)", comparison.nameFor(1))
+        // Keeping the saved one really does bring back the saved sound.
+        assertEquals(saved, comparison.presetFor(1))
+        assertTrue(comparison.soundFor(1, true).tone.bassDb == 2.0)
+    }
+
+    @Test
+    fun differentPresetsKeepTheirPlainNames() {
+        val comparison = AbComparison(quiet, boomy, edited = quiet)
+        assertEquals("Quiet", comparison.nameFor(0))
+        assertEquals("Boomy", comparison.nameFor(1))
+    }
+
+    @Test
+    fun blindComparisonsStayMatchedInEitherOrder() {
+        val comparison = AbComparison(quiet, boomy, blind = true, flipped = true)
+        assertEquals(comparedLoudness(comparison.soundFor(0, true)), comparedLoudness(comparison.soundFor(1, true)), 0.05)
+        assertEquals(quiet, comparison.soundFor(1, true))
+    }
+
     private fun floats(vararg values: Float) = values
 
     /** Runs a move to the end, the way the engine does, and returns every step it took. */

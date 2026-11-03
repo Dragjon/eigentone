@@ -66,6 +66,9 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
     /** Set by the service before [apply]. Takes the sound out of the path during the hearing check. */
     var suspended = false
 
+    /** Set by the service before [apply]. Two sounds are being compared, so changes shouldn't blur together. */
+    var comparing = false
+
     /** Whether the sound is still moving to its target, so [apply] needs calling again shortly. */
     val settling: Boolean get() = chains.values.any { it.moving }
 
@@ -223,18 +226,21 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
             val step = GainRamp.next(
                 chain.lastGains, chain.lastRightGains, chain.lastInput,
                 gains, rightGains, target.inputDb.toFloat(),
-                instant = suspended || chain.lastOff != off,
+                instant = suspended || comparing || chain.lastOff != off,
             )
             chain.lastOff = off
 
             // Each band is a separate call, so a boost could be heard before the level comes down for it.
             // Lowering first and raising last keeps every moment during the update free of clipping.
+            val started = System.nanoTime()
             val goingDown = chain.lastInput.isNaN() || step.inputDb < chain.lastInput
             if (goingDown) pushInput(chain, step.inputDb, state.balance)
             pushBands(dp, map, /* channel = */ 0, step.left, chain.lastGains)
             pushBands(dp, map, /* channel = */ 1, step.right, chain.lastRightGains)
             if (!goingDown) pushInput(chain, step.inputDb, state.balance)
             logMove(chain, step.done)
+            val tookMs = (System.nanoTime() - started) / 1_000_000
+            if (comparing && tookMs >= LOG_SWITCH_MS) Log.i(TAG, "Compare switch on ${chain.label} took $tookMs ms")
 
             if (!chain.verified) {
                 chain.verified = true
@@ -418,5 +424,6 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         private const val MAX_EFFECT_STRENGTH = 1000
         private val BAND_COUNTS = listOf(128, 64, 32, 16)
         private const val MBC_TOP_HZ = 24000f
+        private const val LOG_SWITCH_MS = 5L
     }
 }
