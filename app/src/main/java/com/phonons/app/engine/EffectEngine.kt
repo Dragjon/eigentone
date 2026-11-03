@@ -30,9 +30,11 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         var lastSurround = Double.NaN
         var lastLimiterThreshold = Double.NaN
         val lastGains = FloatArray(bandCount) { Float.NaN }
+        val lastRightGains = FloatArray(bandCount) { Float.NaN }
         var lastInput = Float.NaN
         var lastBalance = Double.NaN
         var lastNight = Double.NaN
+        var lastLeveller = Double.NaN
         var lastLimiter: Boolean? = null
         var lastEnabled: Boolean? = null
         var verified = false
@@ -48,8 +50,17 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
     private var spatialError: String? = null
     private var latest: AppState? = null
 
+    private var rebuilds = 0
+    private var readback: String? = null
+
     /** Set by the service before [apply]. */
     var attenuationDb = 0.0
+
+    /** Set by the service before [apply]. Whether the time of day is inside the night mode schedule. */
+    var scheduledNight = false
+
+    /** Set by the service before [apply]. Takes the sound out of the path during the hearing check. */
+    var suspended = false
 
     fun apply(state: AppState) {
         latest = state
@@ -81,9 +92,11 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
     fun refresh() {
         chains.values.forEach { chain ->
             chain.lastGains.fill(Float.NaN)
+            chain.lastRightGains.fill(Float.NaN)
             chain.lastInput = Float.NaN
             chain.lastBalance = Double.NaN
             chain.lastNight = Double.NaN
+            chain.lastLeveller = Double.NaN
             chain.lastLimiter = null
             chain.lastEnabled = null
             chain.lastLimiterThreshold = Double.NaN
@@ -104,6 +117,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         val shouldBeAttached = activeMode != EngineMode.SESSIONS && chains.isEmpty()
         if (broken || shouldBeAttached) {
             Log.w(TAG, "Watchdog rebuilding effect: broken=$broken unattached=$shouldBeAttached")
+            rebuilds++
             builtMode = null
             apply(state)
         }
@@ -189,22 +203,20 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
     private fun push(chain: Chain, state: AppState) {
         val map = mapper ?: return
         val dp = chain.dp
-        val target = Processing.target(state, attenuationDb)
+        val target = Processing.target(
+            if (suspended) state.copy(bypass = true, matchBypass = false) else state,
+            attenuationDb,
+            scheduledNight,
+        )
         try {
             val gains = map.gains(target.filters)
-            for (i in gains.indices) {
-                val last = chain.lastGains[i]
-                if (last.isNaN() || abs(last - gains[i]) >= GAIN_EPSILON) {
-                    dp.setPreEqBandAllChannelsTo(
-                        i, DynamicsProcessing.EqBand(true, map.cutoffs[i], gains[i]),
-                    )
-                    chain.lastGains[i] = gains[i]
-                }
-            }
+            pushBands(dp, map, /* channel = */ 0, gains, chain.lastGains)
+            val rightGains = if (target.rightFilters === target.filters) gains else map.gains(target.rightFilters)
+            pushBands(dp, map, /* channel = */ 1, rightGains, chain.lastRightGains)
 
             if (!chain.verified) {
                 chain.verified = true
-                verifyBands(chain, map, gains)
+                verifyBands(chain, map, gains, rightGains)
             }
 
             val input = target.inputDb.toFloat()
@@ -226,9 +238,10 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
                 chain.lastLimiterThreshold = target.limiterThresholdDb
             }
 
-            if (target.nightMode != chain.lastNight) {
-                pushNightMode(dp, target.nightMode)
+            if (target.nightMode != chain.lastNight || target.leveller != chain.lastLeveller) {
+                pushDynamics(dp, target.nightMode, target.leveller)
                 chain.lastNight = target.nightMode
+                chain.lastLeveller = target.leveller
             }
 
             val wanted = target.effectEnabled
@@ -241,6 +254,16 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
             error = "Lost connection to ${chain.label}: ${e.message}"
         }
         pushSurround(chain, target)
+    }
+
+    private fun pushBands(dp: DynamicsProcessing, map: CurveMapper, channel: Int, gains: FloatArray, sent: FloatArray) {
+        for (i in gains.indices) {
+            val last = sent[i]
+            if (last.isNaN() || abs(last - gains[i]) >= GAIN_EPSILON) {
+                dp.setPreEqBandByChannelIndex(channel, i, DynamicsProcessing.EqBand(true, map.cutoffs[i], gains[i]))
+                sent[i] = gains[i]
+            }
+        }
     }
 
     /** Only exists while in use, so turning surround off fully removes it from the audio path. */
@@ -287,27 +310,39 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
     }
 
     /** Reads bands back once, so a device that silently ignores them shows up as a visible error. */
-    private fun verifyBands(chain: Chain, map: CurveMapper, gains: FloatArray) {
-        val wrong = gains.indices.count { i ->
-            val band = chain.dp.getPreEqBandByChannelIndex(0, i)
+    private fun verifyBands(chain: Chain, map: CurveMapper, left: FloatArray, right: FloatArray) {
+        fun wrong(channel: Int, gains: FloatArray) = gains.indices.count { i ->
+            val band = chain.dp.getPreEqBandByChannelIndex(channel, i)
             abs(band.cutoffFrequency - map.cutoffs[i]) > 1f || abs(band.gain - gains[i]) > 0.1f
         }
-        Log.i(TAG, "Band readback on ${chain.label}: ${gains.size - wrong}/${gains.size} match")
-        if (wrong > 0) error = "${chain.label} did not accept $wrong of ${gains.size} EQ bands"
+        val total = left.size + right.size
+        val rejected = wrong(0, left) + wrong(1, right)
+        Log.i(TAG, "Band readback on ${chain.label}: ${total - rejected}/$total match across both channels")
+        readback = "${total - rejected}/$total"
+        if (rejected > 0) error = "${chain.label} did not accept $rejected of $total EQ bands"
     }
 
-    /** Evens out loud and quiet parts, with makeup gain so overall level stays similar. */
-    private fun pushNightMode(dp: DynamicsProcessing, amount: Double) {
+    /**
+     * Both modes bring loud and quiet parts closer, with makeup gain so overall level stays similar.
+     * Night mode reacts quickly to tame sudden moments. The leveller is slow and gentle, so it evens
+     * out whole passages and tracks without flattening individual drum hits. There's only one
+     * compressor, so night mode takes priority.
+     */
+    private fun pushDynamics(dp: DynamicsProcessing, night: Double, leveller: Double) {
+        val useNight = night > 0.001
+        val amount = if (useNight) night else leveller
         val on = amount > 0.001
-        val threshold = (-30.0 * amount).toFloat()
-        val ratio = (1.0 + 3.0 * amount).toFloat()
-        val makeup = (9.0 * amount).toFloat()
+        val threshold = ((if (useNight) -30.0 else -24.0) * amount).toFloat()
+        val ratio = (1.0 + (if (useNight) 3.0 else 2.0) * amount).toFloat()
+        val makeup = ((if (useNight) 9.0 else 6.0) * amount).toFloat()
+        val attack = if (useNight) 8f else 50f
+        val release = if (useNight) 120f else 1000f
         val mbc = DynamicsProcessing.Mbc(true, on, MBC_BANDS)
         MBC_CUTOFFS.forEachIndexed { i, cutoff ->
             mbc.setBand(
                 i,
                 DynamicsProcessing.MbcBand(
-                    on, cutoff, /* attack */ 8f, /* release */ 120f, ratio, threshold,
+                    on, cutoff, attack, release, ratio, threshold,
                     /* knee */ 6f, /* gate */ -90f, /* expander */ 1f, /* pre */ 0f, makeup,
                 ),
             )
@@ -335,6 +370,8 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
                 sessions = if (activeMode == EngineMode.SESSIONS) chains.values.map { it.label } else emptyList(),
                 error = error,
                 spatialError = spatialError,
+                rebuilds = rebuilds,
+                readback = readback,
             ),
         )
     }

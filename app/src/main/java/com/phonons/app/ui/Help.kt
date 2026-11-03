@@ -62,12 +62,47 @@ object Help {
         "Bands",
         "More bands allow finer changes. 10 is quickest, and 31 is the most precise but harder to set by finger. Switching keeps your curve's overall shape.",
     )
-    val graphicShapes = Tip("Shapes", "Ready-made curves to start from. Tap one, then adjust it to taste. It replaces the current faders, and leaves your preset's headphone correction alone.")
+    val graphicShapes = Tip("Shapes", "Ready-made curves to start from. Tap one, then adjust it to taste. It replaces the current faders, and your preset's headphone correction stays underneath, so it adds to that.")
     val shapeLibrary = Tip(
         "Shape library",
-        "Search by genre, instrument, situation or problem, or filter by what a curve does, such as More bass. Tap a shape to hear it on your music, and nothing is kept until you choose Use this. These are designed starting points, not measurements. Thumbnails run from 20 Hz on the left to 20 kHz on the right.",
+        "Search by genre, instrument, situation or problem, or filter by what a curve does, such as More bass. Tap a shape to hear it on your music, matched in loudness so the comparison is fair, and nothing is kept until you choose Use this. The level may change slightly when you do. These are designed starting points, not measurements. Thumbnails run from 20 Hz on the left to 20 kHz on the right.",
     )
     val shapeAmount = Tip("Amount", "How strongly the shape is applied. 100% is as designed, lower is more subtle, and higher is stronger. Double-tap to return to 100%.")
+    val shapeMode = Tip(
+        "Replace or Add",
+        "Replace swaps your faders for this shape. Add puts it on top of your current faders, so you can layer shapes, such as a genre plus a fix for something too harsh.",
+    )
+    val correction = Tip(
+        "Headphone correction",
+        "How much of this preset's own filters to apply, such as a headphone correction. 100% is as designed, and 0% removes them while keeping your faders and tone. If a sound seems muted or dull, try turning this down.",
+    )
+    val leveller = Tip(
+        "Volume leveller",
+        "Slowly evens out loud and quiet passages, which helps when apps and tracks differ in level. Higher values sound flatter. Night mode takes priority while it's on.",
+    )
+    val nightSchedule = Tip(
+        "Night mode schedule",
+        "Turns night mode on at the times you choose. It only works while Phonons is running, and it won't lower a stronger setting you've chosen above.",
+    )
+    val nightScheduleAmount = Tip("Scheduled strength", "How strong night mode is during the scheduled hours.")
+    val nightScheduleStart = Tip("Starts at", "The time night mode turns on. Move this in half-hour steps.")
+    val nightScheduleEnd = Tip("Ends at", "The time night mode turns off. It can be after midnight.")
+    val share = Tip("Share this sound", "Creates a text code holding this whole sound, which you can send to someone. It contains EQ settings only, and nothing about you.")
+    val addShared = Tip("Add a shared sound", "Paste a code someone shared with you. It's added as a new preset, and your others are kept.")
+    val hearing = Tip(
+        "Hearing check",
+        "Plays quiet tones in each ear to build a gentle curve for what you hear least well, and can correct each ear separately. It takes about 3 minutes. It isn't a medical test.",
+    )
+    val perApp = Tip(
+        "Per-app presets",
+        "Loads a preset when a chosen app starts playing, such as one sound for Spotify and another for YouTube.",
+    )
+    val perAppAccess = Tip(
+        "Why this access is needed",
+        "Android only reveals which app is playing to apps with notification access. Phonons ignores your notifications and only checks the playing app, and that stays on your phone. Without it, everything else still works.",
+    )
+    val diagnostics = Tip("Status details", "Copies technical details about your phone and the audio engine, for reporting a problem. Nothing is sent anywhere unless you paste it somewhere.")
+    val crashReport = Tip("Crash report", "A technical record of the last crash, kept only on this phone. You choose whether to share it, and deleting it removes it.")
     val graphicSmooth = Tip("Smooth", "Softens sharp steps between neighbouring faders, which often sounds more natural. Tap it again for a stronger effect.")
 
     val surround = Tip(
@@ -123,14 +158,25 @@ object Help {
         "Find headphones",
         "Searches AutoEq's published correction profiles and adds the one you pick. It needs internet access. Measurements are a starting point, and your ears and fit still matter.",
     )
-    val importFile = Tip("Import EQ file", "Adds a preset from an AutoEq or Equalizer APO ParametricEQ.txt file.")
+    val importFile = Tip(
+        "Import EQ file",
+        "Adds a preset from an AutoEq or Equalizer APO file, either ParametricEQ or GraphicEQ. A GraphicEQ file keeps every point, with no rounding to faders.",
+    )
+    val exportFile = Tip(
+        "Export EQ file",
+        "Saves this preset's sound as a GraphicEQ text file, which AutoEq-compatible apps and Equalizer APO can read. Surround and settings outside the preset aren't included.",
+    )
+    val earCorrection = Tip(
+        "Ear correction",
+        "A separate EQ for each ear, from the hearing check. It closes half of the gap between your ears at each frequency, and stays on when you change preset. Fit can affect the result, so repeat the check if it sounds off.",
+    )
     val backup = Tip(
         "Back up presets",
-        "Saves your presets, output choices and favourites to a file. Settings that aren't part of a preset, such as balance and night mode, aren't included.",
+        "Saves your presets, your shapes, output and per-app choices, and favourites to a file. Ear correction is included. Other settings that aren't part of a preset, such as balance and night mode, aren't.",
     )
     val restore = Tip(
         "Restore presets",
-        "Adds presets from a backup file. A preset with the same identity is replaced, and your others are kept.",
+        "Adds presets, your shapes, per-app choices and ear correction from a backup file. Anything with the same identity is replaced, and the rest is kept.",
     )
 
     val engineMode = Tip(
@@ -145,6 +191,8 @@ object Help {
     val statusMode = Tip("Mode", "Which audio route is in use. Global applies to all apps it can reach, and Per app applies to individual players.")
     val statusBands = Tip("EQ bands", "How finely your curve is reproduced. More is more accurate, and 128 is the most Phonons asks for.")
     val statusControl = Tip("In control", "Whether Phonons controls the effect. If another audio app takes over, Phonons' settings may stop applying.")
+    val statusReadback = Tip("Bands accepted", "Phonons reads its settings back from Android to confirm they were applied. All bands should match, such as 128/128.")
+    val statusRepairs = Tip("Repairs", "How many times Phonons has rebuilt the effect after losing it since it last started, such as when Android's audio system restarts. Occasional repairs are fine, but a rising number suggests a problem on this phone.")
     val statusOutput = Tip("Output", "Where Phonons thinks audio is going. This decides which preset loads.")
     val statusApps = Tip("Attached apps", "The players Phonons is processing in Per app mode.")
 }

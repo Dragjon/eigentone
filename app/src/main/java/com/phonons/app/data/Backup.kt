@@ -12,6 +12,10 @@ data class Backup(
     val presets: List<Preset> = emptyList(),
     val outputProfiles: Map<String, String> = emptyMap(),
     val favorites: Set<String> = emptySet(),
+    val customShapes: List<CustomShape> = emptyList(),
+    val favoriteShapes: Set<String> = emptySet(),
+    val appProfiles: Map<String, String> = emptyMap(),
+    val earCorrection: EarCorrection? = null,
 )
 
 /** Reads and writes preset backups. Restored files are sanitised, since they could be edited. */
@@ -20,12 +24,21 @@ object BackupCodec {
     private const val MAX_NAME = 80
     private const val MAX_IMPORT_GAIN = 30.0
     private const val MAX_PREAMP = 30.0
+    private const val MAX_EAR_DB = 6.0
 
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; prettyPrint = true }
 
     fun encode(state: AppState): String = json.encodeToString(
         Backup.serializer(),
-        Backup(presets = state.presets, outputProfiles = state.outputProfiles, favorites = state.favorites),
+        Backup(
+            presets = state.presets,
+            outputProfiles = state.outputProfiles,
+            favorites = state.favorites,
+            customShapes = state.customShapes,
+            favoriteShapes = state.favoriteShapes,
+            appProfiles = state.appProfiles,
+            earCorrection = state.earCorrection,
+        ),
     )
 
     /** Returns null if the text is not a valid backup. */
@@ -36,24 +49,40 @@ object BackupCodec {
                 // Only user presets can be restored, so a backup can't replace a built-in.
                 .filter { it.id.startsWith("user:") && it.name.isNotBlank() }
                 .map(::sanitise),
+            customShapes = backup.customShapes.mapNotNull(::sanitise),
+            earCorrection = backup.earCorrection?.let { ears ->
+                ears.copy(left = ShapeText.cleanCurve(ears.left, MAX_EAR_DB), right = ShapeText.cleanCurve(ears.right, MAX_EAR_DB))
+            },
         )
     } catch (e: Exception) {
         null
     }
 
-    /** Backed-up presets replace ones with the same id, and everything else is kept. */
+    /** Backed-up presets and shapes replace ones with the same id, and everything else is kept. */
     fun merge(state: AppState, backup: Backup): AppState {
         val incoming = backup.presets.associateBy { it.id }
         val kept = state.presets.filterNot { it.id in incoming }
         val known = (BuiltIns.all + kept + backup.presets).map { it.id }.toSet()
+        val incomingShapes = backup.customShapes.map { it.id }.toSet()
         return state.copy(
             presets = kept + backup.presets,
             outputProfiles = state.outputProfiles + backup.outputProfiles.filterValues { it in known },
             favorites = state.favorites + backup.favorites.filter { it in known },
+            customShapes = state.customShapes.filterNot { it.id in incomingShapes } + backup.customShapes,
+            favoriteShapes = state.favoriteShapes + backup.favoriteShapes,
+            appProfiles = state.appProfiles + backup.appProfiles.filterValues { it in known },
+            earCorrection = backup.earCorrection ?: state.earCorrection,
         )
     }
 
-    private fun sanitise(preset: Preset) = preset.copy(
+    /** Returns null if nothing usable is left, as a shape with no points can't be shown or applied. */
+    private fun sanitise(shape: CustomShape): CustomShape? {
+        val points = ShapeText.cleanCurve(shape.points, GraphicEq.MAX_DB).take(ShapeText.MAX_POINTS)
+        if (!shape.id.startsWith("custom:") || shape.name.isBlank() || points.isEmpty()) return null
+        return shape.copy(name = shape.name.take(MAX_NAME), points = points)
+    }
+
+    fun sanitise(preset: Preset) = preset.copy(
         name = preset.name.take(MAX_NAME),
         preampDb = safe(preset.preampDb, 0.0).coerceIn(-MAX_PREAMP, MAX_PREAMP),
         filters = preset.filters.take(MAX_FILTERS).map(::sanitise),
@@ -73,6 +102,8 @@ object BackupCodec {
             graphicBands = bands,
             surround = safe(tone.surround, 0.0).coerceIn(0.0, 1.0),
             strength = safe(tone.strength, 1.0).coerceIn(0.0, 1.5),
+            correction = safe(tone.correction, 1.0).coerceIn(0.0, 1.0),
+            importedCurve = ShapeText.cleanCurve(tone.importedCurve),
         )
     }
 

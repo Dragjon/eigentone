@@ -17,6 +17,9 @@ data class ProcessingTarget(
     val effectEnabled: Boolean,
     val limiterThresholdDb: Double = -1.0,
     val surround: Double = 0.0,
+    val leveller: Double = 0.0,
+    /** Differs from [filters], which is then the left ear, only while ear correction is on. */
+    val rightFilters: List<Filter> = filters,
 )
 
 /** Turns the user's settings into the final processing. Pure, so it can be unit tested. */
@@ -60,9 +63,11 @@ object Processing {
     fun presetFilters(preset: Preset): List<Filter> {
         val tone = preset.tone
         val scale = tone.strength
+        val filterScale = scale * tone.correction
         return preset.filters.map { filter ->
-            if (scale != 1.0 && filter.type.hasGain) filter.copy(gainDb = filter.gainDb * scale) else filter
-        } +
+            if (filterScale != 1.0 && filter.type.hasGain) filter.copy(gainDb = filter.gainDb * filterScale) else filter
+        }.filterNot { tone.correction == 0.0 && !it.type.hasGain } +
+            curveFilter(IMPORTED_CURVE_ID, tone.importedCurve, filterScale) +
             GraphicEq.filters(
                 GraphicEq.normalized(tone.graphicDb, tone.graphicBands).map { it * scale },
                 tone.graphicBands,
@@ -76,14 +81,54 @@ object Processing {
         presetFilters(state.current) +
             if (state.loudness) loudnessFilters(attenuationDb, state.loudnessStrength) else emptyList()
 
-    fun target(state: AppState, attenuationDb: Double): ProcessingTarget {
+    /**
+     * A preset's level belongs to its correction, so turning the correction down takes the matching
+     * level change with it. Otherwise removing a correction would leave the sound needlessly quiet.
+     */
+    fun preampOf(preset: Preset): Double = preset.preampDb * preset.tone.correction
+
+    /** The level going into the EQ for this preset, including any preview trim. */
+    fun inputOf(preset: Preset, filters: List<Filter>, autoHeadroom: Boolean): Double =
+        Eq.inputGainDb(filters, preampOf(preset), autoHeadroom) + preset.tone.trimDb
+
+    private fun curveFilter(id: Int, points: List<ShapePoint>, scale: Double = 1.0): List<Filter> =
+        if (points.isEmpty() || scale == 0.0) {
+            emptyList()
+        } else {
+            listOf(Filter(id, FilterType.CURVE, curve = points.map { it.hz to it.db * scale }))
+        }
+
+    /** The whole preset as one curve including its level, in the form other EQ apps can read. */
+    fun exportCurve(preset: Preset): List<ShapePoint> {
+        val filters = presetFilters(preset)
+        val level = preampOf(preset)
+        return List(EXPORT_POINTS) { i ->
+            val hz = kotlin.math.round(Eq.logFreq(i.toDouble() / (EXPORT_POINTS - 1)))
+            ShapePoint(hz, Eq.curveDb(filters, hz) + level)
+        }
+    }
+
+    fun target(state: AppState, attenuationDb: Double, scheduledNight: Boolean = false): ProcessingTarget {
         val filters = effectiveFilters(state, attenuationDb)
-        val input = Eq.inputGainDb(filters, state.current.preampDb, state.autoHeadroom)
+        val input = inputOf(state.current, filters, state.autoHeadroom)
         if (!state.bypass) {
+            val ears = state.earCorrection?.takeIf { it.enabled }
+            val left = if (ears == null) filters else filters + curveFilter(EAR_CURVE_ID, ears.left)
+            val right = if (ears == null) filters else filters + curveFilter(EAR_CURVE_ID, ears.right)
+            // One level for both ears. Separate levels would shift the balance across every frequency.
+            val shared = if (ears == null) {
+                input
+            } else {
+                min(inputOf(state.current, left, state.autoHeadroom), inputOf(state.current, right, state.autoHeadroom))
+            }
             return ProcessingTarget(
-                filters, input, state.limiter, state.nightMode, effectEnabled = true,
+                left, shared, state.limiter,
+                nightMode = if (scheduledNight) maxOf(state.nightMode, state.nightSchedule.amount) else state.nightMode,
+                effectEnabled = true,
                 limiterThresholdDb = state.limiterThresholdDb,
                 surround = state.current.tone.surround,
+                leveller = state.leveller,
+                rightFilters = right,
             )
         }
         if (!state.matchBypass) {
@@ -124,4 +169,7 @@ object Processing {
     }
 
     private const val LOUDNESS_STEPS = 120
+    private const val EXPORT_POINTS = 127
+    private const val IMPORTED_CURVE_ID = -101
+    private const val EAR_CURVE_ID = -102
 }

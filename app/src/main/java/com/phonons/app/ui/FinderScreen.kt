@@ -55,7 +55,7 @@ import com.phonons.app.data.SoundFinder
 import com.phonons.app.data.Trait
 import java.util.Locale
 
-private enum class FinderStep { INTRO, COMPARE, RESULT }
+private enum class FinderStep { INTRO, COMPARE, FINAL, RESULT }
 
 /**
  * Guided listening test. It changes the live sound while it runs, and puts everything back exactly
@@ -126,12 +126,21 @@ fun FinderScreen(onSetEnabled: (Boolean) -> Unit, onClose: () -> Unit) {
                         start = start,
                         onAnswered = {
                             progress++
-                            if (active.isDone) {
-                                Repo.edit { start.copy(tone = active.result()) }
-                                step = FinderStep.RESULT
-                            }
+                            if (active.isDone) step = FinderStep.FINAL
                         },
                         onCancel = ::cancel,
+                    )
+                }
+                FinderStep.FINAL -> finder?.let { active ->
+                    FinalChoice(
+                        previous = before.current,
+                        result = start.copy(tone = active.result()),
+                        autoHeadroom = state.autoHeadroom,
+                        onKeepPrevious = ::cancel,
+                        onUseNew = {
+                            Repo.edit { start.copy(tone = active.result()) }
+                            step = FinderStep.RESULT
+                        },
                     )
                 }
                 FinderStep.RESULT -> finder?.let { active ->
@@ -188,18 +197,36 @@ private fun Intro(
         Text("• Listening on: $outputLabel", style = MaterialTheme.typography.bodyMedium, color = Palette.Text)
     }
     Text("Start from", style = MaterialTheme.typography.titleSmall, color = Palette.TextDim)
-    if (correction != null) {
-        Button(onClick = { onStart(correction) }, modifier = Modifier.fillMaxWidth()) {
-            Text("${correction.name} correction (recommended)")
+    // A sound the listener has already shaped is a better base than a fresh correction it may replace.
+    val hasOwnSound = current.filters.any { it.gainDb != 0.0 } || current.tone != com.phonons.app.data.Tone()
+    if (hasOwnSound) {
+        Button(onClick = { onStart(current) }, modifier = Modifier.fillMaxWidth()) {
+            Text("My current sound: ${current.name} (recommended)")
         }
+    }
+    if (correction != null) {
+        val recommended = if (hasOwnSound) "" else " (recommended)"
+        if (hasOwnSound) {
+            FilledTonalButton(onClick = { onStart(correction) }, modifier = Modifier.fillMaxWidth()) {
+                Text("${correction.name} correction")
+            }
+        } else {
+            Button(onClick = { onStart(correction) }, modifier = Modifier.fillMaxWidth()) {
+                Text("${correction.name} correction$recommended")
+            }
+        }
+    } else if (hasOwnSound) {
+        FilledTonalButton(onClick = onFind, modifier = Modifier.fillMaxWidth()) { Text("Find my headphones first") }
     } else {
         Button(onClick = onFind, modifier = Modifier.fillMaxWidth()) { Text("Find my headphones first (recommended)") }
     }
-    FilledTonalButton(onClick = { onStart(current) }, modifier = Modifier.fillMaxWidth()) {
-        Text("My current sound: ${current.name}")
+    if (!hasOwnSound) {
+        FilledTonalButton(onClick = { onStart(current) }, modifier = Modifier.fillMaxWidth()) {
+            Text("My current sound: ${current.name}")
+        }
     }
     Text(
-        "A headphone correction evens out your model's sound first, so your choices start from a balanced base.",
+        "A headphone correction evens out your model's sound first, so your choices start from a balanced base. You'll compare the result with your current sound at the end.",
         style = MaterialTheme.typography.bodySmall,
         color = Palette.TextDim,
     )
@@ -303,6 +330,51 @@ private fun SideCard(label: String, selected: Boolean, musicActive: Boolean, mod
             )
         }
     }
+}
+
+/**
+ * The test's result has to beat what the listener already had, or there's no reason to change. Both
+ * play at the same estimated loudness, and neither is presented as the expected answer.
+ */
+@Composable
+private fun FinalChoice(
+    previous: Preset,
+    result: Preset,
+    autoHeadroom: Boolean,
+    onKeepPrevious: () -> Unit,
+    onUseNew: () -> Unit,
+) {
+    var hearingNew by remember { mutableStateOf(true) }
+    fun hear(new: Boolean) {
+        hearingNew = new
+        Repo.edit { if (new) SoundFinder.levelMatched(result, result.tone, previous, autoHeadroom) else previous }
+    }
+    LaunchedEffect(Unit) { hear(true) }
+
+    Text("One last comparison", style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
+    Text(
+        "Is the new sound actually better than what you had? Switch between them, ideally on more than one song. Keeping what you had is a perfectly good answer.",
+        style = MaterialTheme.typography.bodyLarge,
+        color = Palette.TextDim,
+    )
+    NothingPlayingHint()
+    val musicActive = rememberMusicActive()
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        SideCard("What I had", !hearingNew, musicActive, Modifier.weight(1f)) { hear(false) }
+        SideCard("New", hearingNew, musicActive, Modifier.weight(1f)) { hear(true) }
+    }
+    FilledTonalButton(
+        onClick = onKeepPrevious,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 52.dp),
+    ) { Text("Keep what I had") }
+    FilledTonalButton(
+        onClick = onUseNew,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 52.dp),
+    ) { Text("Use the new sound") }
 }
 
 private fun describe(trait: Trait, value: Double): String {

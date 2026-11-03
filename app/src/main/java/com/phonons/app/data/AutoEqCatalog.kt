@@ -38,6 +38,33 @@ object AutoEqCatalog {
             .toList()
     }
 
+    /**
+     * The profile for a connected device, judged by its name. The device's words must be the end of the
+     * profile's name, so "Liberty 4" won't pick "Liberty 4 NC", while a leading brand such as "Sony" is
+     * allowed. Vague names like "Buds" find nothing rather than the wrong headphones.
+     */
+    fun bestMatch(entries: List<CatalogEntry>, deviceName: String): CatalogEntry? {
+        val device = words(deviceName.replace(Regex("""^.*?['’]s\s+"""), ""))
+        val specific = device.size >= 2 || device.any { word -> word.any(Char::isDigit) && word.length >= 3 }
+        if (!specific) return null
+        return entries
+            .filter { entry ->
+                val name = words(entry.name.replace(Regex("""\(.*?\)"""), ""))
+                name.size >= device.size && name.takeLast(device.size) == device
+            }
+            .minWithOrNull(
+                compareBy<CatalogEntry> { entry ->
+                    SOURCE_PREFERENCE.indexOfFirst { it in entry.source.lowercase() }.let { if (it < 0) SOURCE_PREFERENCE.size else it }
+                }.thenBy { it.name.length },
+            )
+    }
+
+    private fun words(text: String): List<String> =
+        text.lowercase().split(Regex("[^a-z0-9]+")).filter { it.isNotEmpty() }
+
+    /** Measurement rigs known for consistency come first. Any match is better than none. */
+    private val SOURCE_PREFERENCE = listOf("oratory1990", "rtings", "crinacle", "dhrme")
+
     fun profileUrl(entry: CatalogEntry): String =
         BASE + entry.path + "/" + entry.path.substringAfterLast('/') + "%20ParametricEQ.txt"
 

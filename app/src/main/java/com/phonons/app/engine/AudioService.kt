@@ -30,12 +30,17 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /** Keeps the effect alive in the background and reacts to players and output changes. */
 class AudioService : Service() {
+
+    private data class Inputs(val state: AppState, val attenuation: Double, val night: Boolean, val suspended: Boolean)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val engineDispatcher = Dispatchers.Default.limitedParallelism(1)
@@ -43,6 +48,7 @@ class AudioService : Service() {
 
     private val engine = EffectEngine { Repo.status.value = it }
     private lateinit var audioManager: AudioManager
+    private val mediaWatcher by lazy { MediaWatcher(this, Repo::onPlayingAppChanged) }
     private var lastNotified: Pair<Boolean, String>? = null
     @Volatile private var outputDeviceType = AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
 
@@ -98,14 +104,34 @@ class AudioService : Service() {
             }
         }
         scope.launch {
-            combine(Repo.state, Repo.attenuationDb) { state, attenuation -> state to attenuation }
+            // Restarts when the schedule is edited, so a change is heard at once rather than at the next check.
+            Repo.state.map { it.nightSchedule }.distinctUntilChanged().collectLatest { schedule ->
+                while (true) {
+                    val now = java.time.LocalTime.now()
+                    Repo.scheduledNight.value = schedule.isActive(now.hour * 60 + now.minute)
+                    delay(SCHEDULE_POLL_MS)
+                }
+            }
+        }
+        scope.launch {
+            while (true) {
+                mediaWatcher.attachIfAllowed()
+                delay(MEDIA_ACCESS_POLL_MS)
+            }
+        }
+        scope.launch {
+            combine(
+                Repo.state, Repo.attenuationDb, Repo.scheduledNight, Repo.hearingCheckRunning,
+            ) { state, attenuation, night, suspended -> Inputs(state, attenuation, night, suspended) }
                 .conflate()
-                .collect { (state, attenuation) ->
+                .collect { (state, attenuation, night, suspended) ->
                     if (!state.enabled) {
                         stopSelf()
                         return@collect
                     }
                     engine.attenuationDb = attenuation
+                    engine.scheduledNight = night
+                    engine.suspended = suspended
                     engine.apply(state)
                     updateNotification(state)
                     delay(APPLY_INTERVAL_MS)
@@ -140,6 +166,8 @@ class AudioService : Service() {
     override fun onDestroy() {
         unregisterReceiver(sessionReceiver)
         audioManager.unregisterAudioDeviceCallback(deviceCallback)
+        mediaWatcher.release()
+        PhononsWidget.refresh(this)
         engine.refreshRequested = null
         // Release on the engine dispatcher so it cannot overlap an apply in progress.
         CoroutineScope(engineDispatcher).launch { engine.release() }
@@ -210,6 +238,7 @@ class AudioService : Service() {
         lastNotified = key
         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(state))
         requestTileRefresh(this)
+        PhononsWidget.refresh(this)
     }
 
     private fun buildNotification(state: AppState): Notification {
@@ -242,6 +271,8 @@ class AudioService : Service() {
         private const val APPLY_INTERVAL_MS = 30L
         private const val WATCHDOG_INTERVAL_MS = 10_000L
         private const val VOLUME_POLL_MS = 1_000L
+        private const val SCHEDULE_POLL_MS = 30_000L
+        private const val MEDIA_ACCESS_POLL_MS = 15_000L
         private const val FALLBACK_RANGE_DB = 45.0
         private const val MAX_ATTENUATION_DB = 60.0
         private const val ACTION_NEXT_PRESET = "com.phonons.app.NEXT_PRESET"

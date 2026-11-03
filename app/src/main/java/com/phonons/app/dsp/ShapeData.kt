@@ -328,7 +328,6 @@ Car stereo | Speakers | doors vehicle | Evens out door-panel boom and adds clari
 """
 
     private const val character = """
-My soundcore curve | Yours | soundcore acoustic custom personal liberty | Your curve from the soundcore app, read from its screen. Set the soundcore EQ to flat when using this, or it applies twice. | 100:4 200:1 400:2 800:2 1600:4 3200:4 6400:4 12800:2
 Warm and smooth | Warm | mellow relaxed | Rich low mids with a soft top. | 60:2 200:2 800:0 3000:-1 8000:-2 14000:-2.5
 Warm blanket | Warm | cosy dark soft | Very cosy and soft around the edges. | 60:3 200:3 700:0.5 2500:-1.5 6000:-3 13000:-4.5
 Velvet | Warm | silky smooth rich | Smooth upper mids with a rich low end. | 70:2 200:1 700:0 3000:-1.5 7000:-1 14000:0.5

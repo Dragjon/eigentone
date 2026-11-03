@@ -19,7 +19,47 @@ data class Tone(
     val surround: Double = 0.0,
     /** Scales every EQ change in the preset: 0 is flat, 1 is as designed, 1.5 is stronger. */
     val strength: Double = 1.0,
+    /** Scales the preset's own filters, such as a headphone correction: 0 removes them, 1 is as designed. */
+    val correction: Double = 1.0,
+    /** A level change for fair comparisons while previewing. Never saved as part of a preset. */
+    val trimDb: Double = 0.0,
+    /** A curve imported at full detail, such as a GraphicEQ file. Scaled by [correction], like filters. */
+    val importedCurve: List<ShapePoint> = emptyList(),
 )
+
+@Serializable
+data class ShapePoint(val hz: Double, val db: Double)
+
+/** A curve the user made, typed in, or got from the hearing check. */
+@Serializable
+data class CustomShape(val id: String, val name: String, val points: List<ShapePoint>)
+
+/**
+ * Separate changes for each ear, added to the preset's sound. These come from the hearing check and
+ * belong to the listener, so they stay in place when the preset changes.
+ */
+@Serializable
+data class EarCorrection(
+    val enabled: Boolean = true,
+    val left: List<ShapePoint> = emptyList(),
+    val right: List<ShapePoint> = emptyList(),
+)
+
+/** Applies night mode automatically during part of the day. Times are minutes after midnight. */
+@Serializable
+data class NightSchedule(
+    val enabled: Boolean = false,
+    val startMinute: Int = 22 * 60,
+    val endMinute: Int = 7 * 60,
+    val amount: Double = 0.6,
+) {
+    /** Handles periods that run past midnight. */
+    fun isActive(minuteOfDay: Int): Boolean = when {
+        !enabled || startMinute == endMinute -> false
+        startMinute < endMinute -> minuteOfDay in startMinute until endMinute
+        else -> minuteOfDay >= startMinute || minuteOfDay < endMinute
+    }
+}
 
 @Serializable
 data class Preset(
@@ -59,6 +99,17 @@ data class AppState(
     val startOnBoot: Boolean = true,
     val favorites: Set<String> = emptySet(),
     val favoriteShapes: Set<String> = emptySet(),
+    val customShapes: List<CustomShape> = emptyList(),
+    /** App package to preset id. */
+    val appProfiles: Map<String, String> = emptyMap(),
+    /** One-off prompts already answered, such as the correction offer for one output. */
+    val dismissedPrompts: Set<String> = emptySet(),
+    val nightSchedule: NightSchedule = NightSchedule(),
+    /** Evens out loud and quiet tracks, from 0 to 1. Night mode takes priority when both are on. */
+    val leveller: Double = 0.0,
+    val earCorrection: EarCorrection? = null,
+    /** Which one-time updates this saved state has had. A fresh install starts at the latest. */
+    val stateVersion: Int = 0,
     val listeningMode: ListeningMode = ListeningMode.NOISE_CANCELLING,
     val analyser: Boolean = false,
     val limiterThresholdDb: Double = -1.0,
@@ -86,15 +137,34 @@ data class AppState(
             limiter = defaults.limiter,
             limiterThresholdDb = defaults.limiterThresholdDb,
             nightMode = defaults.nightMode,
+            nightSchedule = defaults.nightSchedule,
+            leveller = defaults.leveller,
             balance = defaults.balance,
+            earCorrection = defaults.earCorrection,
             loudness = defaults.loudness,
             loudnessStrength = defaults.loudnessStrength,
             matchBypass = defaults.matchBypass,
         )
     }
 
-    /** Moves settings saved by older versions into the current preset, so nobody's sound changes. */
+    /**
+     * Updates a state saved by an older version. The curve below moved out of the shared library when
+     * it became the owner's own shape, and it's added here so that install keeps it. New installs start
+     * at [CURRENT_STATE_VERSION], so they never get it.
+     */
     fun migrated(): AppState {
+        val withCurve = if (stateVersion < 1 && customShapes.none { it.id == OWNER_CURVE.id }) {
+            copy(customShapes = customShapes + OWNER_CURVE)
+        } else {
+            this
+        }
+        // A preview's temporary level can only be here if the app was closed during one.
+        val clean = current.copy(tone = current.tone.copy(trimDb = 0.0))
+        return withCurve.copy(stateVersion = CURRENT_STATE_VERSION, current = clean).withoutLegacyTone()
+    }
+
+    /** Moves settings saved by older versions into the current preset, so nobody's sound changes. */
+    private fun withoutLegacyTone(): AppState {
         val hasLegacy = bassDb != 0.0 || trebleDb != 0.0 || graphicDb.isNotEmpty() || bassTunerDb != 0.0 ||
             bassTunerHz != 80.0 || surround != 0.0
         if (!hasLegacy) return this
@@ -114,6 +184,19 @@ data class AppState(
             bassTunerDb = 0.0,
             bassTunerHz = 80.0,
             surround = 0.0,
+        )
+    }
+
+    companion object {
+        const val CURRENT_STATE_VERSION = 1
+
+        private val OWNER_CURVE = CustomShape(
+            "custom:my-soundcore-curve",
+            "My soundcore curve",
+            listOf(
+                ShapePoint(100.0, 4.0), ShapePoint(200.0, 1.0), ShapePoint(400.0, 2.0), ShapePoint(800.0, 2.0),
+                ShapePoint(1600.0, 4.0), ShapePoint(3200.0, 4.0), ShapePoint(6400.0, 4.0), ShapePoint(12800.0, 2.0),
+            ),
         )
     }
 }
@@ -162,6 +245,10 @@ data class EngineStatus(
     val error: String? = null,
     /** Surround failures are separate, because the EQ keeps working without it. */
     val spatialError: String? = null,
+    /** How many times the watchdog has had to rebuild the effect since the service started. */
+    val rebuilds: Int = 0,
+    /** Bands the phone accepted when read back, as "accepted/total", or null before the first check. */
+    val readback: String? = null,
 )
 
 object BuiltIns {

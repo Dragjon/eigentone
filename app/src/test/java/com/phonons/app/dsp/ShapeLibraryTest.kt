@@ -12,9 +12,10 @@ class ShapeLibraryTest {
     @Test
     fun libraryIsLargeAndEveryCategoryHasShapes() {
         assertTrue("only ${all.size} shapes", all.size >= 500)
-        for (category in ShapeCategory.entries) {
+        for (category in ShapeCategory.entries - ShapeCategory.YOURS) {
             assertTrue(category.label, all.count { it.category == category } >= 25)
         }
+        assertEquals(0, all.count { it.category == ShapeCategory.YOURS })
         // Printed so the count quoted in the app and README can be checked against the real one.
         println("Library: ${all.size}, " + ShapeCategory.entries.joinToString { c -> "${c.label} ${all.count { it.category == c }}" })
     }
@@ -83,19 +84,28 @@ class ShapeLibraryTest {
     }
 
     @Test
-    fun theUsersSoundcoreCurveIsFoundAndHitsItsPoints() {
-        for (query in listOf("my soundcore", "soundcore", "acoustic soundcore")) {
-            assertEquals(query, "My soundcore curve", ShapeLibrary.search(query).first().name)
-        }
-        val shape = all.first { it.name == "My soundcore curve" }
-        val expected = listOf(100.0 to 4.0, 200.0 to 1.0, 400.0 to 2.0, 800.0 to 2.0, 1600.0 to 4.0, 3200.0 to 4.0, 6400.0 to 4.0, 12800.0 to 2.0)
-        assertEquals(expected, shape.points)
-        // The nearest faders at 31 bands stay within half a step of the curve it was read from.
-        val gains = GraphicEq.apply(shape.shape, 31)
-        val freqs = GraphicEq.frequencies(31)
-        assertEquals(4.0, gains[freqs.indexOf(100.0)], 0.0)
-        assertEquals(2.0, gains[freqs.indexOf(800.0)], 0.0)
-        assertEquals(4.0, gains[freqs.indexOf(2000.0)], 0.0)
+    fun yourShapesAreSearchableAndComeFirst() {
+        val mine = ShapeLibrary.yours("custom:a", "Soundcore copy", listOf(100.0 to 4.0, 1000.0 to 0.0))
+        assertEquals("custom:a", mine.id)
+        assertEquals(mine, ShapeLibrary.search("soundcore", yours = listOf(mine)).first())
+        assertEquals(listOf(mine), ShapeLibrary.search("", ShapeCategory.YOURS, yours = listOf(mine)))
+        assertTrue(ShapeLibrary.search("soundcore").none { it.id == "custom:a" })
+        assertEquals(mine, ShapeLibrary.find("custom:a", listOf(mine)))
+    }
+
+    @Test
+    fun followErrorShowsWhenFewFadersBlurAShape() {
+        val detailed = GraphicShape("x", listOf(100.0 to 4.0, 200.0 to 1.0, 400.0 to 2.0, 800.0 to 2.0, 1600.0 to 4.0))
+        assertTrue(GraphicEq.followError(detailed, 10) > 0.75)
+        assertTrue(GraphicEq.followError(detailed, 31) < 0.5)
+    }
+
+    @Test
+    fun layeringAddsToExistingFaders() {
+        val shape = GraphicShape("x", listOf(1000.0 to 3.0))
+        assertEquals(List(10) { 5.0 }, GraphicEq.layered(List(10) { 2.0 }, shape, 10))
+        assertEquals(List(10) { GraphicEq.MAX_DB }, GraphicEq.layered(List(10) { 14.0 }, shape, 10))
+        assertEquals(List(10) { 3.0 }, GraphicEq.layered(emptyList(), shape, 10))
     }
 
     @Test

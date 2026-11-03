@@ -38,6 +38,15 @@ object Repo {
     val attenuationDb = MutableStateFlow(0.0)
     val spectrum = MutableStateFlow<FloatArray?>(null)
 
+    /** The hearing check is running, so the EQ steps aside. Never saved, so it can't get stuck on. */
+    val hearingCheckRunning = MutableStateFlow(false)
+
+    /** Whether the time of day is inside the night mode schedule. Set by the service. */
+    val scheduledNight = MutableStateFlow(false)
+
+    /** The app playing audio, when notification access has been given. Set by the service. */
+    val playingApp = MutableStateFlow<String?>(null)
+
     private val _canUndo = MutableStateFlow(false)
     val canUndo: StateFlow<Boolean> = _canUndo.asStateFlow()
 
@@ -50,7 +59,8 @@ object Repo {
         if (file != null) return
         val atomic = AtomicFile(File(context.filesDir, "state.json"))
         file = atomic
-        load(atomic)?.let { _state.value = it.migrated() }
+        val saved = load(atomic)
+        _state.value = saved?.migrated() ?: AppState(stateVersion = AppState.CURRENT_STATE_VERSION)
         committed = _state.value.current
         _state.drop(1).debounce(400).onEach { save(it) }.launchIn(scope)
     }
@@ -161,6 +171,13 @@ object Repo {
         loadPreset(preset)
     }
 
+    /** Adds a preset from a full-detail curve, such as an imported GraphicEQ file. */
+    fun importCurve(name: String, points: List<ShapePoint>) {
+        val preset = Preset("user:${UUID.randomUUID()}", name, 0.0, emptyList(), tone = Tone(importedCurve = points))
+        _state.update { it.copy(presets = it.presets + preset) }
+        loadPreset(preset)
+    }
+
     /** Assigns a preset to an output, or clears the assignment when [presetId] is null. */
     fun assignToOutput(outputKey: String, presetId: String?) {
         _state.update { s ->
@@ -184,6 +201,47 @@ object Repo {
         _state.update { s ->
             s.copy(favoriteShapes = if (id in s.favoriteShapes) s.favoriteShapes - id else s.favoriteShapes + id)
         }
+    }
+
+    fun saveShape(shape: CustomShape) {
+        _state.update { s ->
+            val replaced = s.customShapes.any { it.id == shape.id }
+            s.copy(customShapes = if (replaced) s.customShapes.map { if (it.id == shape.id) shape else it } else s.customShapes + shape)
+        }
+    }
+
+    fun deleteShape(id: String) {
+        _state.update { s ->
+            s.copy(customShapes = s.customShapes.filterNot { it.id == id }, favoriteShapes = s.favoriteShapes - id)
+        }
+    }
+
+    fun dismissPrompt(key: String) {
+        _state.update { it.copy(dismissedPrompts = it.dismissedPrompts + key) }
+    }
+
+    /** Assigns a preset to an app, or clears it when [presetId] is null. */
+    fun assignToApp(packageName: String, presetId: String?) {
+        _state.update { s ->
+            s.copy(appProfiles = if (presetId == null) s.appProfiles - packageName else s.appProfiles + (packageName to presetId))
+        }
+    }
+
+    /** Adds a preset from a share code and starts using it. Returns false if the code isn't valid. */
+    fun importShareCode(code: String): Boolean {
+        val preset = ShareCode.decode(code) ?: return false
+        _state.update { it.copy(presets = it.presets + preset) }
+        loadPreset(preset)
+        return true
+    }
+
+    /** A different app started playing, so load its preset if it has one. */
+    fun onPlayingAppChanged(packageName: String?) {
+        if (playingApp.value == packageName) return
+        playingApp.value = packageName
+        val state = _state.value
+        val preset = packageName?.let { state.appProfiles[it] }?.let(::findPreset) ?: return
+        if (state.current.id != preset.id) loadPreset(preset)
     }
 
     /** Moves through favourites, or every preset when there are none. */

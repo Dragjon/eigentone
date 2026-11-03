@@ -90,6 +90,21 @@ object GraphicEq {
     fun apply(shape: GraphicShape, bandCount: Int, amount: Double = 1.0): List<Double> =
         frequencies(bandCount).map { snap(interpolate(shape.points, it) * amount) }
 
+    /** Adds a shape to existing faders, so shapes can be layered. */
+    fun layered(base: List<Double>, shape: GraphicShape, bandCount: Int, amount: Double = 1.0): List<Double> {
+        val existing = normalized(base, bandCount)
+        return apply(shape, bandCount, amount).mapIndexed { i, gain -> snap(existing[i] + gain) }
+    }
+
+    /**
+     * The largest gap in dB between a shape and what [bandCount] faders can make of it. Measured on the
+     * finest fader layout, because faders that miss a shape's points blur its detail.
+     */
+    fun followError(shape: GraphicShape, bandCount: Int): Double {
+        val faders = frequencies(bandCount).zip(apply(shape, bandCount))
+        return frequencies(31).maxOf { hz -> abs(interpolate(shape.points, hz) - interpolate(faders, hz)) }
+    }
+
     /** Softens sharp steps between neighbouring faders. */
     fun smooth(gains: List<Double>): List<Double> = gains.indices.map { i ->
         val before = gains.getOrElse(i - 1) { gains[i] }

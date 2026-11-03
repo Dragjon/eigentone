@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Phonons</string>
+    <string name="widget_description">Shows the current preset, with power, Bypass and next preset buttons.</string>
+    <string name="widget_turn_on">Turn on</string>
+    <string name="widget_bypass">Bypass</string>
+    <string name="widget_next">Next</string>
+    <string name="media_access_label">Phonons per-app presets</string>
 </resources>

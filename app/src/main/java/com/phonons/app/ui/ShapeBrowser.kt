@@ -37,7 +37,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -48,12 +50,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
@@ -76,19 +82,27 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.phonons.app.R
+import com.phonons.app.data.CustomShape
 import com.phonons.app.data.Preset
 import com.phonons.app.data.Repo
+import com.phonons.app.data.ShapePoint
+import com.phonons.app.data.ShapeText
+import com.phonons.app.data.SoundFinder
 import com.phonons.app.dsp.GraphicEq
+import com.phonons.app.dsp.GraphicShape
 import com.phonons.app.dsp.LibraryShape
 import com.phonons.app.dsp.ShapeCategory
 import com.phonons.app.dsp.ShapeLibrary
 import com.phonons.app.dsp.ShapeTrait
 import kotlinx.serialization.json.Json
+import java.util.Locale
+import java.util.UUID
 import kotlin.math.roundToInt
 
 private const val THUMBNAIL_RANGE_DB = 9f
 private const val SHORT_SCREEN_DP = 520
 private const val CARD_COLUMNS = 2
+private const val FOLLOW_WARNING_DB = 0.75
 
 /** Survives rotation, so Cancel can always put back exactly what was there before. */
 private val PresetSaver = Saver<Preset, String>(
@@ -108,7 +122,12 @@ private class BrowseOption(val label: String, val detail: String, val count: Int
 fun ShapeBrowser(onClose: () -> Unit) {
     val state by Repo.state.collectAsStateWithLifecycle()
     val before by rememberSaveable(stateSaver = PresetSaver) { mutableStateOf(Repo.state.value.current) }
-    val bands = before.tone.graphicBands
+    var bands by rememberSaveable { mutableIntStateOf(before.tone.graphicBands) }
+    var layering by rememberSaveable { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<ShapeDraft?>(null) }
+    val yours = remember(state.customShapes) {
+        state.customShapes.map { custom -> ShapeLibrary.yours(custom.id, custom.name, custom.points.map { it.hz to it.db }) }
+    }
 
     var query by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf<ShapeCategory?>(null) }
@@ -118,25 +137,35 @@ fun ShapeBrowser(onClose: () -> Unit) {
     var pickedId by rememberSaveable { mutableStateOf<String?>(null) }
     var amount by rememberSaveable { mutableFloatStateOf(1f) }
     var hearingBefore by rememberSaveable { mutableStateOf(false) }
-    val picked = remember(pickedId) { pickedId?.let(ShapeLibrary::find) }
+    val picked = remember(pickedId, yours) { pickedId?.let { ShapeLibrary.find(it, yours) } }
     val focus = LocalFocusManager.current
 
     val favourites = state.favoriteShapes
     val searching = query.isNotBlank()
     val onFirstPage = !searching && category == null && !favouritesOnly && !showAll && trait == null
-    val results = remember(query, category, trait, favouritesOnly, if (favouritesOnly) favourites else null) {
-        ShapeLibrary.search(query, category, trait, if (favouritesOnly) favourites else null)
+    val results = remember(query, category, trait, favouritesOnly, if (favouritesOnly) favourites else null, yours) {
+        ShapeLibrary.search(query, category, trait, if (favouritesOnly) favourites else null, yours)
     }
     val list = rememberLazyListState()
     LaunchedEffect(query, category, trait, favouritesOnly) { list.scrollToItem(0) }
 
+    fun toneFor(shape: LibraryShape, level: Float) = before.tone.copy(
+        graphicDb = if (layering) {
+            GraphicEq.layered(
+                GraphicEq.normalized(before.tone.graphicDb, before.tone.graphicBands).let {
+                    GraphicEq.resample(it, before.tone.graphicBands, bands)
+                },
+                shape.shape, bands, level.toDouble(),
+            )
+        } else {
+            GraphicEq.apply(shape.shape, bands, level.toDouble())
+        },
+        graphicBands = bands,
+    )
+
+    // Matched to the sound before, so a shape isn't favoured just for being louder.
     fun hear(shape: LibraryShape, level: Float) = Repo.edit {
-        before.copy(
-            tone = before.tone.copy(
-                graphicDb = GraphicEq.apply(shape.shape, bands, level.toDouble()),
-                graphicBands = bands,
-            ),
-        )
+        SoundFinder.levelMatched(before, toneFor(shape, level), before, state.autoHeadroom)
     }
 
     fun restore() {
@@ -144,6 +173,7 @@ fun ShapeBrowser(onClose: () -> Unit) {
         pickedId = null
         hearingBefore = false
         amount = 1f
+        bands = before.tone.graphicBands
     }
 
     fun toFirstPage() {
@@ -220,6 +250,7 @@ fun ShapeBrowser(onClose: () -> Unit) {
                 FirstPage(
                     modifier = Modifier.weight(1f),
                     favouriteCount = favourites.size,
+                    yourCount = yours.size,
                     onAll = { showAll = true },
                     onFavourites = { favouritesOnly = true },
                     onCategory = { category = it },
@@ -239,6 +270,24 @@ fun ShapeBrowser(onClose: () -> Unit) {
                         modifier = Modifier.weight(1f),
                     )
                     SoundFilter(trait) { trait = it }
+                }
+                if (category == ShapeCategory.YOURS) {
+                    Row(
+                        Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Button(onClick = { editing = ShapeDraft() }, modifier = Modifier.weight(1f)) { Text("New shape", maxLines = 1) }
+                        FilledTonalButton(
+                            enabled = !GraphicEq.isFlat(GraphicEq.normalized(before.tone.graphicDb, before.tone.graphicBands)),
+                            onClick = {
+                                val faders = GraphicEq.frequencies(before.tone.graphicBands)
+                                    .zip(GraphicEq.normalized(before.tone.graphicDb, before.tone.graphicBands))
+                                    .map { (hz, db) -> ShapePoint(hz, db) }
+                                editing = ShapeDraft(text = ShapeText.format(faders))
+                            },
+                            modifier = Modifier.weight(1f),
+                        ) { Text("Save my faders", maxLines = 1) }
+                    }
                 }
                 LazyColumn(
                     state = list,
@@ -272,6 +321,14 @@ fun ShapeBrowser(onClose: () -> Unit) {
                                 selected = shape.id == pickedId,
                                 favourite = shape.id in favourites,
                                 onToggleFavourite = { Repo.toggleFavoriteShape(shape.id) },
+                                onEdit = if (shape.category == ShapeCategory.YOURS) {
+                                    {
+                                        val custom = state.customShapes.first { it.id == shape.id }
+                                        editing = ShapeDraft(custom.id, custom.name, ShapeText.format(custom.points))
+                                    }
+                                } else {
+                                    null
+                                },
                                 onClick = {
                                     focus.clearFocus()
                                     pickedId = shape.id
@@ -291,6 +348,18 @@ fun ShapeBrowser(onClose: () -> Unit) {
                 shape = picked,
                 amount = amount,
                 hearingBefore = hearingBefore,
+                layering = layering,
+                bands = bands,
+                onLayering = {
+                    layering = it
+                    hearingBefore = false
+                    hear(picked, amount)
+                },
+                onFinerFaders = {
+                    bands = GraphicEq.BAND_OPTIONS.last()
+                    hearingBefore = false
+                    hear(picked, amount)
+                },
                 silentReason = when {
                     !state.enabled -> "Phonons is off, so you won't hear this until it's on."
                     state.bypass -> "Bypass is on, so you won't hear this until it's off."
@@ -307,13 +376,77 @@ fun ShapeBrowser(onClose: () -> Unit) {
                 },
                 onCancel = ::restore,
                 onUse = {
-                    if (hearingBefore) hear(picked, amount)
+                    // Without the comparison's temporary level trim.
+                    Repo.edit { before.copy(tone = toneFor(picked, amount)) }
                     Repo.commit()
                     onClose()
                 },
             )
         }
     }
+
+    editing?.let { draft -> ShapeEditorDialog(draft, onDismiss = { editing = null }) }
+}
+
+/** What's being edited in the shape editor. A null id means it's new. */
+private data class ShapeDraft(val id: String? = null, val name: String = "", val text: String = "")
+
+/** Type in a curve, for example one copied from another app's EQ screen. */
+@Composable
+private fun ShapeEditorDialog(draft: ShapeDraft, onDismiss: () -> Unit) {
+    var name by remember { mutableStateOf(draft.name) }
+    var text by remember { mutableStateOf(draft.text) }
+    val parsed = remember(text) { ShapeText.parse(text) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Palette.Tooltip,
+        title = { Text(if (draft.id == null) "New shape" else "Edit shape") },
+        text = {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true, label = { Text("Name") })
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    minLines = 4,
+                    maxLines = 10,
+                    label = { Text("Frequency and level") },
+                    placeholder = { Text("100 +4\n1.6k -2") },
+                )
+                when {
+                    text.isBlank() -> Text(
+                        "One point per line, such as 100 +4 or 1.6k -2. Copy the values from another app's EQ to match it. Levels between points are filled in.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Palette.TextDim,
+                    )
+                    parsed is ShapeText.Parsed.Problem -> Text(parsed.message, style = MaterialTheme.typography.bodySmall, color = Palette.Danger)
+                    parsed is ShapeText.Parsed.Points -> {
+                        val curve = GraphicEq.apply(GraphicShape(name, parsed.points.map { it.hz to it.db }), 31)
+                        CurveThumbnail(curve, selected = true)
+                    }
+                }
+                if (draft.id != null) {
+                    TextButton(onClick = {
+                        Repo.deleteShape(draft.id)
+                        onDismiss()
+                    }) { Text("Delete shape", color = Palette.Danger) }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = name.isNotBlank() && parsed is ShapeText.Parsed.Points,
+                onClick = {
+                    val points = (parsed as ShapeText.Parsed.Points).points
+                    Repo.saveShape(CustomShape(draft.id ?: "custom:${UUID.randomUUID()}", name.trim(), points))
+                    onDismiss()
+                },
+            ) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 /** Every category and sound at once. Cards and chips wrap, so none can end up off the screen. */
@@ -322,6 +455,7 @@ fun ShapeBrowser(onClose: () -> Unit) {
 private fun FirstPage(
     modifier: Modifier,
     favouriteCount: Int,
+    yourCount: Int,
     onAll: () -> Unit,
     onFavourites: () -> Unit,
     onCategory: (ShapeCategory) -> Unit,
@@ -331,7 +465,8 @@ private fun FirstPage(
     val options = listOf(
         BrowseOption("All shapes", "The whole library", ShapeLibrary.all.size, onAll),
         BrowseOption("Favourites", "Shapes you've starred", favouriteCount, onFavourites),
-    ) + ShapeCategory.entries.map { category ->
+        BrowseOption(ShapeCategory.YOURS.label, ShapeCategory.YOURS.examples, yourCount) { onCategory(ShapeCategory.YOURS) },
+    ) + (ShapeCategory.entries - ShapeCategory.YOURS).map { category ->
         BrowseOption(category.label, category.examples, counts[category] ?: 0) { onCategory(category) }
     }
 
@@ -354,6 +489,8 @@ private fun FirstPage(
                             .fillMaxHeight(),
                     )
                 }
+                // An odd last row keeps its card the same width as the others.
+                if (row.size < CARD_COLUMNS) Spacer(Modifier.weight(1f))
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -452,6 +589,7 @@ private fun ShapeRow(
     selected: Boolean,
     favourite: Boolean,
     onToggleFavourite: () -> Unit,
+    onEdit: (() -> Unit)?,
     onClick: () -> Unit,
 ) {
     Row(
@@ -479,6 +617,11 @@ private fun ShapeRow(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+        if (onEdit != null) {
+            IconButton(onClick = onEdit) {
+                Icon(Icons.Filled.Edit, contentDescription = "Edit ${shape.name}", tint = Palette.TextDim)
+            }
         }
         IconButton(onClick = onToggleFavourite) {
             Icon(
@@ -516,6 +659,10 @@ private fun PreviewPanel(
     shape: LibraryShape,
     amount: Float,
     hearingBefore: Boolean,
+    layering: Boolean,
+    bands: Int,
+    onLayering: (Boolean) -> Unit,
+    onFinerFaders: () -> Unit,
     silentReason: String?,
     onAmount: (Float) -> Unit,
     onToggleBefore: () -> Unit,
@@ -554,6 +701,43 @@ private fun PreviewPanel(
             )
         } else {
             NothingPlayingHint(Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+        }
+        val followError = remember(shape, bands) { GraphicEq.followError(shape.shape, bands) }
+        if (followError > FOLLOW_WARNING_DB && bands < GraphicEq.BAND_OPTIONS.last()) {
+            Row(
+                Modifier.padding(start = 16.dp, end = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "$bands faders miss this shape by up to ${String.format(Locale.US, "%.1f", followError)} dB.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Palette.Text,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onFinerFaders) { Text("Use ${GraphicEq.BAND_OPTIONS.last()}") }
+            }
+        }
+        Row(
+            Modifier.padding(start = 16.dp, end = 8.dp, top = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SingleChoiceSegmentedButtonRow(Modifier.weight(1f)) {
+                SegmentedButton(
+                    selected = !layering,
+                    onClick = { onLayering(false) },
+                    shape = SegmentedButtonDefaults.itemShape(0, 2),
+                    colors = segmentColors(),
+                    icon = {},
+                ) { Text("Replace", maxLines = 1) }
+                SegmentedButton(
+                    selected = layering,
+                    onClick = { onLayering(true) },
+                    shape = SegmentedButtonDefaults.itemShape(1, 2),
+                    colors = segmentColors(),
+                    icon = {},
+                ) { Text("Add", maxLines = 1) }
+            }
+            InfoButton(Help.shapeMode)
         }
         SliderSetting(
             title = "Amount",

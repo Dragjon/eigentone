@@ -195,7 +195,7 @@ class GraphicAndFinderTest {
 
     @Test
     fun migrationLeavesNewStatesAlone() {
-        val state = AppState()
+        val state = AppState(stateVersion = AppState.CURRENT_STATE_VERSION)
         assertEquals(state, state.migrated())
     }
 
@@ -274,9 +274,10 @@ class GraphicAndFinderTest {
     fun comparisonsAreLevelMatched() {
         val reference = Preset("user:a", "A", filters = emptyList())
         val matched = SoundFinder.levelMatched(reference, Tone(bassDb = 6.0, vocalsDb = 3.0), reference)
-        val loudness = Processing.estimatedLoudnessDb(Processing.presetFilters(matched), matched.preampDb)
+        val filters = Processing.presetFilters(matched)
+        val loudness = Processing.estimatedLoudnessDb(filters, Processing.inputOf(matched, filters, true))
         assertEquals(0.0, loudness, 0.01)
-        assertTrue(matched.preampDb < 0.0)
+        assertEquals(0.0, matched.preampDb, 0.0)
     }
 
     @Test

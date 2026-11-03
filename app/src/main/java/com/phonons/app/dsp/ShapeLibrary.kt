@@ -14,6 +14,7 @@ enum class ShapeCategory(val label: String, val examples: String) {
     GEAR("Headphones & speakers", "Earbuds, speakers, car"),
     CHARACTER("Character", "Warm, bright, fun, effects"),
     BLOCKS("Building blocks", "Shelves, peaks, tilts"),
+    YOURS("Your shapes", "Ones you've made or saved"),
 }
 
 /** What a curve actually does. Worked out from the curve itself, so it can't disagree with it. */
@@ -35,8 +36,9 @@ data class LibraryShape(
     val tags: String,
     val description: String,
     val points: List<Pair<Double, Double>>,
+    private val fixedId: String? = null,
 ) {
-    val id: String = name.lowercase(Locale.US).replace(Regex("[^a-z0-9+-]+"), "-").trim('-')
+    val id: String = fixedId ?: name.lowercase(Locale.US).replace(Regex("[^a-z0-9+-]+"), "-").trim('-')
     val shape: GraphicShape get() = GraphicShape(name, points)
 
     /** The curve on the finest fader layout, for traits and thumbnails. */
@@ -54,8 +56,7 @@ data class LibraryShape(
  * A searchable collection of starting curves for the graphic EQ.
  *
  * These are designed starting points based on general mixing practice about which frequencies do
- * what. They aren't measurements, and they don't reproduce any artist's or manufacturer's sound. The
- * exception is "My soundcore curve", which the owner read from their own soundcore app settings.
+ * what. They aren't measurements, and they don't reproduce any artist's or manufacturer's sound.
  * Headphone corrections from real measurements are a separate feature (AutoEq).
  */
 object ShapeLibrary {
@@ -63,7 +64,12 @@ object ShapeLibrary {
         ShapeData.blocks.flatMap { (category, text) -> parse(category, text) } + buildingBlocks()
     }
 
-    fun find(id: String): LibraryShape? = all.firstOrNull { it.id == id }
+    fun find(id: String, yours: List<LibraryShape> = emptyList()): LibraryShape? =
+        yours.firstOrNull { it.id == id } ?: all.firstOrNull { it.id == id }
+
+    /** A shape the user owns, in the form the library works with. */
+    fun yours(id: String, name: String, points: List<Pair<Double, Double>>): LibraryShape =
+        LibraryShape(name, ShapeCategory.YOURS, "Your shapes", "mine custom personal", "A shape you saved.", points, id)
 
     /**
      * Every word must match somewhere. Matches in the name come first, and otherwise the library's
@@ -74,9 +80,10 @@ object ShapeLibrary {
         category: ShapeCategory? = null,
         trait: ShapeTrait? = null,
         only: Set<String>? = null,
+        yours: List<LibraryShape> = emptyList(),
     ): List<LibraryShape> {
         val words = normalise(query).split(' ').filter { it.isNotEmpty() }
-        val matches = all.filter { shape ->
+        val matches = (yours + all).filter { shape ->
             (category == null || shape.category == category) &&
                 (trait == null || trait in shape.traits) &&
                 (only == null || shape.id in only) &&

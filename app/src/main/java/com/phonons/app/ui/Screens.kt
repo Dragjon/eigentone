@@ -104,6 +104,7 @@ import com.phonons.app.data.Preset
 import com.phonons.app.data.Processing
 import com.phonons.app.data.Profiles
 import com.phonons.app.data.Repo
+import com.phonons.app.data.ShapeText
 import com.phonons.app.dsp.AutoEqParser
 import com.phonons.app.dsp.Eq
 import com.phonons.app.dsp.Filter
@@ -134,6 +135,8 @@ private val LocalSnackbar = compositionLocalOf<SnackbarHostState> { error("No sn
 /** Opens the guided listening test from anywhere in the main screens. */
 private val LocalOpenFinder = compositionLocalOf<() -> Unit> { error("No finder") }
 
+private val LocalOpenHearing = compositionLocalOf<() -> Unit> { error("No hearing check") }
+
 /** Opens the shape library from the graphic EQ. */
 private val LocalOpenShapes = compositionLocalOf<() -> Unit> { error("No shape library") }
 
@@ -147,6 +150,12 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
     val scrolls: Map<Tab, ScrollState> = Tab.entries.associateWith { rememberScrollState() }
     var finding by rememberSaveable { mutableStateOf(false) }
     var browsingShapes by rememberSaveable { mutableStateOf(false) }
+    var checkingHearing by rememberSaveable { mutableStateOf(false) }
+
+    if (checkingHearing) {
+        HearingScreen(onClose = { checkingHearing = false })
+        return
+    }
 
     if (finding) {
         FinderScreen(onSetEnabled = onSetEnabled, onClose = { finding = false })
@@ -161,6 +170,7 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
         LocalSnackbar provides snackbar,
         LocalOpenFinder provides { finding = true },
         LocalOpenShapes provides { browsingShapes = true },
+        LocalOpenHearing provides { checkingHearing = true },
     ) {
         Scaffold(
             containerColor = Palette.Background,
@@ -301,6 +311,8 @@ private fun EqTab(state: AppState) {
                 TextButton(onClick = { Repo.update { it.copy(guidedSetupSeen = true) } }) { Text("Not now") }
             }
         }
+    } else {
+        OutputPrompts(state)
     }
 
     Box(
@@ -593,6 +605,19 @@ private fun SoundTab(state: AppState) {
             onChange = { v -> Repo.editTone { it.copy(strength = kotlin.math.round(v * 20.0) / 20.0) } },
             onFinished = Repo::commit,
         )
+        if (state.current.filters.any { it.gainDb != 0.0 || !it.type.hasGain } || state.current.tone.importedCurve.isNotEmpty()) {
+            RowDivider()
+            SliderSetting(
+                title = "Headphone correction",
+                tip = Help.correction,
+                readout = if (state.current.tone.correction <= 0.0) "Off" else formatPercent(state.current.tone.correction),
+                value = state.current.tone.correction.toFloat(),
+                range = 0f..1f,
+                default = 1f,
+                onChange = { v -> Repo.editTone { it.copy(correction = kotlin.math.round(v * 20.0) / 20.0) } },
+                onFinished = Repo::commit,
+            )
+        }
     }
     ToneSection(state)
     SpaceSection(state)
@@ -680,6 +705,14 @@ private fun SpaceSection(state: AppState) {
             origin = 0f,
             onChange = { v -> Repo.update { it.copy(balance = v.toDouble()) } },
         )
+        state.earCorrection?.let { ears ->
+            RowDivider()
+            SwitchSetting("Ear correction", Help.earCorrection, ears.enabled, detail = "A separate EQ for each ear") { on ->
+                Repo.update { it.copy(earCorrection = ears.copy(enabled = on)) }
+            }
+            RowDivider()
+            ActionRow("Remove ear correction", Help.earCorrection) { Repo.update { it.copy(earCorrection = null) } }
+        }
     }
 }
 
@@ -716,13 +749,56 @@ private fun DynamicsSection(state: AppState, attenuation: Double) {
             default = 0f,
             onChange = { v -> Repo.update { it.copy(nightMode = v.toDouble()) } },
         )
+        RowDivider()
+        SliderSetting(
+            title = "Volume leveller",
+            tip = Help.leveller,
+            readout = if (state.leveller <= 0.001) "Off" else formatPercent(state.leveller),
+            value = state.leveller.toFloat(),
+            range = 0f..1f,
+            default = 0f,
+            detail = if (state.leveller > 0.001 && state.nightMode > 0.001) "Night mode is on, so it's used instead." else null,
+            onChange = { v -> Repo.update { it.copy(leveller = if (v < 0.02f) 0.0 else v.toDouble()) } },
+        )
+        RowDivider()
+        val schedule = state.nightSchedule
+        fun updateSchedule(change: (com.phonons.app.data.NightSchedule) -> com.phonons.app.data.NightSchedule) =
+            Repo.update { it.copy(nightSchedule = change(it.nightSchedule)) }
+        SwitchSetting("Night mode schedule", Help.nightSchedule, schedule.enabled) { on -> updateSchedule { it.copy(enabled = on) } }
+        if (schedule.enabled) {
+            TimeSetting("Starts at", Help.nightScheduleStart, schedule.startMinute) { m -> updateSchedule { it.copy(startMinute = m) } }
+            TimeSetting("Ends at", Help.nightScheduleEnd, schedule.endMinute) { m -> updateSchedule { it.copy(endMinute = m) } }
+            SliderSetting(
+                title = "Scheduled strength",
+                tip = Help.nightScheduleAmount,
+                readout = formatPercent(schedule.amount),
+                value = schedule.amount.toFloat(),
+                range = 0.1f..1f,
+                default = 0.6f,
+                onChange = { v -> updateSchedule { it.copy(amount = v.toDouble()) } },
+            )
+        }
     }
+}
+
+/** Half-hour steps, which is plenty for a schedule and easy to set by finger. */
+@Composable
+private fun TimeSetting(title: String, tip: Tip, minute: Int, onChange: (Int) -> Unit) {
+    SliderSetting(
+        title = title,
+        tip = tip,
+        readout = String.format(Locale.US, "%02d:%02d", minute / 60, minute % 60),
+        value = minute.toFloat(),
+        range = 0f..1410f,
+        default = minute.toFloat(),
+        onChange = { v -> onChange((kotlin.math.round(v / 30f) * 30f).toInt()) },
+    )
 }
 
 @Composable
 private fun LevelSection(state: AppState, attenuation: Double) {
     val effective = Processing.effectiveFilters(state, attenuation)
-    val input = Eq.inputGainDb(effective, state.current.preampDb, state.autoHeadroom)
+    val input = Processing.inputOf(state.current, effective, state.autoHeadroom)
     SettingsSection("Level") {
         SliderSetting(
             title = "Preamp",
@@ -773,6 +849,7 @@ private fun PresetsTab(state: AppState) {
     val output by Repo.output.collectAsStateWithLifecycle()
     OutputSection(state, output.key, output.label)
     PresetListSection(state)
+    PerAppSection(state)
     ManageSection(state)
 }
 
@@ -984,19 +1061,24 @@ private fun ManageSection(state: AppState) {
                     }
                     val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
                         ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
-                    Pair(AutoEqParser.parse(text), name)
+                    Triple(AutoEqParser.parse(text), ShapeText.parseGraphicEq(text), name)
                 }
             }
-            val (parsed, name) = result.getOrElse {
+            val (parsed, curve, name) = result.getOrElse {
                 notify(snackbar, "Could not read that file: ${it.message}")
                 return@launch
             }
-            if (parsed == null) {
-                notify(snackbar, "No EQ filters found. Choose an AutoEq or Equalizer APO ParametricEQ.txt file.")
-            } else {
-                val title = name?.substringBeforeLast('.')?.removeSuffix(" ParametricEQ")?.ifBlank { null }
-                Repo.importPreset(title ?: "Imported EQ", parsed)
-                notify(snackbar, "Imported ${parsed.filters.size} filters.")
+            val title = name?.substringBeforeLast('.')?.removeSuffix(" ParametricEQ")?.removeSuffix(" GraphicEQ")?.ifBlank { null }
+            when {
+                parsed != null -> {
+                    Repo.importPreset(title ?: "Imported EQ", parsed)
+                    notify(snackbar, "Imported ${parsed.filters.size} filters.")
+                }
+                curve != null -> {
+                    Repo.importCurve(title ?: "Imported EQ", curve)
+                    notify(snackbar, "Imported a curve with ${curve.size} points.")
+                }
+                else -> notify(snackbar, "No EQ found. Choose an AutoEq or Equalizer APO ParametricEQ or GraphicEQ file.")
             }
         }
     }
@@ -1010,6 +1092,18 @@ private fun ManageSection(state: AppState) {
                 runCatching { context.contentResolver.openOutputStream(uri)!!.use { it.write(text.encodeToByteArray()) } }
             }
             notify(snackbar, if (written.isSuccess) "Backup saved." else "Could not save backup: ${written.exceptionOrNull()?.message}")
+        }
+    }
+    val eqExporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain"),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val text = ShapeText.graphicEq(Processing.exportCurve(Repo.state.value.current))
+        scope.launch {
+            val written = withContext(Dispatchers.IO) {
+                runCatching { context.contentResolver.openOutputStream(uri)!!.use { it.write(text.encodeToByteArray()) } }
+            }
+            notify(snackbar, if (written.isSuccess) "EQ file saved." else "Could not save the file: ${written.exceptionOrNull()?.message}")
         }
     }
     val restorer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -1034,6 +1128,8 @@ private fun ManageSection(state: AppState) {
     SettingsSection("Add and manage") {
         ActionRow("Find my sound", Help.finder, detail = "A short guided listening test", onClick = LocalOpenFinder.current)
         RowDivider()
+        ActionRow("Hearing check", Help.hearing, detail = "Builds a curve for how you hear", onClick = LocalOpenHearing.current)
+        RowDivider()
         ActionRow("Save as new", Help.saveNew) { saving = true }
         if (saved != null && saved != state.current) {
             RowDivider()
@@ -1049,11 +1145,14 @@ private fun ManageSection(state: AppState) {
             importer.launch(arrayOf("text/*", "application/octet-stream"))
         }
         RowDivider()
+        ActionRow("Export EQ file", Help.exportFile) { eqExporter.launch("${state.current.name} GraphicEQ.txt") }
+        RowDivider()
         ActionRow("Back up presets", Help.backup) { exporter.launch("phonons-backup.json") }
         RowDivider()
         ActionRow("Restore presets", Help.restore) {
             restorer.launch(arrayOf("application/json", "text/*", "application/octet-stream"))
         }
+        ShareRows { message -> scope.notify(snackbar, message) }
     }
 
     if (saving) {
@@ -1238,6 +1337,8 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
         )
     }
 
+    DiagnosticsSection(status, output)
+
     SettingsSection("Status") {
         Fact("Running", Help.statusRunning, if (status.running) "Yes" else "No")
         RowDivider()
@@ -1246,6 +1347,10 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
         Fact("EQ bands", Help.statusBands, if (status.bandCount > 0) "${status.bandCount}" else "None")
         RowDivider()
         Fact("In control", Help.statusControl, if (status.hasControl) "Yes" else "No")
+        RowDivider()
+        Fact("Bands accepted", Help.statusReadback, status.readback ?: "Not checked yet")
+        RowDivider()
+        Fact("Repairs", Help.statusRepairs, "${status.rebuilds}")
         RowDivider()
         Fact("Output", Help.statusOutput, output.label)
         if (status.sessions.isNotEmpty()) {
@@ -1277,7 +1382,8 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
 private fun GuideDialog(onDismiss: () -> Unit) {
     val tips = listOf(
         "Get a good seal" to "With earbuds, fit matters more than any setting. If bass sounds thin, try other ear tips before adding EQ.",
-        "Start with Find my sound" to "It picks a correction for your headphones if one is known, then tunes it to what you prefer.",
+        "Use one EQ at a time" to "EQ in a headphone app, such as soundcore, adds to this one. Set it to flat or default, or changes can apply twice.",
+        "Start with Find my sound" to "It picks a correction for your headphones if one is known, then tunes it to what you prefer. It always checks the result against what you had.",
         "Change a little at a time" to "A change of 2 or 3 dB is clearly audible. Very large boosts usually add distortion and lower the overall level.",
         "Prefer cuts to boosts" to "If something is too loud, cutting it often sounds cleaner than boosting everything else.",
         "Compare with Bypass" to "Your ears adapt within minutes, so switch back and forth. If you can't hear a benefit, keep the simpler setting.",

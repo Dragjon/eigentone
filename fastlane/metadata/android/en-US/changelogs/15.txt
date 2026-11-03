@@ -1,0 +1,1 @@
+A separate EQ for each ear from the hearing check, import and export of full-detail GraphicEQ files, and backups that now include your shapes, per-app presets and ear correction.

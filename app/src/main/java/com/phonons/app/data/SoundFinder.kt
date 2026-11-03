@@ -135,13 +135,20 @@ class SoundFinder(private val base: Tone) {
 
         /**
          * Adjusts the level so both sides of a comparison sound about equally loud. Otherwise the
-         * louder one tends to win, whatever its tone. Compared in full against [reference].
+         * louder one tends to win, whatever its tone. Compared in full against [reference], using the
+         * level each would really play at. Only changes a temporary trim, so saving can't keep it.
          */
-        fun levelMatched(preset: Preset, tone: Tone, reference: Preset): Preset {
-            val candidate = preset.copy(tone = tone)
-            val difference = Processing.estimatedLoudnessDb(Processing.presetFilters(candidate), candidate.preampDb) -
-                Processing.estimatedLoudnessDb(Processing.presetFilters(reference), reference.preampDb)
-            return candidate.copy(preampDb = candidate.preampDb - difference)
+        fun levelMatched(preset: Preset, tone: Tone, reference: Preset, autoHeadroom: Boolean = true): Preset {
+            val candidate = preset.copy(tone = tone.copy(trimDb = 0.0))
+            fun loudness(p: Preset): Double {
+                val filters = Processing.presetFilters(p)
+                return Processing.estimatedLoudnessDb(filters, Processing.inputOf(p, filters, autoHeadroom))
+            }
+            val difference = loudness(candidate) - loudness(reference)
+            return candidate.copy(tone = candidate.tone.copy(trimDb = (-difference).coerceAtMost(MAX_TRIM_UP_DB)))
         }
+
+        /** A match usually only undoes what headroom took away, and the limiter covers anything beyond. */
+        private const val MAX_TRIM_UP_DB = 12.0
     }
 }
