@@ -15,6 +15,7 @@ A free system-wide equaliser for Android 14 and newer. No ads, no account, and n
 - **Find my sound**, a guided A/B listening test that has to beat your current sound before you keep it.
 - **Hearing check** that builds a gentle curve for how you hear, with a separate EQ for each ear if they differ, saved per pair of headphones and drawn as a curve for each ear. It isn't a medical test.
 - **EQ files**: import ParametricEQ and GraphicEQ files, and export any sound as a 127-point GraphicEQ file. Imported GraphicEQ curves keep every point rather than being rounded to faders.
+- **Find peaks for me**, a guided listening test that finds peaks and dips in your headphones and suggests narrow filters.
 - **Frequency sweep**, a climbing tone that lets you mark peaks and dips by ear and turns them into narrow filters.
 - **Presets** that load automatically per output, per earbud noise mode and per app.
 - **Multiband compressor**, free and fully adjustable and saved per preset, with three bands, adjustable crossovers, a live response curve and starting styles.
@@ -40,7 +41,7 @@ Crash reports stay on the phone. You choose whether to share one from the System
 Copy the latest `Eigentone-<version>.apk` to the phone and open it, or use USB debugging:
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.19.1.apk
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.20.0.apk
 ```
 
 ## Build

@@ -153,6 +153,133 @@ class NewFeaturesTest {
         assertEquals(Sweep.hzAt(0.5) / Sweep.hzAt(0.25), Sweep.hzAt(0.75) / Sweep.hzAt(0.5), 0.001)
     }
 
+    /** Runs the whole test with a listener who hears these spots as different, and returns what it found. */
+    private fun listen(
+        finder: PeakFinder,
+        hears: (Double) -> SpotAnswer,
+        narrow: (PeakFinder.Question.Narrow) -> SidePick = { SidePick.SAME },
+    ): List<SweepMark> {
+        var questions = 0
+        while (!finder.isDone) {
+            when (val question = finder.question!!) {
+                is PeakFinder.Question.Spot -> finder.answer(hears(question.hz))
+                is PeakFinder.Question.Narrow -> finder.pick(narrow(question))
+            }
+            assertTrue("The test must end", ++questions < 500)
+        }
+        return finder.marks()
+    }
+
+    private fun near(hz: Double, target: Double) = abs(kotlin.math.log2(hz / target)) < 0.13
+
+    @Test
+    fun theFinderCoversTheUsefulRange() {
+        val spots = PeakFinder.spots()
+        assertEquals(PeakFinder.LOWEST_HZ, spots.first(), 0.0)
+        assertTrue(spots.last() <= PeakFinder.HIGHEST_HZ)
+        assertTrue(spots.size in 20..30)
+    }
+
+    @Test
+    fun aListenerHearingNothingGetsNoFilters() {
+        assertTrue(listen(PeakFinder(kotlin.random.Random(1)), { SpotAnswer.SAME }).isEmpty())
+    }
+
+    @Test
+    fun aConsistentPeakAndDipAreFoundWithTheRightDirection() {
+        val marks = listen(PeakFinder(kotlin.random.Random(2)), { hz ->
+            when {
+                near(hz, 3400.0) -> SpotAnswer.STANDS_OUT
+                near(hz, 800.0) -> SpotAnswer.WEAKER
+                else -> SpotAnswer.SAME
+            }
+        })
+        assertEquals(2, marks.size)
+        assertTrue(near(marks[0].hz, 800.0))
+        assertEquals(Sweep.TOO_QUIET_DB, marks[0].gainDb, 0.0)
+        assertTrue(near(marks[1].hz, 3400.0))
+        assertEquals(Sweep.TOO_LOUD_DB, marks[1].gainDb, 0.0)
+    }
+
+    @Test
+    fun aChanceAnswerIsDroppedWhenCheckedAgain() {
+        var firstTime = true
+        val marks = listen(PeakFinder(kotlin.random.Random(3)), { hz ->
+            if (near(hz, 2000.0) && firstTime) {
+                firstTime = false
+                SpotAnswer.STANDS_OUT
+            } else {
+                SpotAnswer.SAME
+            }
+        })
+        assertTrue(marks.isEmpty())
+    }
+
+    @Test
+    fun changingDirectionWhenCheckedAgainIsDropped() {
+        val answers = mutableMapOf<Double, Int>()
+        val marks = listen(PeakFinder(kotlin.random.Random(4)), { hz ->
+            val times = answers.getOrDefault(hz, 0)
+            answers[hz] = times + 1
+            if (times == 0) SpotAnswer.STANDS_OUT else SpotAnswer.WEAKER
+        })
+        assertTrue(marks.isEmpty())
+    }
+
+    @Test
+    fun narrowingMovesTheMarkToThePickedSide() {
+        val hears = { hz: Double -> if (near(hz, 2000.0)) SpotAnswer.STANDS_OUT else SpotAnswer.SAME }
+        val same = listen(PeakFinder(kotlin.random.Random(5)), hears).single().hz
+        val first = listen(PeakFinder(kotlin.random.Random(5)), hears, { SidePick.FIRST }).single().hz
+        val second = listen(PeakFinder(kotlin.random.Random(5)), hears, { SidePick.SECOND }).single().hz
+        assertTrue(first < same)
+        assertTrue(second > same)
+    }
+
+    @Test
+    fun theOrderIsShuffledSoItCantBePredicted() {
+        fun order(seed: Int): List<Double> {
+            val finder = PeakFinder(kotlin.random.Random(seed))
+            val heard = mutableListOf<Double>()
+            while (!finder.isDone) {
+                heard += finder.question!!.hz
+                finder.answer(SpotAnswer.SAME)
+            }
+            return heard
+        }
+        assertTrue(order(1) != order(2))
+        assertEquals(PeakFinder.spots().sorted(), order(1).sorted())
+    }
+
+    @Test
+    fun theStepCountOnlyGrowsWhenSomethingIsFlagged() {
+        val finder = PeakFinder(kotlin.random.Random(6))
+        val start = finder.total
+        assertEquals(PeakFinder.spots().size, start)
+        finder.answer(SpotAnswer.SAME)
+        assertEquals(start, finder.total)
+        finder.answer(SpotAnswer.STANDS_OUT)
+        assertEquals(start + 2, finder.total)
+    }
+
+    @Test
+    fun answeringTheWrongKindOfQuestionDoesNothing() {
+        val finder = PeakFinder(kotlin.random.Random(7))
+        val question = finder.question
+        finder.pick(SidePick.FIRST)
+        assertEquals(question, finder.question)
+        assertEquals(0, finder.answered)
+    }
+
+    @Test
+    fun nearbyMarksFromTheFinderDontStack() {
+        val marks = listen(PeakFinder(kotlin.random.Random(8)), { SpotAnswer.STANDS_OUT })
+        for (i in 1 until marks.size) {
+            assertTrue(kotlin.math.log2(marks[i].hz / marks[i - 1].hz) >= 1.0 / 6.0)
+        }
+        assertTrue(marks.all { it.gainDb == Sweep.TOO_LOUD_DB })
+    }
+
     @Test
     fun nearbyNotesAlternateAroundTheSpot() {
         val tones = Sweep.nearbyTones(1000.0)

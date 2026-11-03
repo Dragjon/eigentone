@@ -148,6 +148,8 @@ private val LocalOpenHearing = compositionLocalOf<() -> Unit> { error("No hearin
 
 private const val SCROLL_FADE_DP = 28
 
+private val LocalOpenPeaks = compositionLocalOf<() -> Unit> { error("No peak finder") }
+
 private val LocalOpenSweep = compositionLocalOf<() -> Unit> { error("No sweep") }
 
 private val LocalOpenCompare = compositionLocalOf<() -> Unit> { error("No comparison") }
@@ -168,6 +170,12 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
     var checkingHearing by rememberSaveable { mutableStateOf(false) }
     var comparing by rememberSaveable { mutableStateOf(false) }
     var sweeping by rememberSaveable { mutableStateOf(false) }
+    var findingPeaks by rememberSaveable { mutableStateOf(false) }
+
+    if (findingPeaks) {
+        PeakFinderScreen(onClose = { findingPeaks = false })
+        return
+    }
 
     if (sweeping) {
         SweepScreen(onClose = { sweeping = false })
@@ -200,6 +208,7 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
         LocalOpenHearing provides { checkingHearing = true },
         LocalOpenCompare provides { comparing = true },
         LocalOpenSweep provides { sweeping = true },
+        LocalOpenPeaks provides { findingPeaks = true },
     ) {
         Scaffold(
             containerColor = Palette.Background,
@@ -1352,6 +1361,8 @@ private fun ManageSection(state: AppState) {
         ActionRow("Find my sound", Help.finder, detail = "A short guided listening test", onClick = LocalOpenFinder.current)
         RowDivider()
         ActionRow("Hearing check", Help.hearing, detail = "Builds a curve for how you hear", onClick = LocalOpenHearing.current)
+        RowDivider()
+        ActionRow("Find peaks for me", Help.peakFinder, detail = "A guided test that finds peaks and dips in your headphones", onClick = LocalOpenPeaks.current)
         RowDivider()
         ActionRow("Frequency sweep", Help.sweep, detail = "Find and fix peaks in your headphones by ear", onClick = LocalOpenSweep.current)
         RowDivider()

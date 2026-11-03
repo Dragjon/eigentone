@@ -89,6 +89,10 @@ object Help {
     val nightScheduleEnd = Tip("Ends at", "The time night mode turns off. It can be after midnight.")
     val share = Tip("Share this sound", "Creates a text code holding this whole sound, which you can send to someone. It contains EQ settings only, and nothing about you.")
     val addShared = Tip("Add a shared sound", "Paste a code someone shared with you. It's added as a new preset, and your others are kept.")
+    val peakFinder = Tip(
+        "Find peaks for me",
+        "Plays notes and asks whether each stands out from those beside it. It asks twice about anything you flag, narrows it down, then suggests filters you can compare with music before keeping. It finds what your ears notice, and isn't a measurement.",
+    )
     val sweep = Tip(
         "Frequency sweep",
         "Plays a tone that climbs through the frequencies. Mark where it jumps out or nearly disappears, and Eigentone adds narrow filters there. It finds what your ears notice, and isn't a measurement. Sweeps also reveal rattles and resonances that music can hide. If a moving tone is hard to judge, pause and compare the spot with nearby notes.",

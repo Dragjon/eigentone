@@ -4,6 +4,7 @@ Find your sound
 - Correct your headphones using AutoEq's published measurements, offered when they connect
 - A guided A/B listening test, where the result has to beat what you already have
 - Compare any two sounds instantly at matched loudness, with an optional blind test
+- A guided test that finds peaks and dips in your headphones by ear, with filters to compare before keeping
 - A frequency sweep to find peaks and dips in your headphones by ear and fix them
 - A hearing check that builds a gentle curve for how you hear, with a separate EQ for each ear if they differ, saved per pair of headphones (not a medical test)
 

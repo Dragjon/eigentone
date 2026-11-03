@@ -1,0 +1,1 @@
+Adds Find peaks for me: a guided listening test that finds peaks and dips in your headphones and suggests filters to compare before keeping.
