@@ -8,6 +8,9 @@ import java.net.URL
 
 data class CatalogEntry(val name: String, val source: String, val path: String) {
     val title: String get() = "$name ($source)"
+
+    /** Over-ear measurements say so in their path. Everything else in the index sits in or at the ear. */
+    val form: HeadphoneForm get() = if ("over-ear" in path) HeadphoneForm.OVER_EAR else HeadphoneForm.IN_EAR
 }
 
 /** Searches AutoEq's published headphone profiles, downloaded from its GitHub repository. */
@@ -15,6 +18,7 @@ object AutoEqCatalog {
     private const val BASE = "https://raw.githubusercontent.com/jaakkopasanen/AutoEq/master/results/"
     private const val MAX_INDEX_BYTES = 8 * 1024 * 1024
     private const val MAX_PROFILE_BYTES = 256 * 1024
+    private const val MAX_RESULT_BYTES = 1024 * 1024
     private const val CACHE_MAX_AGE_MS = 30L * 24 * 60 * 60 * 1000
     private const val TIMEOUT_MS = 20_000
     private const val MAX_MEASUREMENTS = 5
@@ -82,6 +86,13 @@ object AutoEqCatalog {
 
     fun profileUrl(entry: CatalogEntry): String =
         BASE + entry.path + "/" + entry.path.substringAfterLast('/') + "%20ParametricEQ.txt"
+
+    /** Blocking. What this result aims for, or null if it can't be found, which only hides the target choices. */
+    fun loadCorrectionInfo(entry: CatalogEntry): CorrectionInfo? = runCatching {
+        val name = entry.path.substringAfterLast('/')
+        val text = download(BASE + entry.path + "/" + name + ".csv", MAX_RESULT_BYTES).decodeToString()
+        HeadphoneTargets.aimFromResult(text)?.let { CorrectionInfo(entry.form, it) }
+    }.getOrNull()
 
     /** Blocking. Uses a local copy of the index for a month, and falls back to it when offline. */
     @Throws(IOException::class)

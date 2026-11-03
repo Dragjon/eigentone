@@ -6,11 +6,12 @@ import kotlin.math.log2
 
 /** The top-level classes of the library, in the order they're browsed. */
 enum class ShapeCategory(val label: String, val examples: String) {
+    REFERENCE("Research & targets", "Equal loudness, Harman, speech"),
+    FIX("Fix a problem", "Muddy, harsh, thin, dull"),
     MUSIC("Music", "Pop, rock, hip-hop, jazz, classical"),
     INSTRUMENT("Instruments", "Vocals, guitar, drums, piano"),
     MEDIA("Speech & media", "Podcasts, films, games, calls"),
     SITUATION("Situations", "Commute, gym, sleep, low volume"),
-    FIX("Fix a problem", "Muddy, harsh, thin, dull"),
     GEAR("Headphones & speakers", "Earbuds, speakers, car"),
     CHARACTER("Character", "Warm, bright, fun, effects"),
     BLOCKS("Building blocks", "Shelves, peaks, tilts"),
@@ -37,6 +38,8 @@ data class LibraryShape(
     val description: String,
     val points: List<Pair<Double, Double>>,
     private val fixedId: String? = null,
+    /** Where the numbers come from. Null means a designed starting point rather than published data. */
+    val source: String? = null,
 ) {
     val id: String = fixedId ?: name.lowercase(Locale.US).replace(Regex("[^a-z0-9+-]+"), "-").trim('-')
     val shape: GraphicShape get() = GraphicShape(name, points)
@@ -47,7 +50,7 @@ data class LibraryShape(
 
     internal val searchText: String by lazy(LazyThreadSafetyMode.PUBLICATION) {
         ShapeLibrary.normalise(
-            "$name $group ${category.label} $tags $description ${traits.joinToString(" ") { it.label }}",
+            "$name $group ${category.label} $tags $description ${source.orEmpty()} ${traits.joinToString(" ") { it.label }}",
         )
     }
 }
@@ -55,8 +58,10 @@ data class LibraryShape(
 /**
  * A searchable collection of starting curves for the graphic EQ.
  *
- * These are designed starting points based on general mixing practice about which frequencies do
- * what. They aren't measurements, and they don't reproduce any artist's or manufacturer's sound.
+ * Shapes with a [LibraryShape.source] are worked out from published data. The rest are designed starting
+ * points based on general mixing practice about which frequencies do what. They aren't measurements, and
+ * they don't reproduce any artist's or manufacturer's sound. Listening tests found preferences move only
+ * about 1 dB between genres, and common genre presets disagree with each other, so genre shapes stay gentle.
  * Headphone corrections from real measurements are a separate feature (AutoEq).
  */
 object ShapeLibrary {
@@ -146,7 +151,7 @@ object ShapeLibrary {
     private fun parse(category: ShapeCategory, text: String): List<LibraryShape> =
         text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.map { line ->
             val parts = line.split('|').map { it.trim() }
-            require(parts.size == 5) { "Bad shape line: $line" }
+            require(parts.size in 5..6) { "Bad shape line: $line" }
             LibraryShape(
                 name = parts[0],
                 category = category,
@@ -157,6 +162,7 @@ object ShapeLibrary {
                     val (hz, db) = point.split(':')
                     hz.toDouble() to db.toDouble()
                 },
+                source = parts.getOrNull(5),
             )
         }.toList()
 
@@ -168,8 +174,8 @@ object ShapeLibrary {
     private fun buildingBlocks(): List<LibraryShape> = buildList {
         val cat = ShapeCategory.BLOCKS
 
-        for (corner in listOf(60, 80, 100, 150, 200, 300)) {
-            for (db in listOf(10, 8, 6, 4, 3, 2, -2, -3, -4, -6)) {
+        for (corner in listOf(60, 100, 200)) {
+            for (db in listOf(8, 6, 4, 2, -2, -4, -6)) {
                 add(
                     LibraryShape(
                         "Bass ${signed(db)} dB below ${hz(corner)}", cat, "Bass shelves", "low shelf",
@@ -179,8 +185,8 @@ object ShapeLibrary {
                 )
             }
         }
-        for (corner in listOf(2000, 4000, 6000, 8000, 10000, 12000)) {
-            for (db in listOf(8, 6, 4, 3, 2, -2, -3, -4, -6)) {
+        for (corner in listOf(4000, 8000, 12000)) {
+            for (db in listOf(6, 4, 2, -2, -4, -6)) {
                 add(
                     LibraryShape(
                         "Treble ${signed(db)} dB above ${hz(corner)}", cat, "Treble shelves", "high shelf",
@@ -190,12 +196,10 @@ object ShapeLibrary {
                 )
             }
         }
-        val centres = listOf(
-            40, 63, 100, 160, 250, 400, 630, 1000, 1600, 2500, 4000, 6300, 8000, 10000, 16000,
-        )
+        val centres = listOf(63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000)
         for (centre in centres) {
-            val label = if (centre == 6300) "6.3 kHz" else if (centre == 2500) "2.5 kHz" else if (centre == 1600) "1.6 kHz" else hz(centre)
-            for (db in listOf(6, 4, 2, -2, -4, -6)) {
+            val label = hz(centre)
+            for (db in listOf(4, 2, -2, -4)) {
                 add(
                     LibraryShape(
                         "Peak ${signed(db)} dB at $label", cat, "Peaks and dips", "bell boost cut notch",
@@ -205,8 +209,8 @@ object ShapeLibrary {
                 )
             }
         }
-        for (pivot in listOf(500, 1000, 2000)) {
-            for (quarter in listOf(1, 2, 3, 4, 5, 6)) {
+        for (pivot in listOf(1000)) {
+            for (quarter in listOf(1, 2, 3, 4)) {
                 val slope = quarter / 4.0
                 for (sign in listOf(1, -1)) {
                     val perOctave = slope * sign
@@ -224,8 +228,8 @@ object ShapeLibrary {
                 }
             }
         }
-        for (low in listOf(2, 3, 4, 6, 8)) {
-            for (high in listOf(2, 3, 4, 6, 8)) {
+        for (low in listOf(2, 4, 6)) {
+            for (high in listOf(2, 4, 6)) {
                 add(
                     LibraryShape(
                         "Smile bass +$low treble +$high", cat, "Smile curves", "v shape loudness",

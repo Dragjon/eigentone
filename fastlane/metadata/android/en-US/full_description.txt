@@ -11,7 +11,8 @@ Find your sound
 Shape it yourself
 - Graphic EQ with 10, 15 or 31 faders, and draw a curve with one sweep
 - Parametric EQ with up to 20 filters
-- 595 searchable shapes by genre, instrument, situation or problem
+- 350 searchable shapes by genre, instrument, situation or problem, including ones based on published research
+- Headphone targets for measured corrections: Harman, more or less bass, or a diffuse-field reference
 - Hear a shape on your own music before keeping it, and layer shapes together
 - Type in the EQ from another app to make your own shape
 - Import and export GraphicEQ files at full detail, and import ParametricEQ files

@@ -32,6 +32,7 @@ import com.phonons.app.data.AutoEqCatalog
 import com.phonons.app.data.CatalogEntry
 import com.phonons.app.data.Preset
 import com.phonons.app.data.Repo
+import com.phonons.app.data.CorrectionInfo
 import com.phonons.app.data.SoundFinder
 import com.phonons.app.dsp.AutoEqParser
 import com.phonons.app.dsp.ParsedEq
@@ -48,6 +49,7 @@ private const val WHAT_I_HAD = -1
 fun MeasurementCompare(options: List<CatalogEntry>, onDismiss: () -> Unit, onChosen: (String) -> Unit) {
     val before = remember { Repo.state.value }
     var loaded by remember { mutableStateOf<List<Pair<CatalogEntry, ParsedEq>>?>(null) }
+    var infos by remember { mutableStateOf<Map<CatalogEntry, CorrectionInfo?>>(emptyMap()) }
     var selected by remember { mutableIntStateOf(WHAT_I_HAD) }
     var kept by remember { mutableStateOf(false) }
 
@@ -67,6 +69,7 @@ fun MeasurementCompare(options: List<CatalogEntry>, onDismiss: () -> Unit, onCho
                     ?.let { entry to it }
             }
         }
+        infos = withContext(Dispatchers.IO) { profiles.associate { (entry, _) -> entry to AutoEqCatalog.loadCorrectionInfo(entry) } }
         loaded = profiles
         if (profiles.isNotEmpty()) selected = 0
     }
@@ -120,7 +123,7 @@ fun MeasurementCompare(options: List<CatalogEntry>, onDismiss: () -> Unit, onCho
                         // Back to the real sound first, so undo returns there rather than to a preview.
                         Repo.edit { before.current }
                         kept = true
-                        Repo.importPreset(choice.first.title, choice.second)
+                        Repo.importPreset(choice.first.title, choice.second, infos[choice.first])
                         onChosen(appText(R.string.ui_added, choice.first.title))
                     }
                 },

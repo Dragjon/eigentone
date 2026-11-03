@@ -1,0 +1,4 @@
+- New headphone targets in Tune correction: Harman, less bass, more bass, no bass lift, and a reference target
+- New Research & targets shapes, from equal-loudness contours and Harman's listening tests
+- Shape library cut from 595 to 350 by merging near-identical curves, which search still finds by name
+- Genre shapes are now gentler, and Fix a problem comes first

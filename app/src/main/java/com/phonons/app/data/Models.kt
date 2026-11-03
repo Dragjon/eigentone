@@ -36,6 +36,10 @@ data class Tone(
     val harshTamer: Double = 0.0,
     /** Only turns down deep bass when it gets loud, from 0 to 1. */
     val boomTamer: Double = 0.0,
+    /** A sound signature for a measured correction to aim for, from [HeadphoneTarget]. Null keeps the published one. */
+    val targetId: String? = null,
+    /** What a measured correction was published to aim for, which [targetId] works from. */
+    val correctionInfo: CorrectionInfo? = null,
 ) {
     /**
      * Folds the old bass tuner into the bass control. A sound that used both keeps them separate, because
@@ -449,6 +453,13 @@ object BuiltIns {
             f(10, FilterType.BELL, 71.0, -0.3, 2.62),
         ),
     )
+
+    /** What the built-in corrections aim for, from their AutoEq results. The bass version has had its aim changed. */
+    fun correctionInfo(presetId: String): CorrectionInfo? = when (presetId) {
+        liberty4Nc.id -> CorrectionInfo(HeadphoneForm.IN_EAR, listOf(ShapePoint(20.0, 6.4), ShapePoint(31.5, 6.3), ShapePoint(50.0, 5.9), ShapePoint(80.0, 4.3), ShapePoint(125.0, 1.2), ShapePoint(200.0, -0.9), ShapePoint(315.0, -1.4), ShapePoint(500.0, -1.2)))
+        liberty4NcRtings.id -> CorrectionInfo(HeadphoneForm.IN_EAR, listOf(ShapePoint(20.0, 2.8), ShapePoint(31.5, 2.7), ShapePoint(50.0, 2.4), ShapePoint(80.0, 1.2), ShapePoint(125.0, -0.9), ShapePoint(200.0, -2.2), ShapePoint(315.0, -2.2), ShapePoint(500.0, -1.5)))
+        else -> null
+    }
 
     /** Finds a correction preset for a connected output, matched on its name. */
     fun correctionFor(outputKey: String): Preset? =

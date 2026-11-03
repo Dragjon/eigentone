@@ -39,6 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.phonons.app.data.AppState
 import com.phonons.app.data.AutoEqCatalog
 import com.phonons.app.data.BuiltIns
+import com.phonons.app.data.HeadphoneTargets
 import com.phonons.app.data.CrashLog
 import com.phonons.app.data.EngineStatus
 import com.phonons.app.data.OutputInfo
@@ -84,6 +85,8 @@ fun OutputPrompts(state: AppState) {
         !state.current.filters.any { it.gainDb != 0.0 } && state.current.tone.importedCurve.isEmpty()
     when {
         needsCorrection -> CorrectionPrompt(output)
+        targetPrompt(output.key) !in state.dismissedPrompts &&
+            HeadphoneTargets.worthSuggesting(state.current.tone, state.current.id) -> TargetPrompt(output)
         output.key.startsWith("Bluetooth") && EARBUD_EQ_PROMPT !in state.dismissedPrompts -> {
             PromptCard(
                 stringResource(R.string.ui_your_headphones_may_have_their_own_eq),
@@ -94,6 +97,19 @@ fun OutputPrompts(state: AppState) {
         }
     }
 }
+
+/** Corrections are applied as published, so this says when that leaves far less bass than most people prefer. */
+@Composable
+private fun TargetPrompt(output: OutputInfo) {
+    var tuning by remember { mutableStateOf(false) }
+    PromptCard(stringResource(R.string.ui_target_prompt_title), stringResource(R.string.ui_target_prompt_body)) {
+        Button(onClick = { tuning = true }) { Text(stringResource(R.string.ui_target_prompt_action)) }
+        TextButton(onClick = { Repo.dismissPrompt(targetPrompt(output.key)) }) { Text(stringResource(R.string.ui_not_now)) }
+    }
+    if (tuning) CorrectionTuner(onDismiss = { tuning = false })
+}
+
+private fun targetPrompt(outputKey: String) = "target:$outputKey"
 
 @Composable
 private fun CorrectionPrompt(output: OutputInfo) {
@@ -113,7 +129,7 @@ private fun CorrectionPrompt(output: OutputInfo) {
                     val entries = AutoEqCatalog.loadIndex(context.cacheDir)
                     val entry = AutoEqCatalog.bestMatch(entries, output.label) ?: return@runCatching null
                     val parsed = AutoEqParser.parse(AutoEqCatalog.loadProfile(entry)) ?: return@runCatching null
-                    entry to parsed
+                    Triple(entry, parsed, AutoEqCatalog.loadCorrectionInfo(entry))
                 }
             }
             busy = false
@@ -122,7 +138,7 @@ private fun CorrectionPrompt(output: OutputInfo) {
                     if (match == null) {
                         searching = true
                     } else {
-                        Repo.importPreset(match.first.title, match.second)
+                        Repo.importPreset(match.first.title, match.second, match.third)
                         Repo.assignToOutput(output.key, Repo.state.value.current.id)
                     }
                 },

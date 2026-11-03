@@ -10,10 +10,10 @@ class ShapeLibraryTest {
     private val all = ShapeLibrary.all
 
     @Test
-    fun libraryIsLargeAndEveryCategoryHasShapes() {
-        assertTrue("only ${all.size} shapes", all.size >= 500)
+    fun everyCategoryHasEnoughShapes() {
+        assertTrue("only ${all.size} shapes", all.size >= 200)
         for (category in ShapeCategory.entries - ShapeCategory.YOURS) {
-            assertTrue(category.label, all.count { it.category == category } >= 25)
+            assertTrue(category.label, all.count { it.category == category } >= 10)
         }
         assertEquals(0, all.count { it.category == ShapeCategory.YOURS })
         // Printed so the count quoted in the app and README can be checked against the real one.
@@ -30,6 +30,49 @@ class ShapeLibraryTest {
     fun noTwoShapesAreTheSameCurve() {
         val duplicates = all.groupBy { it.curve }.values.filter { it.size > 1 }.map { group -> group.map { it.name } }
         assertEquals(emptyList<List<String>>(), duplicates)
+    }
+
+    @Test
+    fun noTwoShapesInAGroupAreNearlyTheSame() {
+        val close = mutableListOf<String>()
+        for (group in all.filter { it.category != ShapeCategory.BLOCKS }.groupBy { it.category to it.group }.values) {
+            for (i in group.indices) for (j in i + 1 until group.size) {
+                val gaps = group[i].curve.zip(group[j].curve) { a, b -> abs(a - b) }
+                if (gaps.max() <= 0.5) close += "${group[i].name} / ${group[j].name}"
+            }
+        }
+        assertEquals(emptyList<String>(), close)
+    }
+
+    @Test
+    fun genreShapesStayGentle() {
+        for (shape in all.filter { it.category == ShapeCategory.MUSIC }) {
+            assertTrue(shape.name, shape.points.all { abs(it.second) <= 4.0 })
+        }
+    }
+
+    @Test
+    fun mergedShapesCanStillBeFoundByName() {
+        for (name in listOf("Drill", "Shoegaze", "Mandopop", "Bossa nova")) {
+            assertTrue(name, ShapeLibrary.search(name).isNotEmpty())
+        }
+    }
+
+    @Test
+    fun researchShapesSayWhereTheyCameFrom() {
+        val research = all.filter { it.category == ShapeCategory.REFERENCE }
+        assertTrue(research.size >= 10)
+        assertTrue(research.all { !it.source.isNullOrBlank() })
+    }
+
+    @Test
+    fun equalLoudnessShapesFollowThePublishedContours() {
+        fun at(name: String, hz: Double) = GraphicEq.interpolate(all.first { it.name == name }.points, hz)
+        // ISO 226:2003: going from 80 to 70 phon, ears lose about 3 dB at 125 Hz relative to 1 kHz.
+        assertEquals(3.0, at("Quiet listening", 125.0), 0.5)
+        assertEquals(5.5, at("Low volume listening", 125.0), 0.5)
+        assertEquals(8.0, at("Very low volume", 125.0), 0.5)
+        assertEquals(0.0, at("Very low volume", 1000.0), 0.0)
     }
 
     @Test

@@ -18,11 +18,11 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.phonons.app"
-        minSdk = 34
+        applicationId = "io.github.dragjon.eigentone"
+        minSdk = 33
         targetSdk = 36
-        versionCode = 40
-        versionName = "0.25.1"
+        versionCode = 43
+        versionName = "0.27.0"
     }
 
     signingConfigs {

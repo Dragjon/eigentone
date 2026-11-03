@@ -100,6 +100,7 @@ object Processing {
             if (filterScale != 1.0 && filter.type.hasGain) filter.copy(gainDb = filter.gainDb * filterScale) else filter
         }.filterNot { tone.correction == 0.0 && !it.type.hasGain } +
             curveFilter(IMPORTED_CURVE_ID, tone.importedCurve, filterScale) +
+            curveFilter(TARGET_CURVE_ID, HeadphoneTargets.change(HeadphoneTarget.of(tone.targetId), tone.correctionInfo), filterScale) +
             GraphicEq.filters(
                 GraphicEq.normalized(tone.graphicDb, tone.graphicBands).map { it * scale },
                 tone.graphicBands,
@@ -298,6 +299,7 @@ object Processing {
     private const val PEAK_STEPS = 240
     private const val OVER_MARGIN_DB = 0.5
     private const val IMPORTED_CURVE_ID = -101
+    private const val TARGET_CURVE_ID = -104
     private const val EAR_CURVE_ID = -102
     private const val WIDTH_CURVE_ID = -103
 }

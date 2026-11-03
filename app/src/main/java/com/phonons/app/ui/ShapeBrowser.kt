@@ -617,6 +617,15 @@ private fun ShapeRow(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
+            shape.source?.let { source ->
+                Text(
+                    stringResource(R.string.ui_shape_source, source),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Palette.Lit,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         if (onEdit != null) {
             IconButton(onClick = onEdit) {

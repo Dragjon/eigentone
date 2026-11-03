@@ -217,8 +217,8 @@ object Repo {
         }
     }
 
-    fun importPreset(name: String, parsed: ParsedEq) {
-        val preset = Preset("user:${UUID.randomUUID()}", name, parsed.preampDb, parsed.filters)
+    fun importPreset(name: String, parsed: ParsedEq, info: CorrectionInfo? = null) {
+        val preset = Preset("user:${UUID.randomUUID()}", name, parsed.preampDb, parsed.filters, tone = Tone(correctionInfo = info))
         _state.update { it.copy(presets = it.presets + preset) }
         loadPreset(preset)
     }

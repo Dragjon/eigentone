@@ -153,7 +153,7 @@
     <string name="help_save_new_title" formatted="false">Save as new</string>
     <string name="help_shape_amount_body" formatted="false">How strongly the shape is applied. 100% is as designed, lower is more subtle, and higher is stronger. Double-tap to return to 100%.</string>
     <string name="help_shape_amount_title" formatted="false">Amount</string>
-    <string name="help_shape_library_body" formatted="false">Search by genre, instrument, situation or problem, or filter by what a curve does, such as More bass. Tap a shape to hear it on your music, matched in loudness so the comparison is fair, and nothing is kept until you choose Use this. The level may change slightly when you do. These are designed starting points, not measurements. Thumbnails run from 20 Hz on the left to 20 kHz on the right.</string>
+    <string name="help_shape_library_body" formatted="false">Search by genre, instrument, situation or problem, or filter by what a curve does, such as More bass. Tap a shape to hear it on your music, matched in loudness so the comparison is fair, and nothing is kept until you choose Use this. The level may change slightly when you do. Shapes marked with a source come from published data, such as equal-loudness contours and Harman\'s listening tests. The rest are designed starting points, not measurements. Thumbnails run from 20 Hz on the left to 20 kHz on the right.</string>
     <string name="help_shape_library_title" formatted="false">Shape library</string>
     <string name="help_shape_mode_body" formatted="false">Replace swaps your faders for this shape. Add puts it on top of your current faders, so you can layer shapes, such as a genre plus a fix for something too harsh.</string>
     <string name="help_shape_mode_title" formatted="false">Replace or Add</string>
@@ -641,4 +641,24 @@
     <string name="help_bass_frequency_body" formatted="false">Where the bass change fades out. Low values affect only deep rumble, and higher values reach into punch and warmth.</string>
     <string name="help_extra_bass_title" formatted="false">Extra bass</string>
     <string name="help_extra_bass_body" formatted="false">A second bass setting kept from an earlier version, so this sound didn\'t change when the two bass controls became one. Set it to zero to remove it.</string>
+    <string name="ui_shape_source" formatted="false">Source: %1$s</string>
+    <string name="ui_target" formatted="false">Target</string>
+    <string name="ui_target_published" formatted="false">As published</string>
+    <string name="ui_target_harman" formatted="false">Harman</string>
+    <string name="ui_target_less_bass" formatted="false">Less bass</string>
+    <string name="ui_target_more_bass" formatted="false">More bass</string>
+    <string name="ui_target_no_bass_lift" formatted="false">No bass lift</string>
+    <string name="ui_target_diffuse" formatted="false">Reference</string>
+    <string name="ui_target_published_detail" formatted="false">The correction as AutoEq published it.</string>
+    <string name="ui_target_published_below_harman" formatted="false">As AutoEq published it, which aims for about %1$d dB less deep bass than Harman. If this sounds thin, try Harman.</string>
+    <string name="ui_target_harman_detail" formatted="false">The curve most listeners preferred in Harman\'s tests, at about 64%% of those tested.</string>
+    <string name="ui_target_less_bass_detail" formatted="false">About 2 dB less bass than Harman, which about 21%% of those tested preferred.</string>
+    <string name="ui_target_more_bass_detail" formatted="false">5 dB more bass than Harman. About 15%% of those tested preferred 4 to 6 dB more.</string>
+    <string name="ui_target_no_bass_lift_detail" formatted="false">Harman\'s target with its bass lift taken out, for a leaner sound.</string>
+    <string name="ui_target_diffuse_detail" formatted="false">The older diffuse-field reference. Listeners in Harman\'s tests found it lean in bass and forward at 2 to 4 kHz.</string>
+    <string name="help_target_title" formatted="false">Target</string>
+    <string name="help_target_body" formatted="false">A measured correction evens out your headphones towards a sound signature, and published ones don\'t all aim for the same bass. This moves it to the signature you choose. Harman\'s listening tests are where the figures come from, and they describe groups of people, so go by what you like. Targets are saved with the preset.</string>
+    <string name="ui_target_prompt_title" formatted="false">Sounds thin? Try the Harman target</string>
+    <string name="ui_target_prompt_body" formatted="false">This correction aims for less bass than most listeners preferred in Harman\'s tests. You can compare them on your music.</string>
+    <string name="ui_target_prompt_action" formatted="false">Compare targets</string>
 </resources>

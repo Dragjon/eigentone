@@ -1531,11 +1531,12 @@ fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
                                             runCatching { AutoEqCatalog.loadProfile(entry) }
                                         }
                                         val parsed = text.getOrNull()?.let(AutoEqParser::parse)
+                                        val info = if (parsed == null) null else withContext(Dispatchers.IO) { AutoEqCatalog.loadCorrectionInfo(entry) }
                                         busy = false
                                         if (parsed == null) {
                                             problem = appText(R.string.ui_could_not_download_that_profile_it)
                                         } else {
-                                            Repo.importPreset(entry.title, parsed)
+                                            Repo.importPreset(entry.title, parsed, info)
                                             onImported(appText(R.string.ui_added, entry.title))
                                         }
                                     }

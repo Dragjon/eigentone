@@ -132,6 +132,10 @@ object BackupCodec {
             compressor = tone.compressor.clamped(),
             harshTamer = safe(tone.harshTamer, 0.0).coerceIn(0.0, 1.0),
             boomTamer = safe(tone.boomTamer, 0.0).coerceIn(0.0, 1.0),
+            targetId = HeadphoneTarget.of(tone.targetId)?.id,
+            correctionInfo = tone.correctionInfo?.let { info ->
+                info.copy(aim = ShapeText.cleanCurve(info.aim)).takeIf { it.aim.isNotEmpty() }
+            },
             shape = tone.shape?.takeIf { it.name.isNotBlank() }?.let { shape ->
                 AppliedShape(shape.name.take(Tone.MAX_SHAPE_LABEL), shape.faders.take(bands).map { GraphicEq.snap(safe(it, 0.0)) })
             },

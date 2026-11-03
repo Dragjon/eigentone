@@ -1,5 +1,9 @@
 package com.phonons.app.ui
 
+import com.phonons.app.data.HeadphoneTargets
+import com.phonons.app.data.HeadphoneTarget
+import com.phonons.app.data.BuiltIns
+import androidx.compose.ui.Alignment
 import com.phonons.app.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
@@ -86,6 +90,7 @@ fun PresetDetailsDialog(preset: Preset, folders: List<String>, onDismiss: () -> 
  * Adjusts a correction to taste: how much of it to use, and how much bass and treble to add back. It
  * changes the live sound while open, and puts everything back unless kept.
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun CorrectionTuner(onDismiss: () -> Unit) {
     val state by Repo.state.collectAsStateWithLifecycle()
@@ -133,6 +138,39 @@ fun CorrectionTuner(onDismiss: () -> Unit) {
                     default = 1f,
                     onChange = { v -> change { it.copy(correction = round(v * 20.0) / 20.0) } },
                 )
+                val info = before.tone.correctionInfo ?: BuiltIns.correctionInfo(before.id)
+                if (info != null) {
+                    val chosen = HeadphoneTarget.of(tuned.targetId)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.ui_target), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
+                        InfoButton(Help.target)
+                    }
+                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        (listOf<HeadphoneTarget?>(null) + HeadphoneTarget.entries).forEach { option ->
+                            FilterChip(
+                                selected = chosen == option,
+                                onClick = { change { it.copy(targetId = option?.id, correctionInfo = info) } },
+                                label = { Text(stringResource(targetName(option)), maxLines = 1) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Palette.Lit,
+                                    selectedLabelColor = Palette.OnLit,
+                                    labelColor = Palette.Text,
+                                ),
+                            )
+                        }
+                    }
+                    val below = kotlin.math.round(HeadphoneTargets.bassBelowHarman(info)).toInt()
+                    Text(
+                        if (chosen == null && below >= NOTABLE_BASS_GAP_DB) {
+                            stringResource(R.string.ui_target_published_below_harman, below)
+                        } else {
+                            stringResource(targetDetail(chosen))
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Palette.TextDim,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
                 SliderSetting(
                     title = stringResource(R.string.ui_bass),
                     tip = Help.tunerBass,
@@ -180,4 +218,24 @@ fun CorrectionTuner(onDismiss: () -> Unit) {
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.ui_cancel)) } },
     )
+}
+
+private const val NOTABLE_BASS_GAP_DB = 2
+
+private fun targetName(target: HeadphoneTarget?): Int = when (target) {
+    null -> R.string.ui_target_published
+    HeadphoneTarget.HARMAN -> R.string.ui_target_harman
+    HeadphoneTarget.LESS_BASS -> R.string.ui_target_less_bass
+    HeadphoneTarget.MORE_BASS -> R.string.ui_target_more_bass
+    HeadphoneTarget.NO_BASS_LIFT -> R.string.ui_target_no_bass_lift
+    HeadphoneTarget.DIFFUSE_FIELD -> R.string.ui_target_diffuse
+}
+
+private fun targetDetail(target: HeadphoneTarget?): Int = when (target) {
+    null -> R.string.ui_target_published_detail
+    HeadphoneTarget.HARMAN -> R.string.ui_target_harman_detail
+    HeadphoneTarget.LESS_BASS -> R.string.ui_target_less_bass_detail
+    HeadphoneTarget.MORE_BASS -> R.string.ui_target_more_bass_detail
+    HeadphoneTarget.NO_BASS_LIFT -> R.string.ui_target_no_bass_lift_detail
+    HeadphoneTarget.DIFFUSE_FIELD -> R.string.ui_target_diffuse_detail
 }

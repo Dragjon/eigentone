@@ -14,6 +14,7 @@ import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.audiofx.AudioEffect
+import android.os.Build
 import android.os.IBinder
 import android.service.quicksettings.TileService
 import android.content.ComponentName
@@ -240,7 +241,12 @@ class AudioService : Service() {
     }
 
     private fun startInForeground(state: AppState) {
-        startForeground(NOTIFICATION_ID, buildNotification(state), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        // The special-use type only exists from Android 14, and earlier versions don't ask for a type.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(NOTIFICATION_ID, buildNotification(state), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        } else {
+            startForeground(NOTIFICATION_ID, buildNotification(state))
+        }
     }
 
     private fun updateNotification(state: AppState) {

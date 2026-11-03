@@ -12,7 +12,7 @@ Headphone enthusiasts on Android phones who know AutoEq, Q and dB, and want prec
 
 ## Product Purpose
 
-A free, system-wide equaliser for Android 14 and newer that needs no root. It works with Spotify, YouTube and most other apps, and tunes sound to one person's ears and headphones. Success is sound the listener prefers, confirmed by their own ears rather than by the app's claims.
+A free, system-wide equaliser for Android 13 and newer that needs no root. It works with Spotify, YouTube and most other apps, and tunes sound to one person's ears and headphones. Success is sound the listener prefers, confirmed by their own ears rather than by the app's claims.
 
 ## Positioning
 
@@ -24,7 +24,7 @@ Used on a phone with headphones on, usually while music plays in another app, of
 
 ## Capabilities and Constraints
 
-- Graphic EQ (10, 15 or 31 faders), parametric EQ, and a shape library of 595 curves, plus the user's own shapes.
+- Graphic EQ (10, 15 or 31 faders), parametric EQ, and a shape library of 350 curves, plus the user's own shapes.
 - AutoEq corrections with measurement comparison and a tuner, GraphicEQ and ParametricEQ files.
 - Hearing check with per-ear correction, guided peak finder, frequency sweep, Find my sound, and blind A/B comparison.
 - Presets per output, noise mode and app, with search, folders, share codes, backups, a Quick Settings tile, a widget and app icon shortcuts.

@@ -2,13 +2,14 @@
 
 *Eigentones are the natural resonant tones of an enclosed space. "Eigen" is German for "own", so the name reads as "your own tone".*
 
-A free system-wide equaliser for Android 14 and newer. No ads, no account, and no tracking. It runs in the background using Android's `DynamicsProcessing` effect, so it works with Spotify, YouTube and most other apps without root.
+A free system-wide equaliser for Android 13 and newer. No ads, no account, and no tracking. It runs in the background using Android's `DynamicsProcessing` effect, so it works with Spotify, YouTube and most other apps without root.
 
 ## What it does
 
 - **Graphic EQ** with 10, 15 or 31 faders. Drag them or draw a curve with one sweep.
 - **Parametric EQ** with up to 20 filters.
-- **Shape library** of 595 curves, searchable by genre, instrument, situation or problem. Hear each on your music before keeping it, and layer them.
+- **Shape library** of 350 curves, searchable by genre, instrument, situation or problem. Some are worked out from published research, and say so. Hear each on your music before keeping it, and layer them.
+- **Headphone targets**: move a measured correction to Harman, more or less bass, no bass lift, or the diffuse-field reference, worked out from what that correction actually aims for.
 - **Your own shapes**, typed in from any other app's EQ.
 - **Headphone correction** from AutoEq's published measurements, with a strength control, and a way to compare reviewers' measurements by ear. Eigentone offers one when headphones connect.
 - **Compare two sounds**, switching instantly at matched loudness, with an optional blind test.
@@ -40,10 +41,10 @@ Crash reports stay on the phone. You choose whether to share one from the System
 
 ## Install
 
-Copy the latest `Eigentone-<version>.apk` to the phone and open it, or use USB debugging:
+Download the APK from [Releases](https://github.com/Dragjon/eigentone/releases), and open it on the phone. Eigentone is a pre-release, and has only been tested on a Galaxy A54 running Android 16. Or use USB debugging:
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.25.1.apk
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.27.0.apk
 ```
 
 ## Build
@@ -68,13 +69,19 @@ Most text is in `app/src/main/res/values/strings.xml` and `strings_ui.xml`. To a
 - `data/`: saved state, presets, undo, share codes and the listening test logic.
 - `ui/`: the Compose interface.
 
-The app was first called Phonons. The package name (`com.phonons.app`) and class names still use it, because Android treats a new application ID as a different app. It should change once, just before the first public release.
+The app was first called Phonons, so the Kotlin package (`com.phonons.app`) and class names still use it. The application ID is `io.github.dragjon.eigentone`.
+
+## License
+
+Eigentone is free software under the [GNU General Public License v3.0](LICENSE). Third-party material keeps its own terms, listed in [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt).
 
 ## Credits
 
 Barlow and JetBrains Mono are used under the SIL Open Font License 1.1.
 
-The Liberty 4 NC presets and headphone corrections use [AutoEq](https://github.com/jaakkopasanen/AutoEq) results (MIT License). The Liberty presets only appear while those earbuds are connected.
+The Liberty 4 NC presets, headphone corrections and target curves use [AutoEq](https://github.com/jaakkopasanen/AutoEq) results and targets (MIT License). The Liberty presets only appear while those earbuds are connected.
+
+Research shapes and targets use figures from ISO 226:2003 (equal-loudness contours), ANSI S3.5 band weights, and Sean Olive and colleagues' Harman listening research, including "The Perception and Measurement of Headphone Sound Quality" (Acoustics Today, 2022).
 
 ## How the sound is built
 
@@ -88,7 +95,7 @@ The phone has one compressor, so night mode, manual settings and the leveller sh
 
 The graphic EQ defines its curve directly from the faders rather than using overlapping bell filters. Bells of every width measured strayed by up to 3.3 dB between faders. This works because the audio engine takes a curve sampled on 128 bands.
 
-The **shape library** (`dsp/ShapeLibrary.kt`, `dsp/ShapeData.kt`) has 595 graphic EQ curves: 330 hand-written across music, instruments, speech and media, situations, problems, gear and character, plus 265 generated building blocks. They can be searched and filtered by category, or by traits calculated from each curve. They are designed starting points, not measurements, and they don't reproduce any artist's or manufacturer's sound.
+The **shape library** (`dsp/ShapeLibrary.kt`, `dsp/ShapeData.kt`) has 350 graphic EQ curves: 13 worked out from published data, 245 hand-written across problems, music, instruments, speech and media, situations, gear and character, plus 92 generated building blocks. They can be searched and filtered by category, or by traits calculated from each curve. Shapes with a source come from published data. The rest are designed starting points, not measurements, and they don't reproduce any artist's or manufacturer's sound. Shapes less than a useful difference apart were merged, and their names still find them in search. Genre shapes stay within 4 dB, because listening tests found preferences move only about 1 dB between genres, and the genre presets in Android and VLC disagree with each other.
 
 **Find my sound** narrows bass, vocals, treble and space through level-matched A/B choices. Its ranges follow Harman's published headphone preference research. It finds a preference for this music and these headphones, not an objectively best sound.
 

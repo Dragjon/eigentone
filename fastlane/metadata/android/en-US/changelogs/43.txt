@@ -1,0 +1,2 @@
+- First public pre-release, under the GPL-3.0 licence
+- New application ID, so this installs as a new app: back up your presets in the old one first

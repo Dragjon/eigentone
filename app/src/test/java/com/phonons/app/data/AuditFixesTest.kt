@@ -102,6 +102,93 @@ class AuditFixesTest {
         assertEquals(0.0, Processing.rightTrimDb(0.0), 0.0)
     }
 
+    private val flatBassAim = listOf(20.0, 50.0, 125.0, 200.0, 500.0).map { ShapePoint(it, -1.6) }
+    private val inEar = CorrectionInfo(HeadphoneForm.IN_EAR, flatBassAim)
+
+    private fun lift(target: HeadphoneTarget, info: CorrectionInfo, hz: Double) =
+        com.phonons.app.dsp.GraphicEq.interpolate(HeadphoneTargets.change(target, info).map { it.hz to it.db }, hz)
+
+    @Test
+    fun aCorrectionWithoutABassLiftGetsItFromHarman() {
+        assertEquals(8.3, lift(HeadphoneTarget.HARMAN, inEar, 50.0), 0.3)
+        assertEquals(0.0, lift(HeadphoneTarget.HARMAN, inEar, 1000.0), 0.0)
+        assertEquals(8.0, HeadphoneTargets.bassBelowHarman(inEar), 0.5)
+    }
+
+    @Test
+    fun aCorrectionAlreadyOnHarmanBarelyMoves() {
+        val onHarman = CorrectionInfo(
+            HeadphoneForm.IN_EAR,
+            listOf(ShapePoint(20.0, 7.6), ShapePoint(50.0, 6.7), ShapePoint(80.0, 4.2), ShapePoint(125.0, 1.4), ShapePoint(200.0, -1.0), ShapePoint(500.0, -1.4)),
+        )
+        assertEquals(0.0, lift(HeadphoneTarget.HARMAN, onHarman, 50.0), 0.2)
+    }
+
+    @Test
+    fun theBassChoicesKeepTheirPublishedDistanceFromHarman() {
+        val harman = lift(HeadphoneTarget.HARMAN, inEar, 31.5)
+        assertEquals(harman + 5.0, lift(HeadphoneTarget.MORE_BASS, inEar, 31.5), 0.2)
+        assertEquals(harman - 2.0, lift(HeadphoneTarget.LESS_BASS, inEar, 31.5), 0.2)
+        assertEquals(harman - 9.0, lift(HeadphoneTarget.NO_BASS_LIFT, inEar, 31.5), 0.2)
+    }
+
+    @Test
+    fun onlyTheReferenceTargetChangesTheTreble() {
+        assertEquals(0.0, lift(HeadphoneTarget.HARMAN, inEar, 8000.0), 0.0)
+        org.junit.Assert.assertTrue(lift(HeadphoneTarget.DIFFUSE_FIELD, inEar, 12500.0) > 3.0)
+    }
+
+    @Test
+    fun noTargetOrNoInfoChangesNothing() {
+        assertEquals(emptyList<ShapePoint>(), HeadphoneTargets.change(null, inEar))
+        assertEquals(emptyList<ShapePoint>(), HeadphoneTargets.change(HeadphoneTarget.HARMAN, null))
+        val preset = Preset("user:t", "T", tone = Tone(targetId = "harman"))
+        assertEquals(emptyList<com.phonons.app.dsp.Filter>(), Processing.presetFilters(preset))
+    }
+
+    @Test
+    fun harmanIsOnlySuggestedWhenItWouldHelp() {
+        assertEquals(true, HeadphoneTargets.worthSuggesting(Tone(correctionInfo = inEar), "user:a"))
+        // Already chosen, nothing known about the aim, and already close to Harman.
+        assertEquals(false, HeadphoneTargets.worthSuggesting(Tone(correctionInfo = inEar, targetId = "harman-less-bass"), "user:a"))
+        assertEquals(false, HeadphoneTargets.worthSuggesting(Tone(), "user:a"))
+        assertEquals(false, HeadphoneTargets.worthSuggesting(Tone(), "builtin:liberty4nc"))
+        assertEquals(true, HeadphoneTargets.worthSuggesting(Tone(), "builtin:liberty4nc-rtings"))
+    }
+
+    @Test
+    fun aTargetIsPartOfThePresetsSound() {
+        val preset = Preset("user:t", "T", tone = Tone(targetId = "harman", correctionInfo = inEar))
+        org.junit.Assert.assertTrue(com.phonons.app.dsp.Eq.curveDb(Processing.presetFilters(preset), 50.0) > 7.0)
+        val off = preset.copy(tone = preset.tone.copy(correction = 0.0))
+        assertEquals(0.0, com.phonons.app.dsp.Eq.curveDb(Processing.presetFilters(off), 50.0), 0.0)
+    }
+
+    @Test
+    fun aBackupKeepsOnlyKnownTargets() {
+        val good = Preset("user:t", "T", tone = Tone(targetId = "harman", correctionInfo = inEar))
+        assertEquals("harman", BackupCodec.sanitise(good).tone.targetId)
+        val bad = good.copy(tone = good.tone.copy(targetId = "made up"))
+        assertNull(BackupCodec.sanitise(bad).tone.targetId)
+    }
+
+    @Test
+    fun aResultFileGivesItsAimRelativeTo1kHz() {
+        val text = "frequency,raw,target\n20.00,1,8\n1000.00,1,2\n20000.00,1,-3\n"
+        val aim = HeadphoneTargets.aimFromResult(text)!!
+        assertEquals(6.0, aim.first().db, 0.001)
+        assertNull(HeadphoneTargets.aimFromResult("not,a,result\n1,2,3"))
+        assertNull(HeadphoneTargets.aimFromResult(""))
+    }
+
+    @Test
+    fun theHeadphoneFormComesFromTheMeasurementPath() {
+        assertEquals(HeadphoneForm.OVER_EAR, CatalogEntry("A", "s", "oratory1990/over-ear/A").form)
+        assertEquals(HeadphoneForm.OVER_EAR, CatalogEntry("A", "s", "Rtings/HMS%20II.3%20over-ear/A").form)
+        assertEquals(HeadphoneForm.IN_EAR, CatalogEntry("A", "s", "DHRME/in-ear/A").form)
+        assertEquals(HeadphoneForm.IN_EAR, CatalogEntry("A", "s", "Regan/earbud/A").form)
+    }
+
     @Test
     fun anImportedPreampStaysInASafeRange() {
         assertEquals(30.0, AutoEqParser.parse("Preamp: 9999 dB\nFilter 1: ON PK Fc 1000 Hz Gain 1 dB Q 1")!!.preampDb, 0.0)
