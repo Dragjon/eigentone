@@ -1,5 +1,7 @@
 package com.phonons.app.ui
 
+import com.phonons.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -56,9 +58,9 @@ fun CompressorSection(state: AppState) {
     var details by remember { mutableStateOf(false) }
     fun change(transform: (Compressor) -> Compressor) = Repo.editTone { it.copy(compressor = transform(it.compressor)) }
 
-    SettingsSection("Compressor") {
+    SettingsSection(stringResource(R.string.ui_compressor)) {
         SwitchSetting(
-            "Multiband compressor",
+            stringResource(R.string.ui_multiband_compressor),
             Help.compressor,
             compressor.enabled,
             detail = if (compressor.enabled && nightActive) "Night mode is on, so it's used instead." else null,
@@ -117,7 +119,7 @@ fun CompressorSection(state: AppState) {
         if (band.enabled) {
             TransferCurve(band)
             SliderSetting(
-                title = "Threshold",
+                title = stringResource(R.string.ui_threshold),
                 tip = Help.compressorThreshold,
                 readout = formatLevel(band.thresholdDb, sign = false),
                 value = band.thresholdDb.toFloat(),
@@ -127,7 +129,7 @@ fun CompressorSection(state: AppState) {
                 onFinished = Repo::commit,
             )
             LogSlider(
-                title = "Ratio",
+                title = stringResource(R.string.ui_ratio),
                 tip = Help.compressorRatio,
                 readout = String.format(Locale.US, "%.1f : 1", band.ratio),
                 value = band.ratio,
@@ -137,7 +139,7 @@ fun CompressorSection(state: AppState) {
                 onFinished = Repo::commit,
             )
             SliderSetting(
-                title = "Makeup",
+                title = stringResource(R.string.ui_makeup),
                 tip = Help.compressorMakeup,
                 readout = formatLevel(band.makeupDb, sign = true),
                 value = band.makeupDb.toFloat(),
@@ -157,7 +159,7 @@ fun CompressorSection(state: AppState) {
         if (details) {
             if (band.enabled) {
                 LogSlider(
-                    title = "Attack",
+                    title = stringResource(R.string.ui_attack),
                     tip = Help.compressorAttack,
                     readout = formatMs(band.attackMs),
                     value = band.attackMs,
@@ -167,7 +169,7 @@ fun CompressorSection(state: AppState) {
                     onFinished = Repo::commit,
                 )
                 LogSlider(
-                    title = "Release",
+                    title = stringResource(R.string.ui_release),
                     tip = Help.compressorRelease,
                     readout = formatMs(band.releaseMs),
                     value = band.releaseMs,
@@ -177,7 +179,7 @@ fun CompressorSection(state: AppState) {
                     onFinished = Repo::commit,
                 )
                 SliderSetting(
-                    title = "Knee",
+                    title = stringResource(R.string.ui_knee),
                     tip = Help.compressorKnee,
                     readout = formatLevel(band.kneeDb, sign = false),
                     value = band.kneeDb.toFloat(),
@@ -189,7 +191,7 @@ fun CompressorSection(state: AppState) {
             }
             RowDivider()
             LogSlider(
-                title = "Bass to mids",
+                title = stringResource(R.string.ui_bass_to_mids),
                 tip = Help.compressorCrossover,
                 readout = GraphicEq.formatFrequency(compressor.lowCrossoverHz),
                 value = compressor.lowCrossoverHz,
@@ -199,7 +201,7 @@ fun CompressorSection(state: AppState) {
                 onFinished = Repo::commit,
             )
             LogSlider(
-                title = "Mids to treble",
+                title = stringResource(R.string.ui_mids_to_treble),
                 tip = Help.compressorCrossover,
                 readout = GraphicEq.formatFrequency(compressor.highCrossoverHz),
                 value = compressor.highCrossoverHz,
@@ -259,7 +261,7 @@ private fun TransferCurve(band: CompressorBand) {
             }
             drawPath(path, Palette.Amber, style = Stroke(width = 2.dp.toPx()))
         }
-        Text("Level in, left to right. Level out, bottom to top.", style = MaterialTheme.typography.bodySmall, color = Palette.TextDim)
+        Text(stringResource(R.string.ui_level_in_left_to_right_level_out_bottom), style = MaterialTheme.typography.bodySmall, color = Palette.TextDim)
     }
 }
 

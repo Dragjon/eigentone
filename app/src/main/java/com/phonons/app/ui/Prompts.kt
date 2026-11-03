@@ -1,5 +1,7 @@
 package com.phonons.app.ui
 
+import com.phonons.app.R
+import androidx.compose.ui.res.stringResource
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -87,10 +89,10 @@ fun OutputPrompts(state: AppState) {
         needsCorrection -> CorrectionPrompt(output)
         output.key.startsWith("Bluetooth") && EARBUD_EQ_PROMPT !in state.dismissedPrompts -> {
             PromptCard(
-                "Your headphones may have their own EQ",
+                stringResource(R.string.ui_your_headphones_may_have_their_own_eq),
                 "EQ in a headphone app, such as soundcore, Sony or Galaxy Wearable, adds to this one, so changes can apply twice. For the clearest results, set it to flat or default, and turn off any bass boost.",
             ) {
-                Button(onClick = { Repo.dismissPrompt(EARBUD_EQ_PROMPT) }) { Text("Got it") }
+                Button(onClick = { Repo.dismissPrompt(EARBUD_EQ_PROMPT) }) { Text(stringResource(R.string.ui_got_it)) }
             }
         }
     }
@@ -147,7 +149,7 @@ private fun CorrectionPrompt(output: OutputInfo) {
                 }
             },
         ) { Text(if (busy) "Looking…" else "Find a correction") }
-        TextButton(enabled = !busy, onClick = { Repo.dismissPrompt(correctionPrompt(output.key)) }) { Text("Not now") }
+        TextButton(enabled = !busy, onClick = { Repo.dismissPrompt(correctionPrompt(output.key)) }) { Text(stringResource(R.string.ui_not_now)) }
     }
     if (searching) {
         AutoEqDialog(onDismiss = { searching = false }) {
@@ -163,7 +165,7 @@ fun ShareRows(snack: (String) -> Unit) {
     val context = LocalContext.current
     var pasting by remember { mutableStateOf(false) }
     RowDivider()
-    ActionRow("Share this sound", Help.share) {
+    ActionRow(stringResource(R.string.ui_share_this_sound), Help.share) {
         val preset = Repo.state.value.current
         val send = Intent(Intent.ACTION_SEND).setType("text/plain")
             .putExtra(Intent.EXTRA_SUBJECT, "${preset.name} for Eigentone")
@@ -171,14 +173,14 @@ fun ShareRows(snack: (String) -> Unit) {
         context.startActivity(Intent.createChooser(send, "Share ${preset.name}"))
     }
     RowDivider()
-    ActionRow("Add a shared sound", Help.addShared) { pasting = true }
+    ActionRow(stringResource(R.string.ui_add_a_shared_sound), Help.addShared) { pasting = true }
     if (pasting) {
         var code by remember { mutableStateOf("") }
         var failed by remember { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { pasting = false },
             containerColor = Palette.Tooltip,
-            title = { Text("Add a shared sound") },
+            title = { Text(stringResource(R.string.ui_add_a_shared_sound)) },
             text = {
                 OutlinedTextField(
                     value = code,
@@ -186,9 +188,9 @@ fun ShareRows(snack: (String) -> Unit) {
                         code = it
                         failed = false
                     },
-                    label = { Text("Share code") },
+                    label = { Text(stringResource(R.string.ui_share_code)) },
                     isError = failed,
-                    supportingText = if (failed) ({ Text("That isn't a valid share code.") }) else null,
+                    supportingText = if (failed) ({ Text(stringResource(R.string.ui_that_isn_t_a_valid_share_code)) }) else null,
                     maxLines = 5,
                 )
             },
@@ -200,9 +202,9 @@ fun ShareRows(snack: (String) -> Unit) {
                     } else {
                         failed = true
                     }
-                }) { Text("Add") }
+                }) { Text(stringResource(R.string.ui_add)) }
             },
-            dismissButton = { TextButton(onClick = { pasting = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { pasting = false }) { Text(stringResource(R.string.ui_cancel)) } },
         )
     }
 }
@@ -223,12 +225,12 @@ fun PerAppSection(state: AppState) {
     }
     val playing by Repo.playingApp.collectAsStateWithLifecycle()
 
-    SettingsSection("Per-app presets", trailing = { InfoButton(Help.perApp) }) {
+    SettingsSection(stringResource(R.string.ui_per_app_presets), trailing = { InfoButton(Help.perApp) }) {
         if (!allowed) {
             ActionRow(
-                "Allow per-app presets",
+                stringResource(R.string.ui_allow_per_app_presets),
                 Help.perAppAccess,
-                detail = "Android lists this under notification access. Eigentone only checks which app is playing.",
+                detail = stringResource(R.string.ui_android_lists_this_under_notification_ac),
             ) { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
             return@SettingsSection
         }
@@ -264,7 +266,7 @@ fun PerAppSection(state: AppState) {
                         color = Palette.TextDim,
                     )
                 }
-                TextButton(onClick = { Repo.assignToApp(packageName, null) }) { Text("Clear") }
+                TextButton(onClick = { Repo.assignToApp(packageName, null) }) { Text(stringResource(R.string.ui_clear)) }
             }
         }
     }
@@ -278,7 +280,7 @@ fun DiagnosticsSection(status: EngineStatus, output: OutputInfo) {
     val rivals = remember { otherEffectApps(context) }
     var copied by remember { mutableStateOf(false) }
 
-    SettingsSection("Troubleshooting") {
+    SettingsSection(stringResource(R.string.ui_troubleshooting)) {
         if (!status.hasControl && rivals.isNotEmpty()) {
             Text(
                 "Another audio app has control. Try closing or turning off: ${rivals.joinToString()}.",
@@ -307,14 +309,14 @@ fun DiagnosticsSection(status: EngineStatus, output: OutputInfo) {
         }
         crash?.let { report ->
             RowDivider()
-            ActionRow("Share crash report", Help.crashReport, detail = "Eigentone crashed recently. Nothing is sent unless you choose to.") {
+            ActionRow(stringResource(R.string.ui_share_crash_report), Help.crashReport, detail = stringResource(R.string.ui_eigentone_crashed_recently_nothing_is_se)) {
                 val send = Intent(Intent.ACTION_SEND).setType("text/plain")
                     .putExtra(Intent.EXTRA_SUBJECT, "Eigentone crash report")
                     .putExtra(Intent.EXTRA_TEXT, report)
                 context.startActivity(Intent.createChooser(send, "Share crash report"))
             }
             RowDivider()
-            ActionRow("Delete crash report", Help.crashReport) {
+            ActionRow(stringResource(R.string.ui_delete_crash_report), Help.crashReport) {
                 CrashLog.clear(context)
                 crash = null
             }

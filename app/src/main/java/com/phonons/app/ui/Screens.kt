@@ -1,5 +1,6 @@
 package com.phonons.app.ui
 
+import androidx.compose.ui.res.stringResource
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -84,6 +85,9 @@ import com.phonons.app.data.NightSchedule
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material3.FilledTonalIconButton
 import com.phonons.app.data.ClipRisk
+import androidx.compose.material.icons.filled.Close
+import com.phonons.app.data.PresetOrganiser
+import com.phonons.app.engine.PresetShortcuts
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.graphics.Brush
@@ -147,6 +151,7 @@ private val LocalOpenFinder = compositionLocalOf<() -> Unit> { error("No finder"
 private val LocalOpenHearing = compositionLocalOf<() -> Unit> { error("No hearing check") }
 
 private const val SCROLL_FADE_DP = 28
+private const val SEARCH_FROM_PRESETS = 6
 
 private val LocalOpenPeaks = compositionLocalOf<() -> Unit> { error("No peak finder") }
 
@@ -163,6 +168,13 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
     val status by Repo.status.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(Tab.EQ) }
     val snackbar = remember { SnackbarHostState() }
+    val appContext = LocalContext.current
+    LaunchedEffect(state.favorites, state.presets) {
+        val available = BuiltIns.all + state.presets
+        withContext(Dispatchers.Default) {
+            PresetShortcuts.update(appContext, PresetOrganiser.shortcuts(state, available))
+        }
+    }
     // Each tab keeps its own position, so switching never lands partway down another page.
     val scrolls: Map<Tab, ScrollState> = Tab.entries.associateWith { rememberScrollState() }
     var finding by rememberSaveable { mutableStateOf(false) }
@@ -295,7 +307,7 @@ private fun TopBar(state: AppState, status: EngineStatus, onSetEnabled: (Boolean
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text("Eigentone", style = MaterialTheme.typography.titleLarge, color = Palette.Text)
+            Text(stringResource(R.string.ui_eigentone), style = MaterialTheme.typography.titleLarge, color = Palette.Text)
             val problem = state.enabled && (status.error != null || !status.hasControl)
             Text(
                 statusLine(state, status),
@@ -322,9 +334,9 @@ private fun TopBar(state: AppState, status: EngineStatus, onSetEnabled: (Boolean
 private fun BypassButton(bypassed: Boolean) {
     val toggle = { Repo.update { it.copy(bypass = !it.bypass) } }
     if (bypassed) {
-        Button(onClick = { toggle() }) { Text("Bypassed") }
+        Button(onClick = { toggle() }) { Text(stringResource(R.string.ui_bypassed)) }
     } else {
-        FilledTonalButton(onClick = { toggle() }) { Text("Bypass") }
+        FilledTonalButton(onClick = { toggle() }) { Text(stringResource(R.string.ui_bypass)) }
     }
 }
 
@@ -350,7 +362,7 @@ private fun UndoRedoButtons(labels: Boolean) {
             FilledTonalButton(enabled = canUndo, onClick = Repo::undo) {
                 Icon(painterResource(R.drawable.ic_undo), contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
-                Text("Undo")
+                Text(stringResource(R.string.ui_undo))
             }
             FilledTonalButton(enabled = canRedo, onClick = Repo::redo) {
                 Icon(
@@ -361,16 +373,16 @@ private fun UndoRedoButtons(labels: Boolean) {
                         .graphicsLayer(scaleX = -1f),
                 )
                 Spacer(Modifier.size(8.dp))
-                Text("Redo")
+                Text(stringResource(R.string.ui_redo))
             }
         } else {
             FilledTonalIconButton(enabled = canUndo, onClick = Repo::undo) {
-                Icon(painterResource(R.drawable.ic_undo), contentDescription = "Undo", modifier = Modifier.size(18.dp))
+                Icon(painterResource(R.drawable.ic_undo), contentDescription = stringResource(R.string.ui_undo), modifier = Modifier.size(18.dp))
             }
             FilledTonalIconButton(enabled = canRedo, onClick = Repo::redo) {
                 Icon(
                     painterResource(R.drawable.ic_undo),
-                    contentDescription = "Redo",
+                    contentDescription = stringResource(R.string.ui_redo),
                     modifier = Modifier
                         .size(18.dp)
                         .graphicsLayer(scaleX = -1f),
@@ -409,15 +421,15 @@ private fun EqTab(state: AppState) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("New here? Find your sound", style = MaterialTheme.typography.titleMedium, color = Palette.Text)
+            Text(stringResource(R.string.ui_new_here_find_your_sound), style = MaterialTheme.typography.titleMedium, color = Palette.Text)
             Text(
-                "Compare two versions of a song a few times, and Eigentone builds a preset from what you prefer.",
+                stringResource(R.string.ui_compare_two_versions_of_a_song_a_few_tim),
                 style = MaterialTheme.typography.bodyMedium,
                 color = Palette.TextDim,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = openFinder) { Text("Start") }
-                TextButton(onClick = { Repo.update { it.copy(guidedSetupSeen = true) } }) { Text("Not now") }
+                Button(onClick = openFinder) { Text(stringResource(R.string.ui_start)) }
+                TextButton(onClick = { Repo.update { it.copy(guidedSetupSeen = true) } }) { Text(stringResource(R.string.ui_not_now)) }
             }
         }
     } else {
@@ -456,14 +468,14 @@ private fun EqTab(state: AppState) {
                 shape = SegmentedButtonDefaults.itemShape(0, 2),
                 colors = segmentColors(),
                 icon = {},
-            ) { Text("Graphic", maxLines = 1) }
+            ) { Text(stringResource(R.string.ui_graphic), maxLines = 1) }
             SegmentedButton(
                 selected = !graphicMode,
                 onClick = { graphicMode = false },
                 shape = SegmentedButtonDefaults.itemShape(1, 2),
                 colors = segmentColors(),
                 icon = {},
-            ) { Text("Parametric", maxLines = 1) }
+            ) { Text(stringResource(R.string.ui_parametric), maxLines = 1) }
         }
         InfoButton(Help.eqMode)
     }
@@ -471,7 +483,7 @@ private fun EqTab(state: AppState) {
     if (graphicMode) {
         GraphicEqConsole(state.current.tone, onBrowseShapes = LocalOpenShapes.current)
         UndoRedoButtons(labels = true)
-        SettingsSection("Display") { AnalyserSetting(state) }
+        SettingsSection(stringResource(R.string.ui_display)) { AnalyserSetting(state) }
         return
     }
 
@@ -492,7 +504,7 @@ private fun EqTab(state: AppState) {
         ) {
             Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.size(8.dp))
-            Text("Add filter")
+            Text(stringResource(R.string.ui_add_filter))
         }
         UndoRedoButtons(labels = false)
     }
@@ -519,7 +531,7 @@ private fun EqTab(state: AppState) {
         )
     }
 
-    SettingsSection("Display") { AnalyserSetting(state) }
+    SettingsSection(stringResource(R.string.ui_display)) { AnalyserSetting(state) }
 }
 
 /** Runs the analyser only while the EQ tab is visible, and only if it has been turned on. */
@@ -559,7 +571,7 @@ private fun AnalyserSetting(state: AppState) {
     }
     val context = LocalContext.current
     SwitchSetting(
-        "Spectrum analyser",
+        stringResource(R.string.ui_spectrum_analyser),
         Help.analyser,
         state.analyser,
         detail = if (analyserUnavailable.value) "This phone refused the analyser." else null,
@@ -586,17 +598,17 @@ private fun FilterEditor(filter: Filter, filters: List<Filter>, onSelect: (Int) 
         trailing = {
             // Nodes can overlap on the graph, so every filter is also reachable from here.
             IconButton(enabled = index > 0, onClick = { onSelect(filters[index - 1].id) }) {
-                Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "Previous filter")
+                Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.ui_previous_filter))
             }
             IconButton(enabled = index < filters.lastIndex, onClick = { onSelect(filters[index + 1].id) }) {
-                Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "Next filter")
+                Icon(Icons.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.ui_next_filter))
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete filter", tint = Palette.Danger)
+                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.ui_delete_filter), tint = Palette.Danger)
             }
         },
     ) {
-        SwitchSetting("Enabled", Help.filterEnabled, filter.enabled) { on ->
+        SwitchSetting(stringResource(R.string.ui_enabled), Help.filterEnabled, filter.enabled) { on ->
             updateFilter(filter.id) { it.copy(enabled = on) }
             Repo.commit()
         }
@@ -605,7 +617,7 @@ private fun FilterEditor(filter: Filter, filters: List<Filter>, onSelect: (Int) 
             Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Type", style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
+                Text(stringResource(R.string.ui_type), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
                 InfoButton(Help.filterType)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
@@ -620,7 +632,7 @@ private fun FilterEditor(filter: Filter, filters: List<Filter>, onSelect: (Int) 
         }
         RowDivider()
         SliderSetting(
-            title = "Frequency",
+            title = stringResource(R.string.ui_frequency),
             tip = Help.frequency,
             readout = formatHz(filter.freq),
             value = Eq.logPosition(filter.freq).toFloat(),
@@ -633,7 +645,7 @@ private fun FilterEditor(filter: Filter, filters: List<Filter>, onSelect: (Int) 
         if (filter.type.hasGain) {
             RowDivider()
             SliderSetting(
-                title = "Gain",
+                title = stringResource(R.string.ui_gain),
                 tip = Help.gain,
                 readout = formatDb(filter.gainDb),
                 value = filter.gainDb.toFloat(),
@@ -646,7 +658,7 @@ private fun FilterEditor(filter: Filter, filters: List<Filter>, onSelect: (Int) 
         }
         RowDivider()
         SliderSetting(
-            title = "Q",
+            title = stringResource(R.string.ui_q),
             tip = Help.q,
             readout = String.format(Locale.US, "%.2f", filter.q),
             value = qPosition(filter.q),
@@ -698,7 +710,7 @@ private fun SoundTab(state: AppState) {
     val attenuation by Repo.attenuationDb.collectAsStateWithLifecycle()
     SettingsSection(state.current.name) {
         SliderSetting(
-            title = "Preset strength",
+            title = stringResource(R.string.ui_preset_strength),
             tip = Help.strength,
             readout = formatPercent(state.current.tone.strength),
             value = state.current.tone.strength.toFloat(),
@@ -711,7 +723,7 @@ private fun SoundTab(state: AppState) {
         if (state.current.filters.any { it.gainDb != 0.0 || !it.type.hasGain } || state.current.tone.importedCurve.isNotEmpty()) {
             RowDivider()
             SliderSetting(
-                title = "Headphone correction",
+                title = stringResource(R.string.ui_headphone_correction),
                 tip = Help.correction,
                 readout = if (state.current.tone.correction <= 0.0) "Off" else formatPercent(state.current.tone.correction),
                 value = state.current.tone.correction.toFloat(),
@@ -734,13 +746,13 @@ private fun ToneSection(state: AppState) {
     val tone = state.current.tone
     val modified = tone.bassDb != 0.0 || tone.trebleDb != 0.0 || tone.vocalsDb != 0.0 || tone.bassTunerDb != 0.0
     SettingsSection(
-        "Tone",
+        stringResource(R.string.ui_tone),
         trailing = {
             if (modified) {
                 TextButton(onClick = {
                     Repo.editTone { it.copy(bassDb = 0.0, trebleDb = 0.0, vocalsDb = 0.0, bassTunerDb = 0.0) }
                     Repo.commit()
-                }) { Text("Reset tone") }
+                }) { Text(stringResource(R.string.ui_reset_tone)) }
             }
         },
     ) {
@@ -752,7 +764,7 @@ private fun ToneSection(state: AppState) {
         RowDivider()
         ToneSlider("Bass tuner", Help.bassTunerAmount, tone.bassTunerDb) { v -> Repo.editTone { it.copy(bassTunerDb = v) } }
         SliderSetting(
-            title = "Bass tuner frequency",
+            title = stringResource(R.string.ui_bass_tuner_frequency),
             tip = Help.bassTunerFrequency,
             readout = formatHz(tone.bassTunerHz),
             value = tone.bassTunerHz.toFloat(),
@@ -783,7 +795,7 @@ private fun ToneSlider(title: String, tip: Tip, value: Double, onChange: (Double
 private fun SpaceSection(state: AppState) {
     val status by Repo.status.collectAsStateWithLifecycle()
     val systemSpatialAudio = rememberSystemSpatialAudio()
-    SettingsSection("Space") {
+    SettingsSection(stringResource(R.string.ui_space)) {
         SliderSetting(
             title = if (state.useSystemSurround) "Virtual surround" else "Stereo width",
             tip = if (state.useSystemSurround) Help.surround else Help.stereoWidth,
@@ -800,12 +812,12 @@ private fun SpaceSection(state: AppState) {
             onChange = { v -> Repo.editTone { it.copy(surround = if (v < 0.02f) 0.0 else v.toDouble()) } },
             onFinished = Repo::commit,
         )
-        SwitchSetting("Use the phone's virtual surround", Help.systemSurround, state.useSystemSurround) { on ->
+        SwitchSetting(stringResource(R.string.ui_use_the_phone_s_virtual_surround), Help.systemSurround, state.useSystemSurround) { on ->
             Repo.update { it.copy(useSystemSurround = on) }
         }
         RowDivider()
         SliderSetting(
-            title = "Balance",
+            title = stringResource(R.string.ui_balance),
             tip = Help.balance,
             readout = when {
                 state.balance < -0.005 -> "L ${formatPercent(-state.balance)}"
@@ -837,12 +849,12 @@ private fun EarCorrectionRows(state: AppState) {
     if (Profiles.supportsModes(key)) {
         if (ears != null) {
             RowDivider()
-            SwitchSetting("Ear correction", Help.earCorrection, ears.enabled, detail = "A separate EQ for each ear, for ${output.label}") { on ->
+            SwitchSetting(stringResource(R.string.ui_ear_correction), Help.earCorrection, ears.enabled, detail = "A separate EQ for each ear, for ${output.label}") { on ->
                 setEars(ears.copy(enabled = on))
             }
             EarCurvesGraph(ears, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             RowDivider()
-            ActionRow("Remove ear correction", Help.earCorrection) { setEars(null) }
+            ActionRow(stringResource(R.string.ui_remove_ear_correction), Help.earCorrection) { setEars(null) }
         } else if (measured != null && record != null) {
             // Offered until it's used, so leaving the hearing check without choosing doesn't lose it.
             val correction = remember(measured) { measured.earCorrection() }
@@ -886,14 +898,14 @@ private fun EarCorrectionRows(state: AppState) {
 @Composable
 private fun DynamicsSection(state: AppState, attenuation: Double) {
     val scheduledNight by Repo.scheduledNight.collectAsStateWithLifecycle()
-    SettingsSection("Dynamics") {
-        SwitchSetting("Adapt to volume", Help.loudness, state.loudness) { on ->
+    SettingsSection(stringResource(R.string.ui_dynamics)) {
+        SwitchSetting(stringResource(R.string.ui_adapt_to_volume), Help.loudness, state.loudness) { on ->
             Repo.update { it.copy(loudness = on) }
         }
         if (state.loudness) {
             val added = Processing.loudnessFilters(attenuation, state.loudnessStrength)
             SliderSetting(
-                title = "Strength",
+                title = stringResource(R.string.ui_strength),
                 tip = Help.loudnessStrength,
                 readout = formatPercent(state.loudnessStrength),
                 value = state.loudnessStrength.toFloat(),
@@ -909,7 +921,7 @@ private fun DynamicsSection(state: AppState, attenuation: Double) {
         }
         RowDivider()
         SliderSetting(
-            title = "Night mode",
+            title = stringResource(R.string.ui_night_mode),
             tip = Help.nightMode,
             readout = if (state.nightMode <= 0.001) "Off" else formatPercent(state.nightMode),
             value = state.nightMode.toFloat(),
@@ -919,7 +931,7 @@ private fun DynamicsSection(state: AppState, attenuation: Double) {
         )
         RowDivider()
         SliderSetting(
-            title = "Volume leveller",
+            title = stringResource(R.string.ui_volume_leveller),
             tip = Help.leveller,
             readout = if (state.leveller <= 0.001) "Off" else formatPercent(state.leveller),
             value = state.leveller.toFloat(),
@@ -937,20 +949,20 @@ private fun DynamicsSection(state: AppState, attenuation: Double) {
         val schedule = state.nightSchedule
         fun updateSchedule(change: (com.phonons.app.data.NightSchedule) -> com.phonons.app.data.NightSchedule) =
             Repo.update { it.copy(nightSchedule = change(it.nightSchedule)) }
-        SwitchSetting("Night mode schedule", Help.nightSchedule, schedule.enabled) { on -> updateSchedule { it.copy(enabled = on) } }
+        SwitchSetting(stringResource(R.string.ui_night_mode_schedule), Help.nightSchedule, schedule.enabled) { on -> updateSchedule { it.copy(enabled = on) } }
         if (schedule.enabled) {
             TimeSetting("Starts at", Help.nightScheduleStart, schedule.startMinute) { m -> updateSchedule { it.copy(startMinute = m) } }
             TimeSetting("Ends at", Help.nightScheduleEnd, schedule.endMinute) { m -> updateSchedule { it.copy(endMinute = m) } }
             if (schedule.startMinute == schedule.endMinute) {
                 Text(
-                    "The start and end are the same, so night mode won't turn on.",
+                    stringResource(R.string.ui_the_start_and_end_are_the_same_so_night),
                     style = MaterialTheme.typography.bodySmall,
                     color = Palette.Danger,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 )
             }
             SliderSetting(
-                title = "Scheduled strength",
+                title = stringResource(R.string.ui_scheduled_strength),
                 tip = Help.nightScheduleAmount,
                 readout = formatPercent(schedule.amount),
                 value = schedule.amount.toFloat(),
@@ -981,9 +993,9 @@ private fun TimeSetting(title: String, tip: Tip, minute: Int, onChange: (Int) ->
                 TextButton(onClick = {
                     onChange(clock.hour * 60 + clock.minute)
                     picking = false
-                }) { Text("Set") }
+                }) { Text(stringResource(R.string.ui_set)) }
             },
-            dismissButton = { TextButton(onClick = { picking = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { picking = false }) { Text(stringResource(R.string.ui_cancel)) } },
         )
     }
 }
@@ -1014,9 +1026,9 @@ private fun ClipWarning(state: AppState, attenuation: Double) {
 private fun LevelSection(state: AppState, attenuation: Double) {
     val effective = Processing.effectiveFilters(state, attenuation)
     val input = Processing.inputOf(state.current, effective, state.autoHeadroom)
-    SettingsSection("Level") {
+    SettingsSection(stringResource(R.string.ui_level)) {
         SliderSetting(
-            title = "Preamp",
+            title = stringResource(R.string.ui_preamp),
             tip = Help.preamp,
             readout = formatDb(state.current.preampDb),
             value = state.current.preampDb.toFloat(),
@@ -1028,17 +1040,17 @@ private fun LevelSection(state: AppState, attenuation: Double) {
         )
         RowDivider()
         SwitchSetting(
-            "Automatic headroom",
+            stringResource(R.string.ui_automatic_headroom),
             Help.headroom,
             state.autoHeadroom,
             detail = "Level going into the EQ: ${formatDb(input)}",
         ) { on -> Repo.update { it.copy(autoHeadroom = on) } }
         RowDivider()
         ClipWarning(state, attenuation)
-        SwitchSetting("Limiter", Help.limiter, state.limiter) { on -> Repo.update { it.copy(limiter = on) } }
+        SwitchSetting(stringResource(R.string.ui_limiter), Help.limiter, state.limiter) { on -> Repo.update { it.copy(limiter = on) } }
         if (state.limiter) {
             SliderSetting(
-                title = "Limiter threshold",
+                title = stringResource(R.string.ui_limiter_threshold),
                 tip = Help.limiterThreshold,
                 readout = formatDb(state.limiterThresholdDb),
                 value = state.limiterThresholdDb.toFloat(),
@@ -1049,7 +1061,7 @@ private fun LevelSection(state: AppState, attenuation: Double) {
             )
         }
         RowDivider()
-        SwitchSetting("Level-matched Bypass", Help.matchBypass, state.matchBypass) { on ->
+        SwitchSetting(stringResource(R.string.ui_level_matched_bypass), Help.matchBypass, state.matchBypass) { on ->
             Repo.update { it.copy(matchBypass = on) }
         }
     }
@@ -1081,7 +1093,7 @@ private fun OutputSection(state: AppState, outputKey: String, outputLabel: Strin
     SettingsSection(outputLabel) {
         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Assigned preset", style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
+                Text(stringResource(R.string.ui_assigned_preset), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
                 InfoButton(Help.outputPreset)
             }
             Text(
@@ -1114,7 +1126,7 @@ private fun OutputSection(state: AppState, outputKey: String, outputLabel: Strin
                 if (assigned != null) {
                     // Clears the mode's own choice first, then the output's main one.
                     val clearKey = if (assignKey in state.outputProfiles) assignKey else outputKey
-                    TextButton(onClick = { Repo.assignToOutput(clearKey, null) }) { Text("Clear") }
+                    TextButton(onClick = { Repo.assignToOutput(clearKey, null) }) { Text(stringResource(R.string.ui_clear)) }
                 }
             }
         }
@@ -1122,7 +1134,7 @@ private fun OutputSection(state: AppState, outputKey: String, outputLabel: Strin
             RowDivider()
             Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Earbud noise mode", style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
+                    Text(stringResource(R.string.ui_earbud_noise_mode), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
                     InfoButton(Help.noiseMode)
                 }
                 val modes = ListeningMode.entries
@@ -1140,7 +1152,7 @@ private fun OutputSection(state: AppState, outputKey: String, outputLabel: Strin
             }
         }
         RowDivider()
-        SwitchSetting("Switch automatically", Help.autoSwitch, state.autoSwitch) { on ->
+        SwitchSetting(stringResource(R.string.ui_switch_automatically), Help.autoSwitch, state.autoSwitch) { on ->
             Repo.update { it.copy(autoSwitch = on) }
         }
     }
@@ -1161,7 +1173,25 @@ private fun PresetListSection(state: AppState) {
     val snackbar = LocalSnackbar.current
     val scope = rememberCoroutineScope()
     val connected = rememberConnectedOutputNames()
-    val (headphones, general) = BuiltIns.availableFor(connected).partition(BuiltIns::isForSpecificHeadphones)
+    var query by rememberSaveable { mutableStateOf("") }
+    val allFolders = PresetOrganiser.folders(state.presets)
+    fun shown(presets: List<Preset>) = presets.filter { PresetOrganiser.matches(it, query) }
+    val (headphones, general) = shown(BuiltIns.availableFor(connected)).partition(BuiltIns::isForSpecificHeadphones)
+    val own = shown(state.presets)
+
+    // Only worth the space once there's a list to search.
+    if (state.presets.size + general.size + headphones.size > SEARCH_FROM_PRESETS || query.isNotEmpty()) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            singleLine = true,
+            label = { Text(stringResource(R.string.ui_search_presets)) },
+            trailingIcon = if (query.isEmpty()) null else ({
+                IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.ui_clear_search)) }
+            }),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 
     @Composable
     fun Group(title: String, presets: List<Preset>, deletable: Boolean, tip: Tip? = null) {
@@ -1173,6 +1203,7 @@ private fun PresetListSection(state: AppState) {
                     preset = preset,
                     selected = preset.id == state.current.id,
                     favorite = preset.id in state.favorites,
+                    folders = allFolders,
                     onDelete = if (deletable) {
                         {
                             val before = Repo.state.value
@@ -1198,23 +1229,22 @@ private fun PresetListSection(state: AppState) {
         }
     }
 
-    Group("Your presets", state.presets, deletable = true, tip = Help.favorites)
+    Group("Your presets", own.filter { it.folder == null }, deletable = true, tip = Help.favorites)
+    PresetOrganiser.folders(own).forEach { folder ->
+        Group(folder, own.filter { it.folder == folder }, deletable = true)
+    }
     Group("Liberty 4 NC correction", headphones, deletable = false, tip = if (state.presets.isEmpty()) Help.favorites else null)
     Group("General", general, deletable = false)
+    if (query.isNotBlank() && own.isEmpty() && headphones.isEmpty() && general.isEmpty()) {
+        Text(stringResource(R.string.ui_no_presets_match_that), style = MaterialTheme.typography.bodyMedium, color = Palette.TextDim)
+    }
 }
 
 @Composable
-private fun PresetRow(preset: Preset, selected: Boolean, favorite: Boolean, onDelete: (() -> Unit)?) {
+private fun PresetRow(preset: Preset, selected: Boolean, favorite: Boolean, folders: List<String>, onDelete: (() -> Unit)?) {
     var renaming by remember { mutableStateOf(false) }
     if (renaming) {
-        SaveDialog(
-            title = "Rename preset",
-            initial = preset.name,
-            onDismiss = { renaming = false },
-        ) { name ->
-            Repo.renamePreset(preset.id, name)
-            renaming = false
-        }
+        PresetDetailsDialog(preset, folders, onDismiss = { renaming = false })
     }
     Row(
         Modifier
@@ -1226,7 +1256,7 @@ private fun PresetRow(preset: Preset, selected: Boolean, favorite: Boolean, onDe
     ) {
         Box(Modifier.size(24.dp), contentAlignment = Alignment.CenterStart) {
             if (selected) {
-                Icon(Icons.Filled.Check, contentDescription = "Selected", tint = Palette.Amber, modifier = Modifier.size(20.dp))
+                Icon(Icons.Filled.Check, contentDescription = stringResource(R.string.ui_selected), tint = Palette.Amber, modifier = Modifier.size(20.dp))
             }
         }
         Text(
@@ -1247,7 +1277,7 @@ private fun PresetRow(preset: Preset, selected: Boolean, favorite: Boolean, onDe
         }
         if (onDelete != null) {
             IconButton(onClick = { renaming = true }) {
-                Icon(Icons.Filled.Edit, contentDescription = "Rename ${preset.name}", tint = Palette.TextDim)
+                Icon(Icons.Filled.Edit, contentDescription = "Edit ${preset.name}", tint = Palette.TextDim)
             }
             IconButton(onClick = onDelete) {
                 Icon(Icons.Filled.Delete, contentDescription = "Delete ${preset.name}", tint = Palette.Danger)
@@ -1263,6 +1293,7 @@ private fun ManageSection(state: AppState) {
     val snackbar = LocalSnackbar.current
     var saving by remember { mutableStateOf(false) }
     var finding by remember { mutableStateOf(false) }
+    var tuning by remember { mutableStateOf(false) }
     val saved = state.presets.firstOrNull { it.id == state.current.id }
 
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -1355,18 +1386,18 @@ private fun ManageSection(state: AppState) {
         }
     }
 
-    SettingsSection("Add and manage") {
-        ActionRow("Compare two sounds", Help.compare, detail = "Switch instantly, with an optional blind test", onClick = LocalOpenCompare.current)
+    SettingsSection(stringResource(R.string.ui_add_and_manage)) {
+        ActionRow(stringResource(R.string.ui_compare_two_sounds), Help.compare, detail = stringResource(R.string.ui_switch_instantly_with_an_optional_blind), onClick = LocalOpenCompare.current)
         RowDivider()
-        ActionRow("Find my sound", Help.finder, detail = "A short guided listening test", onClick = LocalOpenFinder.current)
+        ActionRow(stringResource(R.string.ui_find_my_sound), Help.finder, detail = stringResource(R.string.ui_a_short_guided_listening_test), onClick = LocalOpenFinder.current)
         RowDivider()
-        ActionRow("Hearing check", Help.hearing, detail = "Builds a curve for how you hear", onClick = LocalOpenHearing.current)
+        ActionRow(stringResource(R.string.ui_hearing_check), Help.hearing, detail = stringResource(R.string.ui_builds_a_curve_for_how_you_hear), onClick = LocalOpenHearing.current)
         RowDivider()
-        ActionRow("Find peaks for me", Help.peakFinder, detail = "A guided test that finds peaks and dips in your headphones", onClick = LocalOpenPeaks.current)
+        ActionRow(stringResource(R.string.ui_find_peaks_for_me), Help.peakFinder, detail = stringResource(R.string.ui_a_guided_test_that_finds_peaks_and_dips), onClick = LocalOpenPeaks.current)
         RowDivider()
-        ActionRow("Frequency sweep", Help.sweep, detail = "Find and fix peaks in your headphones by ear", onClick = LocalOpenSweep.current)
+        ActionRow(stringResource(R.string.ui_frequency_sweep), Help.sweep, detail = stringResource(R.string.ui_find_and_fix_peaks_in_your_headphones_by), onClick = LocalOpenSweep.current)
         RowDivider()
-        ActionRow("Save as new", Help.saveNew) { saving = true }
+        ActionRow(stringResource(R.string.ui_save_as_new), Help.saveNew) { saving = true }
         if (saved != null && saved != state.current) {
             RowDivider()
             ActionRow("Update ${saved.name}", Help.update) {
@@ -1375,25 +1406,29 @@ private fun ManageSection(state: AppState) {
             }
         }
         RowDivider()
-        ActionRow("Find headphones", Help.find) { finding = true }
+        ActionRow(stringResource(R.string.ui_find_headphones), Help.find) { finding = true }
+        if (state.current.filters.any { it.gainDb != 0.0 } || state.current.tone.importedCurve.isNotEmpty()) {
+            RowDivider()
+            ActionRow(stringResource(R.string.ui_tune_correction), Help.tuner, detail = stringResource(R.string.ui_use_less_of_it_or_add_bass_or_treble_bac)) { tuning = true }
+        }
         RowDivider()
-        ActionRow("Import EQ file", Help.importFile) {
+        ActionRow(stringResource(R.string.ui_import_eq_file), Help.importFile) {
             importer.launch(arrayOf("text/*", "application/octet-stream"))
         }
         RowDivider()
-        ActionRow("Export EQ file", Help.exportFile) { eqExporter.launch("${state.current.name} GraphicEQ.txt") }
+        ActionRow(stringResource(R.string.ui_export_eq_file), Help.exportFile) { eqExporter.launch("${state.current.name} GraphicEQ.txt") }
         RowDivider()
         val canExportFilters = remember(state.current) { Processing.exportFilters(state.current) != null }
         ActionRow(
-            "Export filters file",
+            stringResource(R.string.ui_export_filters_file),
             Help.exportParametric,
             detail = if (canExportFilters) null else "This preset uses faders or a curve, so use Export EQ file instead.",
             enabled = canExportFilters,
         ) { parametricExporter.launch("${state.current.name} ParametricEQ.txt") }
         RowDivider()
-        ActionRow("Back up presets", Help.backup) { exporter.launch("eigentone-backup.json") }
+        ActionRow(stringResource(R.string.ui_back_up_presets), Help.backup) { exporter.launch("eigentone-backup.json") }
         RowDivider()
-        ActionRow("Restore presets", Help.restore) {
+        ActionRow(stringResource(R.string.ui_restore_presets), Help.restore) {
             restorer.launch(arrayOf("application/json", "text/*", "application/octet-stream"))
         }
         ShareRows { message -> scope.notify(snackbar, message) }
@@ -1409,8 +1444,11 @@ private fun ManageSection(state: AppState) {
         AutoEqDialog(onDismiss = { finding = false }) { result ->
             scope.notify(snackbar, result)
             finding = false
+            // A correction is the moment people find it too neutral, so offer this straight away.
+            tuning = true
         }
     }
+    if (tuning) CorrectionTuner(onDismiss = { tuning = false })
 }
 
 /** Finds and imports a headphone profile from AutoEq's published results. */
@@ -1433,21 +1471,21 @@ fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Palette.Tooltip,
-        title = { Text("Find headphones") },
+        title = { Text(stringResource(R.string.ui_find_headphones)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
                     singleLine = true,
-                    label = { Text("Headphone model") },
+                    label = { Text(stringResource(R.string.ui_headphone_model)) },
                     enabled = entries != null && !busy,
                 )
                 when {
                     problem != null -> Text(problem.orEmpty(), color = Palette.Danger, style = MaterialTheme.typography.bodySmall)
-                    entries == null -> Text("Loading the list…", color = Palette.TextDim)
-                    busy -> Text("Downloading…", color = Palette.TextDim)
-                    query.isNotBlank() && results.isEmpty() -> Text("No matches.", color = Palette.TextDim)
+                    entries == null -> Text(stringResource(R.string.ui_loading_the_list), color = Palette.TextDim)
+                    busy -> Text(stringResource(R.string.ui_downloading), color = Palette.TextDim)
+                    query.isNotBlank() && results.isEmpty() -> Text(stringResource(R.string.ui_no_matches), color = Palette.TextDim)
                 }
                 LazyColumn(Modifier.heightIn(max = 320.dp)) {
                     items(results) { entry ->
@@ -1479,7 +1517,7 @@ fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.ui_close)) } },
     )
 }
 
@@ -1496,12 +1534,12 @@ private fun SaveDialog(
         containerColor = Palette.Tooltip,
         title = { Text(title) },
         text = {
-            OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true, label = { Text("Name") })
+            OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true, label = { Text(stringResource(R.string.ui_name)) })
         },
         confirmButton = {
-            TextButton(enabled = name.isNotBlank(), onClick = { onSave(name.trim()) }) { Text("Save") }
+            TextButton(enabled = name.isNotBlank(), onClick = { onSave(name.trim()) }) { Text(stringResource(R.string.ui_save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.ui_cancel)) } },
     )
 }
 
@@ -1517,10 +1555,10 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
         onPauseOrDispose { }
     }
 
-    SettingsSection("Engine") {
+    SettingsSection(stringResource(R.string.ui_engine)) {
         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Audio route", style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
+                Text(stringResource(R.string.ui_audio_route), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
                 InfoButton(Help.engineMode)
             }
             val modes = EngineMode.entries
@@ -1537,16 +1575,16 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
             }
         }
         RowDivider()
-        SwitchSetting("Low latency", Help.lowLatency, state.lowLatency) { on ->
+        SwitchSetting(stringResource(R.string.ui_low_latency), Help.lowLatency, state.lowLatency) { on ->
             Repo.update { it.copy(lowLatency = on) }
         }
         RowDivider()
-        SwitchSetting("Start automatically", Help.startOnBoot, state.startOnBoot) { on ->
+        SwitchSetting(stringResource(R.string.ui_start_automatically), Help.startOnBoot, state.startOnBoot) { on ->
             Repo.update { it.copy(startOnBoot = on) }
         }
         if (!exempt) {
             RowDivider()
-            ActionRow("Allow background use", Help.battery, detail = "Battery optimisation may stop the EQ when locked.") {
+            ActionRow(stringResource(R.string.ui_allow_background_use), Help.battery, detail = stringResource(R.string.ui_battery_optimisation_may_stop_the_eq_whe)) {
                 context.startActivity(
                     Intent(
                         Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
@@ -1559,31 +1597,31 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
 
     var showGuide by remember { mutableStateOf(false) }
     var confirmReset by remember { mutableStateOf(false) }
-    SettingsSection("Help and reset") {
-        ActionRow("Getting the best sound", Help.guide) { showGuide = true }
+    SettingsSection(stringResource(R.string.ui_help_and_reset)) {
+        ActionRow(stringResource(R.string.ui_getting_the_best_sound), Help.guide) { showGuide = true }
         RowDivider()
-        ActionRow("Reset sound settings", Help.reset) { confirmReset = true }
+        ActionRow(stringResource(R.string.ui_reset_sound_settings_2), Help.reset) { confirmReset = true }
     }
     if (showGuide) GuideDialog(onDismiss = { showGuide = false })
     if (confirmReset) {
         AlertDialog(
             onDismissRequest = { confirmReset = false },
             containerColor = Palette.Tooltip,
-            title = { Text("Reset sound settings?") },
-            text = { Text("The sound goes back to Flat. Your saved presets and output choices are kept.") },
+            title = { Text(stringResource(R.string.ui_reset_sound_settings)) },
+            text = { Text(stringResource(R.string.ui_the_sound_goes_back_to_flat_your_saved_p)) },
             confirmButton = {
                 TextButton(onClick = {
                     Repo.resetSound()
                     confirmReset = false
-                }) { Text("Reset", color = Palette.Danger) }
+                }) { Text(stringResource(R.string.ui_reset), color = Palette.Danger) }
             },
-            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text(stringResource(R.string.ui_cancel)) } },
         )
     }
 
     DiagnosticsSection(status, output)
 
-    SettingsSection("Status") {
+    SettingsSection(stringResource(R.string.ui_status)) {
         Fact("Running", Help.statusRunning, if (status.running) "Yes" else "No")
         RowDivider()
         Fact("Mode", Help.statusMode, status.mode)
@@ -1636,7 +1674,7 @@ private fun GuideDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Palette.Tooltip,
-        title = { Text("Getting the best sound") },
+        title = { Text(stringResource(R.string.ui_getting_the_best_sound)) },
         text = {
             Column(
                 Modifier.verticalScroll(rememberScrollState()),
@@ -1650,7 +1688,7 @@ private fun GuideDialog(onDismiss: () -> Unit) {
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.ui_close)) } },
     )
 }
 

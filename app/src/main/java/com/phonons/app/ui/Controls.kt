@@ -1,5 +1,7 @@
 package com.phonons.app.ui
 
+import com.phonons.app.R
+import androidx.compose.ui.res.stringResource
 import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
@@ -112,13 +114,13 @@ fun InfoButton(tip: Tip) {
         positionProvider = TooltipDefaults.rememberRichTooltipPositionProvider(),
         tooltip = {
             RichTooltip(
-                title = { Text(tip.title, style = MaterialTheme.typography.titleSmall) },
+                title = { Text(stringResource(tip.title), style = MaterialTheme.typography.titleSmall) },
                 colors = TooltipDefaults.richTooltipColors(
                     containerColor = Palette.Tooltip,
                     contentColor = Palette.Text,
                     titleContentColor = Palette.Text,
                 ),
-            ) { Text(tip.body, style = MaterialTheme.typography.bodyMedium) }
+            ) { Text(stringResource(tip.body), style = MaterialTheme.typography.bodyMedium) }
         },
         state = state,
         enableUserInput = false,
@@ -126,7 +128,7 @@ fun InfoButton(tip: Tip) {
         IconButton(onClick = { scope.launch { state.show() } }) {
             Icon(
                 Icons.Outlined.Info,
-                contentDescription = "About ${tip.title}",
+                contentDescription = stringResource(R.string.ui_about_setting, stringResource(tip.title)),
                 tint = Palette.TextDim,
                 modifier = Modifier.size(18.dp),
             )
@@ -411,7 +413,7 @@ fun rememberMusicActive(): Boolean {
 fun NothingPlayingHint(modifier: Modifier = Modifier) {
     if (rememberMusicActive()) return
     Text(
-        "Nothing is playing. Start your music app to hear this, because Eigentone only changes its sound.",
+        stringResource(R.string.ui_nothing_is_playing_start_your_music_app),
         style = MaterialTheme.typography.bodySmall,
         color = Palette.Text,
         modifier = modifier,

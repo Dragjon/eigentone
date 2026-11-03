@@ -1,7 +1,7 @@
 Eigentone is a free equaliser that changes the sound of apps across your phone, including Spotify and YouTube, without root. No ads, no account and no tracking.
 
 Find your sound
-- Correct your headphones using AutoEq's published measurements, offered when they connect
+- Correct your headphones using AutoEq's published measurements, offered when they connect, then tune it to taste
 - A guided A/B listening test, where the result has to beat what you already have
 - Compare any two sounds instantly at matched loudness, with an optional blind test
 - A guided test that finds peaks and dips in your headphones by ear, with filters to compare before keeping
@@ -21,6 +21,8 @@ Made for daily use
 - A free three-band compressor saved with each preset, with adjustable crossovers, a response curve and starting styles
 - Volume leveller, scheduled night mode, loudness compensation and limiter
 - Balance, stereo width and virtual surround
+- Search your presets and file them in folders
+- Hold the app icon to jump to your favourite presets
 - Share a sound with a text code
 - Quick Settings tile and home-screen widget
 

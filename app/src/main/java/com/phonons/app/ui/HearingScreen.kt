@@ -1,5 +1,7 @@
 package com.phonons.app.ui
 
+import com.phonons.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -145,13 +147,13 @@ fun HearingScreen(onClose: () -> Unit) {
 
 @Composable
 private fun Intro(onStart: () -> Unit, onCancel: () -> Unit) {
-    Text("Hearing check", style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
+    Text(stringResource(R.string.ui_hearing_check), style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
     Text(
-        "You'll hear quiet tones in one ear at a time and say whether you heard them. It takes about 3 minutes, and it makes a gentle curve that lifts what you hear least well.",
+        stringResource(R.string.ui_you_ll_hear_quiet_tones_in_one_ear_at_a),
         style = MaterialTheme.typography.bodyLarge,
         color = Palette.TextDim,
     )
-    SettingsSection("Before you start") {
+    SettingsSection(stringResource(R.string.ui_before_you_start)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(
                 "Wear the headphones you want this for, and go somewhere quiet.",
@@ -162,12 +164,12 @@ private fun Intro(onStart: () -> Unit, onCancel: () -> Unit) {
         }
     }
     Text(
-        "This isn't a medical hearing test and can't diagnose anything. If you're worried about your hearing, see a professional.",
+        stringResource(R.string.ui_this_isn_t_a_medical_hearing_test_and_ca),
         style = MaterialTheme.typography.bodySmall,
         color = Palette.TextDim,
     )
-    Button(onClick = onStart, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Start") }
-    TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text("Not now") }
+    Button(onClick = onStart, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.ui_start)) }
+    TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_not_now)) }
 }
 
 @Composable
@@ -211,7 +213,7 @@ private fun Tones(
         },
     )
     Text(
-        "After you hear one, the next is quieter, so it's normal for tones to become very faint or vanish. Answer honestly rather than guessing.",
+        stringResource(R.string.ui_after_you_hear_one_the_next_is_quieter_s),
         style = MaterialTheme.typography.bodyMedium,
         color = Palette.TextDim,
     )
@@ -220,15 +222,15 @@ private fun Tones(
         enabled = phase == TonePhase.PLAYING || phase == TonePhase.ASKING,
         onClick = { onAnswer(true) },
         modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp),
-    ) { Text("I heard it") }
+    ) { Text(stringResource(R.string.ui_i_heard_it)) }
     FilledTonalButton(
         enabled = phase == TonePhase.ASKING,
         onClick = { onAnswer(false) },
         modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp),
-    ) { Text("I didn't hear it") }
+    ) { Text(stringResource(R.string.ui_i_didn_t_hear_it)) }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TextButton(onClick = onPlayAgain, modifier = Modifier.heightIn(min = 48.dp)) { Text("Play again") }
-        TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text("Stop") }
+        TextButton(onClick = onPlayAgain, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_play_again)) }
+        TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_stop)) }
     }
 }
 
@@ -252,7 +254,7 @@ private fun Result(result: HearingResult, onClose: () -> Unit) {
         return shape
     }
 
-    Text("Your curve", style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
+    Text(stringResource(R.string.ui_your_curve), style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
     Text(
         if (hasCurve) {
             "This lifts the frequencies you heard least well, by half the difference. These headphones' own tuning is part of the result, so it suits them best."
@@ -263,7 +265,7 @@ private fun Result(result: HearingResult, onClose: () -> Unit) {
         color = Palette.TextDim,
     )
     if (hasCurve) {
-        SettingsSection("Changes") {
+        SettingsSection(stringResource(R.string.ui_changes)) {
             points.forEach { point ->
                 Row(
                     Modifier
@@ -302,14 +304,14 @@ private fun Result(result: HearingResult, onClose: () -> Unit) {
                 onClose()
             },
             modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-        ) { Text("Add to my sound") }
+        ) { Text(stringResource(R.string.ui_add_to_my_sound)) }
         FilledTonalButton(
             onClick = {
                 save()
                 onClose()
             },
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-        ) { Text("Only save it to Your shapes") }
+        ) { Text(stringResource(R.string.ui_only_save_it_to_your_shapes)) }
     }
     if (Profiles.supportsModes(output.key)) {
         HearingGraph(result)
@@ -349,7 +351,7 @@ private fun Result(result: HearingResult, onClose: () -> Unit) {
 fun HearingGraph(result: HearingResult, modifier: Modifier = Modifier) {
     val levels = remember(result) { result.earLevels() }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("How each ear heard", style = MaterialTheme.typography.titleSmall, color = Palette.Text)
+        Text(stringResource(R.string.ui_how_each_ear_heard), style = MaterialTheme.typography.titleSmall, color = Palette.Text)
         EarCurvesGraph(
             levels,
             Modifier
@@ -358,7 +360,7 @@ fun HearingGraph(result: HearingResult, modifier: Modifier = Modifier) {
             rangeDb = HEARING_GRAPH_RANGE_DB,
         )
         Text(
-            "Higher means that ear needed a louder tone. This compares your ears with each other, and isn't a measure of how well you hear.",
+            stringResource(R.string.ui_higher_means_that_ear_needed_a_louder_to),
             style = MaterialTheme.typography.bodySmall,
             color = Palette.TextDim,
         )

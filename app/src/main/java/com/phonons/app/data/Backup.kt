@@ -110,6 +110,7 @@ object BackupCodec {
         preampDb = safe(preset.preampDb, 0.0).coerceIn(-MAX_PREAMP, MAX_PREAMP),
         filters = preset.filters.take(MAX_FILTERS).map(::sanitise),
         tone = sanitise(preset.tone),
+        folder = PresetOrganiser.cleanFolder(preset.folder),
     )
 
     private fun sanitise(tone: Tone): Tone {

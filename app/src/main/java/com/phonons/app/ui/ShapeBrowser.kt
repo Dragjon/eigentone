@@ -1,5 +1,6 @@
 package com.phonons.app.ui
 
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -213,7 +214,7 @@ fun ShapeBrowser(onClose: () -> Unit) {
     ) {
         Row(Modifier.padding(start = 4.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { goBack() }) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.ui_back))
             }
             Text(
                 title,
@@ -236,12 +237,12 @@ fun ShapeBrowser(onClose: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                placeholder = { Text("Rock, muddy, podcast, bass 100", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                placeholder = { Text(stringResource(R.string.ui_rock_muddy_podcast_bass_100), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                 trailingIcon = {
                     if (query.isNotEmpty()) {
-                        IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Clear, contentDescription = "Clear search") }
+                        IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Clear, contentDescription = stringResource(R.string.ui_clear_search)) }
                     }
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -278,7 +279,7 @@ fun ShapeBrowser(onClose: () -> Unit) {
                         Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Button(onClick = { editing = ShapeDraft() }, modifier = Modifier.weight(1f)) { Text("New shape", maxLines = 1) }
+                        Button(onClick = { editing = ShapeDraft() }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.ui_new_shape), maxLines = 1) }
                         FilledTonalButton(
                             enabled = !GraphicEq.isFlat(GraphicEq.normalized(before.tone.graphicDb, before.tone.graphicBands)),
                             onClick = {
@@ -288,7 +289,7 @@ fun ShapeBrowser(onClose: () -> Unit) {
                                 editing = ShapeDraft(text = ShapeText.format(faders))
                             },
                             modifier = Modifier.weight(1f),
-                        ) { Text("Save my faders", maxLines = 1) }
+                        ) { Text(stringResource(R.string.ui_save_my_faders), maxLines = 1) }
                     }
                 }
                 LazyColumn(
@@ -408,18 +409,18 @@ private fun ShapeEditorDialog(draft: ShapeDraft, onDismiss: () -> Unit) {
                 Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true, label = { Text("Name") })
+                OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true, label = { Text(stringResource(R.string.ui_name)) })
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
                     minLines = 4,
                     maxLines = 10,
-                    label = { Text("Frequency and level") },
+                    label = { Text(stringResource(R.string.ui_frequency_and_level)) },
                     placeholder = { Text("100 +4\n1.6k -2") },
                 )
                 when {
                     text.isBlank() -> Text(
-                        "One point per line, such as 100 +4 or 1.6k -2. Copy the values from another app's EQ to match it. Levels between points are filled in.",
+                        stringResource(R.string.ui_one_point_per_line_such_as_100_4_or_1_6k),
                         style = MaterialTheme.typography.bodySmall,
                         color = Palette.TextDim,
                     )
@@ -433,7 +434,7 @@ private fun ShapeEditorDialog(draft: ShapeDraft, onDismiss: () -> Unit) {
                     TextButton(onClick = {
                         Repo.deleteShape(draft.id)
                         onDismiss()
-                    }) { Text("Delete shape", color = Palette.Danger) }
+                    }) { Text(stringResource(R.string.ui_delete_shape), color = Palette.Danger) }
                 }
             }
         },
@@ -445,9 +446,9 @@ private fun ShapeEditorDialog(draft: ShapeDraft, onDismiss: () -> Unit) {
                     Repo.saveShape(CustomShape(draft.id ?: "custom:${UUID.randomUUID()}", name.trim(), points))
                     onDismiss()
                 },
-            ) { Text("Save") }
+            ) { Text(stringResource(R.string.ui_save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.ui_cancel)) } },
     )
 }
 
@@ -479,7 +480,7 @@ private fun FirstPage(
             .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Browse by type", style = MaterialTheme.typography.titleSmall, color = Palette.TextDim)
+        Text(stringResource(R.string.ui_browse_by_type), style = MaterialTheme.typography.titleSmall, color = Palette.TextDim)
         options.chunked(CARD_COLUMNS).forEach { row ->
             // Equal heights keep the grid tidy when one card's text wraps further than its neighbour's.
             Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -496,7 +497,7 @@ private fun FirstPage(
             }
         }
         Spacer(Modifier.height(8.dp))
-        Text("Browse by sound", style = MaterialTheme.typography.titleSmall, color = Palette.TextDim)
+        Text(stringResource(R.string.ui_browse_by_sound), style = MaterialTheme.typography.titleSmall, color = Palette.TextDim)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ShapeTrait.entries.forEach { option ->
                 FilterChip(
@@ -547,7 +548,7 @@ private fun SoundFilter(selected: ShapeTrait?, onSelect: (ShapeTrait?) -> Unit) 
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuItem(
-                text = { Text("Any sound") },
+                text = { Text(stringResource(R.string.ui_any_sound)) },
                 onClick = {
                     onSelect(null)
                     open = false
@@ -580,7 +581,7 @@ private fun EmptyResults(favouritesEmpty: Boolean, onClear: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             color = Palette.TextDim,
         )
-        TextButton(onClick = onClear) { Text("Back to the library") }
+        TextButton(onClick = onClear) { Text(stringResource(R.string.ui_back_to_the_library)) }
     }
 }
 
@@ -689,9 +690,9 @@ private fun PreviewPanel(
             )
             Spacer(Modifier.width(8.dp))
             if (hearingBefore) {
-                Button(onClick = onToggleBefore) { Text("Hearing before") }
+                Button(onClick = onToggleBefore) { Text(stringResource(R.string.ui_hearing_before)) }
             } else {
-                FilledTonalButton(onClick = onToggleBefore) { Text("Hear before") }
+                FilledTonalButton(onClick = onToggleBefore) { Text(stringResource(R.string.ui_hear_before)) }
             }
         }
         if (silentReason != null) {
@@ -730,19 +731,19 @@ private fun PreviewPanel(
                     shape = SegmentedButtonDefaults.itemShape(0, 2),
                     colors = segmentColors(),
                     icon = {},
-                ) { Text("Replace", maxLines = 1) }
+                ) { Text(stringResource(R.string.ui_replace), maxLines = 1) }
                 SegmentedButton(
                     selected = layering,
                     onClick = { onLayering(true) },
                     shape = SegmentedButtonDefaults.itemShape(1, 2),
                     colors = segmentColors(),
                     icon = {},
-                ) { Text("Add", maxLines = 1) }
+                ) { Text(stringResource(R.string.ui_add), maxLines = 1) }
             }
             InfoButton(Help.shapeMode)
         }
         SliderSetting(
-            title = "Amount",
+            title = stringResource(R.string.ui_amount),
             tip = Help.shapeAmount,
             readout = "${(amount * 100).roundToInt()}%",
             value = amount,
@@ -756,8 +757,8 @@ private fun PreviewPanel(
                 .padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            FilledTonalButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancel") }
-            Button(onClick = onUse, modifier = Modifier.weight(1f)) { Text("Use this") }
+            FilledTonalButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.ui_cancel)) }
+            Button(onClick = onUse, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.ui_use_this)) }
         }
     }
 }

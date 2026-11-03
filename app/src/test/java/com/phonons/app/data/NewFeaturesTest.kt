@@ -172,6 +172,74 @@ class NewFeaturesTest {
 
     private fun near(hz: Double, target: Double) = abs(kotlin.math.log2(hz / target)) < 0.13
 
+    private val bassy = Preset("user:1", "Liberty 4 NC + bass", folder = "Commute")
+
+    @Test
+    fun presetSearchMatchesEveryWordInAnyOrder() {
+        assertTrue(PresetOrganiser.matches(bassy, "bass lib"))
+        assertTrue(PresetOrganiser.matches(bassy, "BASS"))
+        assertTrue(PresetOrganiser.matches(bassy, ""))
+        assertTrue(PresetOrganiser.matches(bassy, "commute"))
+        assertFalse(PresetOrganiser.matches(bassy, "bass treble"))
+        assertTrue(PresetOrganiser.matches(Preset("user:2", "No folder"), "   "))
+    }
+
+    @Test
+    fun folderNamesAreTidied() {
+        assertEquals("Gym", PresetOrganiser.cleanFolder("  Gym "))
+        assertNull(PresetOrganiser.cleanFolder("   "))
+        assertNull(PresetOrganiser.cleanFolder(null))
+        assertEquals(PresetOrganiser.MAX_FOLDER_NAME, PresetOrganiser.cleanFolder("x".repeat(500))!!.length)
+    }
+
+    @Test
+    fun foldersOnlyExistWhileUsedAndAreSorted() {
+        val presets = listOf(
+            Preset("user:a", "A", folder = "gym"),
+            Preset("user:b", "B", folder = "Commute"),
+            Preset("user:c", "C", folder = "gym"),
+            Preset("user:d", "D"),
+        )
+        assertEquals(listOf("Commute", "gym"), PresetOrganiser.folders(presets))
+    }
+
+    @Test
+    fun foldersSurviveBackupsAndShareCodesTidied() {
+        val preset = Preset("user:a", "A", folder = "  Gym  ")
+        val restored = BackupCodec.decode(BackupCodec.encode(AppState(presets = listOf(preset))))!!
+        assertEquals("Gym", restored.presets.single().folder)
+        assertEquals("Gym", ShareCode.decode(ShareCode.encode(preset))!!.folder)
+    }
+
+    @Test
+    fun presetsWithoutAFolderStillLoad() {
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+        assertNull(json.decodeFromString(Preset.serializer(), """{"id":"user:a","name":"A"}""").folder)
+    }
+
+    @Test
+    fun movingAPresetToAFolderAlsoMovesTheOneInUse() {
+        val preset = Preset("user:move", "Move")
+        Repo.update { it.copy(presets = listOf(preset), current = preset) }
+        Repo.moveToFolder("user:move", " Gym ")
+        assertEquals("Gym", Repo.state.value.presets.single().folder)
+        assertEquals("Gym", Repo.state.value.current.folder)
+        Repo.moveToFolder("user:move", "")
+        assertNull(Repo.state.value.current.folder)
+    }
+
+    @Test
+    fun shortcutsPreferFavouritesThenYourOwnAndStopAtTheLimit() {
+        val own = List(6) { Preset("user:$it", "P$it") }
+        val builtIn = Preset("builtin:x", "Built")
+        val state = AppState(favorites = setOf("builtin:x", "user:5"))
+        val chosen = PresetOrganiser.shortcuts(state, listOf(builtIn) + own)
+        assertEquals(PresetOrganiser.MAX_SHORTCUTS, chosen.size)
+        assertEquals(listOf("builtin:x", "user:5", "user:0", "user:1"), chosen.map { it.id })
+        // Built-ins nobody chose don't take up room.
+        assertTrue(PresetOrganiser.shortcuts(AppState(), listOf(builtIn)).isEmpty())
+    }
+
     @Test
     fun theFinderCoversTheUsefulRange() {
         val spots = PeakFinder.spots()

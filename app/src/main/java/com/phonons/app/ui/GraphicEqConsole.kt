@@ -1,5 +1,6 @@
 package com.phonons.app.ui
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -86,14 +87,14 @@ fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
     }
 
     SettingsSection(
-        "Graphic EQ",
+        stringResource(R.string.ui_graphic_eq),
         trailing = {
             InfoButton(Help.graphic)
             if (!GraphicEq.isFlat(gains)) {
                 TextButton(onClick = {
                     setGains(emptyList())
                     Repo.commit()
-                }) { Text("Reset") }
+                }) { Text(stringResource(R.string.ui_reset)) }
             }
         },
     ) {
@@ -126,7 +127,7 @@ fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(enabled = band > 0, onClick = { selected = band - 1 }) {
-                Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "Previous band")
+                Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.ui_previous_band))
             }
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(GraphicEq.formatFrequency(freqs[band]), style = MaterialTheme.typography.bodyMedium, color = Palette.Text)
@@ -137,7 +138,7 @@ fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
                 )
             }
             IconButton(enabled = band < bands - 1, onClick = { selected = band + 1 }) {
-                Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "Next band")
+                Icon(Icons.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.ui_next_band))
             }
             Spacer(Modifier.weight(0.15f))
             fun nudge(by: Double) {
@@ -156,7 +157,7 @@ fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
 
         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Bands", style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
+                Text(stringResource(R.string.ui_bands), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
                 InfoButton(Help.graphicBands)
             }
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
@@ -185,13 +186,13 @@ fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
 
         Column(Modifier.padding(top = 4.dp, bottom = 12.dp)) {
             Row(Modifier.padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Shapes", style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
+                Text(stringResource(R.string.ui_shapes), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
                 InfoButton(Help.graphicShapes)
                 Spacer(Modifier.weight(1f))
                 TextButton(enabled = !GraphicEq.isFlat(gains), onClick = {
                     setGains(GraphicEq.smooth(gains))
                     Repo.commit()
-                }) { Text("Smooth") }
+                }) { Text(stringResource(R.string.ui_smooth)) }
                 InfoButton(Help.graphicSmooth)
             }
             LazyRow(

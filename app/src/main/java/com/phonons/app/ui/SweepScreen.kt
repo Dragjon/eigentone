@@ -1,5 +1,7 @@
 package com.phonons.app.ui
 
+import com.phonons.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -145,9 +147,9 @@ fun SweepScreen(onClose: () -> Unit) {
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Frequency sweep", style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
+            Text(stringResource(R.string.ui_frequency_sweep), style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
             Text(
-                "A tone climbs from deep bass to high treble. It should stay about equally loud, so mark anywhere it jumps out or nearly disappears. Keep your volume low, and stop if it's ever uncomfortable.",
+                stringResource(R.string.ui_a_tone_climbs_from_deep_bass_to_high_tre),
                 style = MaterialTheme.typography.bodyMedium,
                 color = Palette.TextDim,
             )
@@ -203,22 +205,22 @@ fun SweepScreen(onClose: () -> Unit) {
                 )
             }
             if (failed) {
-                Text("This phone wouldn't play the tone.", style = MaterialTheme.typography.bodyMedium, color = Palette.Danger)
+                Text(stringResource(R.string.ui_this_phone_wouldn_t_play_the_tone), style = MaterialTheme.typography.bodyMedium, color = Palette.Danger)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilledTonalButton(
                     enabled = playing,
                     onClick = { marks = Sweep.addMark(marks, hz, Sweep.TOO_LOUD_DB) },
                     modifier = Modifier.weight(1f).heightIn(min = 64.dp),
-                ) { Text("Too loud here") }
+                ) { Text(stringResource(R.string.ui_too_loud_here)) }
                 FilledTonalButton(
                     enabled = playing,
                     onClick = { marks = Sweep.addMark(marks, hz, Sweep.TOO_QUIET_DB) },
                     modifier = Modifier.weight(1f).heightIn(min = 64.dp),
-                ) { Text("Too quiet here") }
+                ) { Text(stringResource(R.string.ui_too_quiet_here)) }
             }
             SliderSetting(
-                title = "Tone level",
+                title = stringResource(R.string.ui_tone_level),
                 tip = Help.sweepLevel,
                 readout = String.format(Locale.US, "%.0f dB", levelDb),
                 value = levelDb.toFloat(),
@@ -226,10 +228,10 @@ fun SweepScreen(onClose: () -> Unit) {
                 default = Sweep.DEFAULT_LEVEL_DB.toFloat(),
                 onChange = { levelDb = it.toDouble() },
             )
-            SwitchSetting("Hear through my EQ", Help.sweepHearEq, hearEq) { hearEq = it }
+            SwitchSetting(stringResource(R.string.ui_hear_through_my_eq), Help.sweepHearEq, hearEq) { hearEq = it }
 
             if (marks.isNotEmpty()) {
-                SettingsSection("Your marks") {
+                SettingsSection(stringResource(R.string.ui_your_marks)) {
                     marks.forEachIndexed { index, mark ->
                         if (index > 0) RowDivider()
                         Row(
@@ -246,7 +248,7 @@ fun SweepScreen(onClose: () -> Unit) {
                                 modifier = Modifier.weight(1f),
                             )
                             Text(String.format(Locale.US, "%+.0f dB", mark.gainDb), style = Readout, color = Palette.Amber)
-                            TextButton(onClick = { marks = marks - mark }) { Text("Remove") }
+                            TextButton(onClick = { marks = marks - mark }) { Text(stringResource(R.string.ui_remove)) }
                         }
                     }
                 }

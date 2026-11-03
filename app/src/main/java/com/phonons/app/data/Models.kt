@@ -121,6 +121,8 @@ data class Preset(
     val preampDb: Double = 0.0,
     val filters: List<Filter> = emptyList(),
     val tone: Tone = Tone(),
+    /** Where it's filed in the preset list, or null for none. */
+    val folder: String? = null,
 )
 
 @Serializable

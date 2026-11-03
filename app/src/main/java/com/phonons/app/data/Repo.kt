@@ -173,6 +173,17 @@ object Repo {
         _state.update { s -> s.renamedPreset(id, name) }
     }
 
+    /** Files a user preset in a folder, including the working copy if it's the one in use. */
+    fun moveToFolder(id: String, folder: String?) {
+        val cleaned = PresetOrganiser.cleanFolder(folder)
+        _state.update { s ->
+            s.copy(
+                presets = s.presets.map { if (it.id == id) it.copy(folder = cleaned) else it },
+                current = if (s.current.id == id) s.current.copy(folder = cleaned) else s.current,
+            )
+        }
+    }
+
     /** Returns the sound to a clean start. Presets and output choices are kept. */
     fun resetSound() {
         commit()

@@ -21,6 +21,7 @@ A free system-wide equaliser for Android 14 and newer. No ads, no account, and n
 - **Multiband compressor**, free and fully adjustable and saved per preset, with three bands, adjustable crossovers, a live response curve and starting styles.
 - **Volume leveller**, night mode with a schedule, loudness compensation, limiter, balance, stereo width and virtual surround.
 - **Undo and redo**, a saved-curve overlay while editing and a warning when settings could clip.
+- **Preset search and folders**, app icon shortcuts to your favourites, and a tuner that adds bass or treble back to a correction.
 - **Share codes**, backups, a Quick Settings tile and a home-screen widget.
 
 ## Privacy
@@ -41,7 +42,7 @@ Crash reports stay on the phone. You choose whether to share one from the System
 Copy the latest `Eigentone-<version>.apk` to the phone and open it, or use USB debugging:
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.20.0.apk
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.21.0.apk
 ```
 
 ## Build
@@ -54,6 +55,10 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 The APK is written to `app\build\outputs\apk\release\app-release.apk`.
 
 Back up `phonons-release.jks` and `keystore.properties`. They are excluded from version control, and Android refuses updates signed with a different key, so losing them means uninstalling (and losing presets) to update.
+
+## Translating
+
+Most text is in `app/src/main/res/values/strings.xml` and `strings_ui.xml`. To add a language, copy those to `values-<code>/` and translate them. Text with values inserted, such as "Deleted Main preset", and text chosen by a condition is still in the Kotlin code, and needs moving before a translation can be complete.
 
 ## Layout
 

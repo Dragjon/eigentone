@@ -1,5 +1,7 @@
 package com.phonons.app.ui
 
+import com.phonons.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -177,9 +179,9 @@ private fun Intro(
     onFind: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    Text("Find my sound", style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
+    Text(stringResource(R.string.ui_find_my_sound), style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
     Text(
-        "You'll compare two versions of your music a few times and choose the one you prefer. It takes about two minutes, and there are no wrong answers.",
+        stringResource(R.string.ui_you_ll_compare_two_versions_of_your_musi),
         style = MaterialTheme.typography.bodyLarge,
         color = Palette.TextDim,
     )
@@ -191,12 +193,12 @@ private fun Intro(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Before you start", style = MaterialTheme.typography.titleSmall, color = Palette.Text)
-        Text("• Play a song you know well, and keep it playing.", style = MaterialTheme.typography.bodyMedium, color = Palette.Text)
-        Text("• Set a comfortable volume, and leave it there.", style = MaterialTheme.typography.bodyMedium, color = Palette.Text)
+        Text(stringResource(R.string.ui_before_you_start), style = MaterialTheme.typography.titleSmall, color = Palette.Text)
+        Text(stringResource(R.string.ui_play_a_song_you_know_well_and_keep_it_pl), style = MaterialTheme.typography.bodyMedium, color = Palette.Text)
+        Text(stringResource(R.string.ui_set_a_comfortable_volume_and_leave_it_th), style = MaterialTheme.typography.bodyMedium, color = Palette.Text)
         Text("• Listening on: $outputLabel", style = MaterialTheme.typography.bodyMedium, color = Palette.Text)
     }
-    Text("Start from", style = MaterialTheme.typography.titleSmall, color = Palette.TextDim)
+    Text(stringResource(R.string.ui_start_from), style = MaterialTheme.typography.titleSmall, color = Palette.TextDim)
     // A sound the listener has already shaped is a better base than a fresh correction it may replace.
     val hasOwnSound = current.filters.any { it.gainDb != 0.0 } || current.tone != com.phonons.app.data.Tone()
     if (hasOwnSound) {
@@ -216,9 +218,9 @@ private fun Intro(
             }
         }
     } else if (hasOwnSound) {
-        FilledTonalButton(onClick = onFind, modifier = Modifier.fillMaxWidth()) { Text("Find my headphones first") }
+        FilledTonalButton(onClick = onFind, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.ui_find_my_headphones_first)) }
     } else {
-        Button(onClick = onFind, modifier = Modifier.fillMaxWidth()) { Text("Find my headphones first (recommended)") }
+        Button(onClick = onFind, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.ui_find_my_headphones_first_recommended)) }
     }
     if (!hasOwnSound) {
         FilledTonalButton(onClick = { onStart(current) }, modifier = Modifier.fillMaxWidth()) {
@@ -226,11 +228,11 @@ private fun Intro(
         }
     }
     Text(
-        "A headphone correction evens out your model's sound first, so your choices start from a balanced base. You'll compare the result with your current sound at the end.",
+        stringResource(R.string.ui_a_headphone_correction_evens_out_your_mo),
         style = MaterialTheme.typography.bodySmall,
         color = Palette.TextDim,
     )
-    TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text("Not now") }
+    TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_not_now)) }
 }
 
 @Composable
@@ -267,7 +269,7 @@ private fun Compare(
     )
     Text(round.trait.question, style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
     Text(
-        "Switch between them as often as you like while the music plays. Both are matched in loudness.",
+        stringResource(R.string.ui_switch_between_them_as_often_as_you_like),
         style = MaterialTheme.typography.bodyMedium,
         color = Palette.TextDim,
     )
@@ -296,8 +298,8 @@ private fun Compare(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp),
-    ) { Text("I can't hear a difference") }
-    TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text("Stop and undo") }
+    ) { Text(stringResource(R.string.ui_i_can_t_hear_a_difference)) }
+    TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_stop_and_undo)) }
 }
 
 @Composable
@@ -351,9 +353,9 @@ private fun FinalChoice(
     }
     LaunchedEffect(Unit) { hear(true) }
 
-    Text("One last comparison", style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
+    Text(stringResource(R.string.ui_one_last_comparison), style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
     Text(
-        "Is the new sound actually better than what you had? Switch between them, ideally on more than one song. Keeping what you had is a perfectly good answer.",
+        stringResource(R.string.ui_is_the_new_sound_actually_better_than_wh),
         style = MaterialTheme.typography.bodyLarge,
         color = Palette.TextDim,
     )
@@ -368,13 +370,13 @@ private fun FinalChoice(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 52.dp),
-    ) { Text("Keep what I had") }
+    ) { Text(stringResource(R.string.ui_keep_what_i_had)) }
     FilledTonalButton(
         onClick = onUseNew,
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 52.dp),
-    ) { Text("Use the new sound") }
+    ) { Text(stringResource(R.string.ui_use_the_new_sound)) }
 }
 
 private fun describe(trait: Trait, value: Double): String {
@@ -401,9 +403,9 @@ private fun Result(
         Repo.edit { SoundFinder.levelMatched(start, tone, finished) }
     }
 
-    Text("Your sound", style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
+    Text(stringResource(R.string.ui_your_sound), style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
     Text(
-        "This is what you preferred with this music and these headphones. Other songs may suit it differently, and you can run the test again at any time.",
+        stringResource(R.string.ui_this_is_what_you_preferred_with_this_mus),
         style = MaterialTheme.typography.bodyLarge,
         color = Palette.TextDim,
     )
@@ -430,7 +432,7 @@ private fun Result(
             }
         }
     }
-    Text("Compare", style = MaterialTheme.typography.titleSmall, color = Palette.TextDim)
+    Text(stringResource(R.string.ui_compare), style = MaterialTheme.typography.titleSmall, color = Palette.TextDim)
     NothingPlayingHint()
     val musicActive = rememberMusicActive()
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -441,7 +443,7 @@ private fun Result(
         value = name,
         onValueChange = { name = it },
         singleLine = true,
-        label = { Text("Preset name") },
+        label = { Text(stringResource(R.string.ui_preset_name)) },
         modifier = Modifier.fillMaxWidth(),
     )
     Button(
@@ -461,7 +463,7 @@ private fun Result(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 52.dp),
-    ) { Text("Save and use") }
-    TextButton(onClick = onDiscard, modifier = Modifier.heightIn(min = 48.dp)) { Text("Discard") }
-    if (state.bypass) Text("Bypass is on, so you won't hear the changes.", color = Palette.Danger)
+    ) { Text(stringResource(R.string.ui_save_and_use)) }
+    TextButton(onClick = onDiscard, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_discard)) }
+    if (state.bypass) Text(stringResource(R.string.ui_bypass_is_on_so_you_won_t_hear_the_chang), color = Palette.Danger)
 }

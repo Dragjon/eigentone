@@ -1,5 +1,7 @@
 package com.phonons.app.ui
 
+import com.phonons.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -209,9 +211,9 @@ private fun Choose(
     // Comparing something with itself wouldn't tell anyone anything, so neither slot offers the other's sound.
     val otherId = if (choosingFirst) secondId else firstId
 
-    Text("Compare two sounds", style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
+    Text(stringResource(R.string.ui_compare_two_sounds), style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
     Text(
-        "Switch between them while your music plays. They play at about the same loudness, so the louder one doesn't win just for being louder.",
+        stringResource(R.string.ui_switch_between_them_while_your_music_pla),
         style = MaterialTheme.typography.bodyLarge,
         color = Palette.TextDim,
     )
@@ -244,11 +246,11 @@ private fun Choose(
             Option(preset.id, label(preset))
         }
     }
-    SettingsSection("Options") {
-        SwitchSetting("Blind comparison", Help.compareBlind, blind, onChange = onBlind)
+    SettingsSection(stringResource(R.string.ui_options)) {
+        SwitchSetting(stringResource(R.string.ui_blind_comparison), Help.compareBlind, blind, onChange = onBlind)
     }
-    Button(enabled = canStart, onClick = onStart, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Start comparing") }
-    TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text("Cancel") }
+    Button(enabled = canStart, onClick = onStart, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.ui_start_comparing)) }
+    TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_cancel)) }
 }
 
 @Composable
@@ -290,7 +292,7 @@ private fun Listen(
         color = Palette.TextDim,
     )
     if (silent) {
-        Text("Eigentone is off, so both will sound the same until it's on.", style = MaterialTheme.typography.bodyMedium, color = Palette.Danger)
+        Text(stringResource(R.string.ui_eigentone_is_off_so_both_will_sound_the), style = MaterialTheme.typography.bodyMedium, color = Palette.Danger)
     } else {
         NothingPlayingHint()
     }
@@ -313,7 +315,7 @@ private fun Listen(
             )
         }
     }
-    TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text("Keep what I had") }
+    TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_keep_what_i_had)) }
 }
 
 @Composable
@@ -325,9 +327,9 @@ private fun Reveal(chosen: String, other: String, wasCurrent: Boolean, onUse: ()
         color = Palette.TextDim,
     )
     if (wasCurrent) {
-        Button(onClick = onCancel, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Done") }
+        Button(onClick = onCancel, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.ui_done)) }
     } else {
         Button(onClick = onUse, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Use $chosen", maxLines = 1, overflow = TextOverflow.Ellipsis) }
-        TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text("Keep what I had") }
+        TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_keep_what_i_had)) }
     }
 }

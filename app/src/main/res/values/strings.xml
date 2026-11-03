@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="ui_about_setting">About %1$s</string>
     <string name="app_name">Eigentone</string>
     <string name="widget_description">Shows the current preset, with power, Bypass and next preset buttons.</string>
     <string name="widget_turn_on">Turn on</string>

@@ -1,5 +1,7 @@
 package com.phonons.app.ui
 
+import com.phonons.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -185,13 +187,13 @@ fun PeakFinderScreen(onClose: () -> Unit) {
 
 @Composable
 private fun Intro(failed: Boolean, onStart: () -> Unit, onCancel: () -> Unit) {
-    Text("Find peaks for me", style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
+    Text(stringResource(R.string.ui_find_peaks_for_me), style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
     Text(
         "You'll hear a note alternating with the notes just beside it, and say whether it stands out. There are about ${PeakFinder.spots().size} short questions, then a few more about anything you flagged. It takes around 3 minutes.",
         style = MaterialTheme.typography.bodyLarge,
         color = Palette.TextDim,
     )
-    SettingsSection("Before you start") {
+    SettingsSection(stringResource(R.string.ui_before_you_start)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(
                 "Wear the headphones you want this for, and go somewhere quiet.",
@@ -201,13 +203,13 @@ private fun Intro(failed: Boolean, onStart: () -> Unit, onCancel: () -> Unit) {
         }
     }
     Text(
-        "This finds what you hear on these headphones. It isn't a measurement.",
+        stringResource(R.string.ui_this_finds_what_you_hear_on_these_headph),
         style = MaterialTheme.typography.bodySmall,
         color = Palette.TextDim,
     )
-    if (failed) Text("This phone wouldn't play the tone.", style = MaterialTheme.typography.bodyMedium, color = Palette.Danger)
-    Button(onClick = onStart, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Start") }
-    TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text("Not now") }
+    if (failed) Text(stringResource(R.string.ui_this_phone_wouldn_t_play_the_tone), style = MaterialTheme.typography.bodyMedium, color = Palette.Danger)
+    Button(onClick = onStart, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.ui_start)) }
+    TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_not_now)) }
 }
 
 @Composable
@@ -269,7 +271,7 @@ private fun Questions(
         }
     }
     SliderSetting(
-        title = "Tone level",
+        title = stringResource(R.string.ui_tone_level),
         tip = Help.sweepLevel,
         readout = String.format(Locale.US, "%.0f dB", levelDb),
         value = levelDb.toFloat(),
@@ -277,7 +279,7 @@ private fun Questions(
         default = Sweep.DEFAULT_LEVEL_DB.toFloat(),
         onChange = { onLevel(it.toDouble()) },
     )
-    TextButton(onClick = onStop, modifier = Modifier.heightIn(min = 48.dp)) { Text("Stop") }
+    TextButton(onClick = onStop, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_stop)) }
 }
 
 @Composable
@@ -297,13 +299,13 @@ private fun Result(
     onClose: () -> Unit,
 ) {
     if (marks.isEmpty()) {
-        Text("Nothing stood out", style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
+        Text(stringResource(R.string.ui_nothing_stood_out), style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
         Text(
-            "Nothing held up when checked twice, so there's nothing to add. Your headphones sound even to you, or the differences are too small to be worth fixing.",
+            stringResource(R.string.ui_nothing_held_up_when_checked_twice_so_th),
             style = MaterialTheme.typography.bodyLarge,
             color = Palette.TextDim,
         )
-        Button(onClick = onClose, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Done") }
+        Button(onClick = onClose, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.ui_done)) }
         return
     }
 
@@ -311,9 +313,9 @@ private fun Result(
     LaunchedEffect(hearingNew) { onHear(hearingNew) }
     val filters = remember(marks) { Sweep.addTo(emptyList(), marks) }
 
-    Text("What you found", style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
+    Text(stringResource(R.string.ui_what_you_found), style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
     Text(
-        "These narrow filters would even out what you noticed. Play some music and compare before keeping them.",
+        stringResource(R.string.ui_these_narrow_filters_would_even_out_what),
         style = MaterialTheme.typography.bodyLarge,
         color = Palette.TextDim,
     )
@@ -332,7 +334,7 @@ private fun Result(
         heightDp = 150,
         rangeDb = RESULT_GRAPH_RANGE_DB,
     )
-    SettingsSection("Changes") {
+    SettingsSection(stringResource(R.string.ui_changes)) {
         marks.forEachIndexed { index, mark ->
             if (index > 0) RowDivider()
             Row(
@@ -354,7 +356,7 @@ private fun Result(
     }
     if (marks.size >= MANY_MARKS) {
         Text(
-            "That's a lot of spots for a single pair of headphones, and some may just be how your ears hear different notes. Compare carefully, and run this again if the result sounds worse.",
+            stringResource(R.string.ui_that_s_a_lot_of_spots_for_a_single_pair),
             style = MaterialTheme.typography.bodySmall,
             color = Palette.TextDim,
         )
@@ -365,6 +367,6 @@ private fun Result(
         SideCard("Before", !hearingNew, musicActive, Modifier.weight(1f)) { hearingNew = false }
         SideCard("With filters", hearingNew, musicActive, Modifier.weight(1f)) { hearingNew = true }
     }
-    Button(onClick = onAdd, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Add to my sound") }
-    TextButton(onClick = onClose, modifier = Modifier.heightIn(min = 48.dp)) { Text("Discard") }
+    Button(onClick = onAdd, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.ui_add_to_my_sound)) }
+    TextButton(onClick = onClose, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_discard)) }
 }
