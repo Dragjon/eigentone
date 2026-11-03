@@ -144,6 +144,96 @@ class NewFeaturesTest {
         assertEquals(1.0, decoded.tone.correction, 0.0)
     }
 
+    @Test
+    fun theSweepCoversTheWholeRange() {
+        assertEquals(Eq.MIN_FREQ, Sweep.hzAt(0.0), 0.001)
+        assertEquals(Eq.MAX_FREQ, Sweep.hzAt(1.0), 0.001)
+        assertEquals(Eq.MAX_FREQ, Sweep.hzAt(5.0), 0.001)
+        // Each step along it is the same musical distance.
+        assertEquals(Sweep.hzAt(0.5) / Sweep.hzAt(0.25), Sweep.hzAt(0.75) / Sweep.hzAt(0.5), 0.001)
+    }
+
+    @Test
+    fun marksAtDifferentSpotsStaySeparateAndInOrder() {
+        val marks = Sweep.addMark(Sweep.addMark(emptyList(), 6000.0, -3.0), 200.0, 2.0)
+        assertEquals(listOf(200.0, 6000.0), marks.map { it.hz })
+    }
+
+    @Test
+    fun markingTheSameSpotGoesFurther() {
+        var marks = Sweep.addMark(emptyList(), 6000.0, -3.0)
+        marks = Sweep.addMark(marks, 6100.0, -3.0)
+        assertEquals(1, marks.size)
+        assertEquals(-6.0, marks.single().gainDb, 0.0)
+        repeat(10) { marks = Sweep.addMark(marks, 6000.0, -3.0) }
+        assertEquals(-9.0, marks.single().gainDb, 0.0)
+    }
+
+    @Test
+    fun oppositeMarksAtTheSameSpotCancelOut() {
+        val marks = Sweep.addMark(Sweep.addMark(emptyList(), 1000.0, 2.0), 1000.0, -2.0)
+        assertTrue(marks.isEmpty())
+    }
+
+    @Test
+    fun marksBecomeNarrowFiltersBesideTheOnesAlreadyThere() {
+        val existing = listOf(com.phonons.app.dsp.Filter(7, com.phonons.app.dsp.FilterType.BELL, 100.0, 1.0, 1.0))
+        val filters = Sweep.addTo(existing, listOf(SweepMark(6000.0, -3.0), SweepMark(9000.0, 2.0)))
+        assertEquals(3, filters.size)
+        assertEquals(existing.single(), filters[0])
+        assertEquals(listOf(7, 8, 9), filters.map { it.id })
+        assertEquals(-3.0, Eq.curveDb(listOf(filters[1]), 6000.0), 0.01)
+        // Narrow, so it barely touches a frequency an octave away.
+        assertTrue(abs(Eq.curveDb(listOf(filters[1]), 3000.0)) < 0.3)
+    }
+
+    @Test
+    fun marksStopAtThePresetsFilterLimit() {
+        val full = List(19) { com.phonons.app.dsp.Filter(it + 1, com.phonons.app.dsp.FilterType.BELL, 100.0 + it, 0.0, 1.0) }
+        assertEquals(1, Sweep.roomFor(full))
+        assertEquals(20, Sweep.addTo(full, listOf(SweepMark(500.0, 2.0), SweepMark(900.0, 2.0))).size)
+        assertEquals(0, Sweep.roomFor(full + full))
+    }
+
+    private fun tone(oscillator: SweepOscillator, hz: Double, db: Double, sounding: Boolean = true, frames: Int = 4800): FloatArray {
+        val buffer = FloatArray(frames * 2)
+        oscillator.fill(buffer, hz, db, sounding)
+        return buffer
+    }
+
+    @Test
+    fun theToneNeverGoesAboveTheSafetyLimit() {
+        val oscillator = SweepOscillator(48000)
+        repeat(10) {
+            val limit = Math.pow(10.0, Sweep.MAX_LEVEL_DB / 20)
+            assertTrue(tone(oscillator, 1000.0, 20.0).all { abs(it) <= limit + 0.0001 })
+        }
+    }
+
+    @Test
+    fun theToneFadesInAndOutWithoutClicks() {
+        val oscillator = SweepOscillator(48000)
+        val start = tone(oscillator, 1000.0, -30.0)
+        assertTrue(abs(start[0]) < 0.001)
+        assertFalse(oscillator.isSilent)
+        val end = tone(oscillator, 1000.0, -30.0, sounding = false)
+        assertTrue(oscillator.isSilent)
+        assertTrue(abs(end[end.size - 2]) < 0.0001)
+    }
+
+    @Test
+    fun theToneMovesSmoothlyWhenThePitchJumps() {
+        val oscillator = SweepOscillator(48000)
+        tone(oscillator, 500.0, -30.0)
+        val jumped = tone(oscillator, 8000.0, -30.0)
+        val amplitude = Math.pow(10.0, -30.0 / 20)
+        // No sample leaps further than even the highest pitch here could move in one step.
+        val largestAllowed = amplitude * 2 * Math.PI * 8000.0 / 48000 * 1.05
+        for (i in 2 until jumped.size step 2) {
+            assertTrue(abs(jumped[i] - jumped[i - 2]) <= largestAllowed)
+        }
+    }
+
     private val boosted = Preset("user:b", "Boost", tone = Tone(bassDb = 6.0))
 
     @Test

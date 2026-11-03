@@ -148,6 +148,8 @@ private val LocalOpenHearing = compositionLocalOf<() -> Unit> { error("No hearin
 
 private const val SCROLL_FADE_DP = 28
 
+private val LocalOpenSweep = compositionLocalOf<() -> Unit> { error("No sweep") }
+
 private val LocalOpenCompare = compositionLocalOf<() -> Unit> { error("No comparison") }
 
 /** Opens the shape library from the graphic EQ. */
@@ -165,6 +167,12 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
     var browsingShapes by rememberSaveable { mutableStateOf(false) }
     var checkingHearing by rememberSaveable { mutableStateOf(false) }
     var comparing by rememberSaveable { mutableStateOf(false) }
+    var sweeping by rememberSaveable { mutableStateOf(false) }
+
+    if (sweeping) {
+        SweepScreen(onClose = { sweeping = false })
+        return
+    }
 
     if (comparing) {
         CompareScreen(onClose = { comparing = false })
@@ -191,6 +199,7 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
         LocalOpenShapes provides { browsingShapes = true },
         LocalOpenHearing provides { checkingHearing = true },
         LocalOpenCompare provides { comparing = true },
+        LocalOpenSweep provides { sweeping = true },
     ) {
         Scaffold(
             containerColor = Palette.Background,
@@ -1343,6 +1352,8 @@ private fun ManageSection(state: AppState) {
         ActionRow("Find my sound", Help.finder, detail = "A short guided listening test", onClick = LocalOpenFinder.current)
         RowDivider()
         ActionRow("Hearing check", Help.hearing, detail = "Builds a curve for how you hear", onClick = LocalOpenHearing.current)
+        RowDivider()
+        ActionRow("Frequency sweep", Help.sweep, detail = "Find and fix peaks in your headphones by ear", onClick = LocalOpenSweep.current)
         RowDivider()
         ActionRow("Save as new", Help.saveNew) { saving = true }
         if (saved != null && saved != state.current) {

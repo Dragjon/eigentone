@@ -1,0 +1,1 @@
+Adds a frequency sweep: a climbing tone that lets you mark peaks and dips in your headphones by ear, and turns them into precise filters.

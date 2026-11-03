@@ -89,6 +89,15 @@ object Help {
     val nightScheduleEnd = Tip("Ends at", "The time night mode turns off. It can be after midnight.")
     val share = Tip("Share this sound", "Creates a text code holding this whole sound, which you can send to someone. It contains EQ settings only, and nothing about you.")
     val addShared = Tip("Add a shared sound", "Paste a code someone shared with you. It's added as a new preset, and your others are kept.")
+    val sweep = Tip(
+        "Frequency sweep",
+        "Plays a tone that climbs through the frequencies. Mark where it jumps out or nearly disappears, and Eigentone adds narrow filters there. It finds what your ears notice, and isn't a measurement. Sweeps also reveal rattles and resonances that music can hide.",
+    )
+    val sweepLevel = Tip("Tone level", "How loud the tone is, before your phone's volume. It can't go above a set limit, so it stays gentle at a normal volume.")
+    val sweepHearEq = Tip(
+        "Hear through my EQ",
+        "Off lets you hear the headphones without your EQ, which is best for finding problems. On lets you check how your sound handles them, including filters you've added.",
+    )
     val compare = Tip(
         "Compare two sounds",
         "Switch instantly between two presets, or a preset and your current sound, at about the same loudness. Nothing changes unless you choose one.",
