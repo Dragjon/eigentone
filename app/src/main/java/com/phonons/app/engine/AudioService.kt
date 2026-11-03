@@ -19,8 +19,6 @@ import android.service.quicksettings.TileService
 import android.content.ComponentName
 import com.phonons.app.R
 import com.phonons.app.data.AppState
-import com.phonons.app.data.BuiltIns
-import com.phonons.app.data.OutputInfo
 import com.phonons.app.data.Profiles
 import com.phonons.app.data.Repo
 import com.phonons.app.ui.MainActivity
@@ -97,7 +95,12 @@ class AudioService : Service() {
             RECEIVER_EXPORTED,
         )
         audioManager.registerAudioDeviceCallback(deviceCallback, null)
-        onOutputChanged(starting = true)
+        onOutputChanged()
+        scope.launch {
+            combine(Repo.comparing, Repo.hearingCheckRunning) { comparing, checking -> comparing || checking }
+                .distinctUntilChanged()
+                .collect { busy -> if (!busy) onOutputChanged() }
+        }
 
         engine.refreshRequested = { scope.launch { engine.refresh() } }
         scope.launch {
@@ -205,54 +208,29 @@ class AudioService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     /**
-     * [starting] also applies the output's preset when nothing appears to have changed, because the
-     * output may have changed while the service was not running.
+     * Compares with the output last acted on, which is saved, so turning the EQ off and on keeps a preset
+     * picked by hand, while headphones changed during that time are still noticed. Waits for an open tool,
+     * which is using the sound and is checked again when it closes.
      */
-    private fun onOutputChanged(starting: Boolean = false) {
-        val previous = Repo.output.value
-        val info = currentOutput()
+    @Synchronized
+    private fun onOutputChanged() {
+        val detected = OutputDetector.current(this)
+        val info = detected.info
+        outputDeviceType = detected.deviceType
         Repo.output.value = info
         Repo.update { it.withLegacyEarsMovedTo(info) }
-        if (!starting && previous == info) return
+        if (Repo.toolBusy) return
         val state = Repo.state.value
+        if (state.lastOutputKey == info.key) return
+        Repo.update { it.copy(lastOutputKey = info.key) }
         if (!state.autoSwitch) return
-
-        val assigned = Profiles.presetIdFor(state, info.key)?.let(Repo::findPreset)
-        if (assigned != null) {
-            if (state.current.id != assigned.id) Repo.loadPreset(assigned)
-            return
-        }
-        // Correction tuned for one output is wrong on another, so don't carry it across. Anything
-        // the user has edited, or loaded by hand, is left alone.
-        val cameFromAssigned = Profiles.isAssigned(state, previous.key, state.current.id)
-        val isUnedited = Repo.findPreset(state.current.id) == state.current
-        if (previous != info && cameFromAssigned && isUnedited) Repo.loadPreset(BuiltIns.flat)
-    }
-
-    private fun currentOutput(): OutputInfo {
-        val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-        val best = OUTPUT_PRIORITY.firstNotNullOfOrNull { type -> devices.firstOrNull { it.type == type } }
-        outputDeviceType = best?.type ?: AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
-        if (best == null) return OutputInfo("speaker", "Phone speaker")
-        val family = when (best.type) {
-            AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
-            AudioDeviceInfo.TYPE_BLE_HEADSET,
-            AudioDeviceInfo.TYPE_BLE_SPEAKER -> "Bluetooth"
-            AudioDeviceInfo.TYPE_USB_HEADSET,
-            AudioDeviceInfo.TYPE_USB_DEVICE -> "USB"
-            AudioDeviceInfo.TYPE_WIRED_HEADSET,
-            AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "Wired"
-            else -> "Speaker"
-        }
-        if (family == "Speaker") return OutputInfo("speaker", "Phone speaker")
-        val name = best.productName?.toString().orEmpty().ifBlank { family }
-        return OutputInfo("$family:$name", if (name == family) "$family headphones" else name)
+        Profiles.presetForNewOutput(state, state.lastOutputKey, info.key, Repo::findPreset)?.let(Repo::loadPreset)
     }
 
     private fun createChannel() {
         // Low importance files it under silent notifications at the bottom. This ranks it with ordinary
         // ones, and it still makes no sound. A channel's importance can't be raised later, hence a new one.
-        val channel = NotificationChannel(CHANNEL_ID, "Equaliser running", NotificationManager.IMPORTANCE_DEFAULT)
+        val channel = NotificationChannel(CHANNEL_ID, getString(R.string.engine_channel), NotificationManager.IMPORTANCE_DEFAULT)
         channel.setShowBadge(false)
         channel.setSound(null, null)
         channel.enableVibration(false)
@@ -266,6 +244,8 @@ class AudioService : Service() {
     }
 
     private fun updateNotification(state: AppState) {
+        // A blind comparison's sound is named after its preset, which would give the answer away.
+        if (Repo.comparing.value) return
         val key = state.bypass to state.current.name
         if (key == lastNotified) return
         lastNotified = key
@@ -278,19 +258,19 @@ class AudioService : Service() {
         val open = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE,
         )
-        val bypassLabel = if (state.bypass) "Resume" else "Bypass"
+        val bypassLabel = getString(if (state.bypass) R.string.engine_resume else R.string.widget_bypass)
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_phonons)
             .setContentTitle(state.current.name)
-            .setContentText(if (state.bypass) "Bypassed" else "Equaliser on")
+            .setContentText(getString(if (state.bypass) R.string.ui_bypassed else R.string.engine_on))
             .setContentIntent(open)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(Notification.CATEGORY_SERVICE)
             .setColor(NOTIFICATION_COLOUR)
-            .addAction(Notification.Action.Builder(null, "Next preset", servicePending(ACTION_NEXT_PRESET, 3)).build())
+            .addAction(Notification.Action.Builder(null, getString(R.string.engine_next_preset), servicePending(ACTION_NEXT_PRESET, 3)).build())
             .addAction(Notification.Action.Builder(null, bypassLabel, servicePending(ACTION_TOGGLE_BYPASS, 1)).build())
-            .addAction(Notification.Action.Builder(null, "Turn off", servicePending(ACTION_TURN_OFF, 2)).build())
+            .addAction(Notification.Action.Builder(null, getString(R.string.engine_turn_off), servicePending(ACTION_TURN_OFF, 2)).build())
             .build()
     }
 
@@ -315,16 +295,6 @@ class AudioService : Service() {
         private const val ACTION_NEXT_PRESET = "com.phonons.app.NEXT_PRESET"
         private const val ACTION_TURN_OFF = "com.phonons.app.TURN_OFF"
         private const val ACTION_TOGGLE_BYPASS = "com.phonons.app.TOGGLE_BYPASS"
-
-        private val OUTPUT_PRIORITY = listOf(
-            AudioDeviceInfo.TYPE_USB_HEADSET,
-            AudioDeviceInfo.TYPE_USB_DEVICE,
-            AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
-            AudioDeviceInfo.TYPE_WIRED_HEADSET,
-            AudioDeviceInfo.TYPE_BLE_HEADSET,
-            AudioDeviceInfo.TYPE_BLE_SPEAKER,
-            AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
-        )
 
         /** Throws ForegroundServiceStartNotAllowedException if the app may not start it right now. */
         fun start(context: Context) {

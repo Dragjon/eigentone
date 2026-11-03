@@ -10,8 +10,11 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class Tone(
     val bassDb: Double = 0.0,
+    /** Where the bass change fades out. */
+    val bassHz: Double = DEFAULT_BASS_HZ,
     val trebleDb: Double = 0.0,
     val vocalsDb: Double = 0.0,
+    /** The separate bass tuner from earlier versions. Only still used by sounds that had both, see [withMergedBass]. */
     val bassTunerDb: Double = 0.0,
     val bassTunerHz: Double = 80.0,
     val graphicDb: List<Double> = emptyList(),
@@ -34,6 +37,16 @@ data class Tone(
     /** Only turns down deep bass when it gets loud, from 0 to 1. */
     val boomTamer: Double = 0.0,
 ) {
+    /**
+     * Folds the old bass tuner into the bass control. A sound that used both keeps them separate, because
+     * two shelves at different frequencies can't become one without changing how it sounds.
+     */
+    fun withMergedBass(): Tone = when {
+        bassTunerDb == 0.0 -> copy(bassTunerHz = DEFAULT_TUNER_HZ)
+        bassDb == 0.0 -> copy(bassDb = bassTunerDb, bassHz = bassTunerHz, bassTunerDb = 0.0, bassTunerHz = DEFAULT_TUNER_HZ)
+        else -> this
+    }
+
     /**
      * Names what the faders hold. Moving a fader afterwards shows as edited, because the name no longer
      * tells the whole story. Sounds set before names were saved are matched against [known] shapes.
@@ -60,6 +73,8 @@ data class Tone(
     }
 
     companion object {
+        const val DEFAULT_BASS_HZ = 105.0
+        private const val DEFAULT_TUNER_HZ = 80.0
         const val FLAT_LABEL = "Flat"
         const val CUSTOM_LABEL = "Custom"
         const val MAX_SHAPE_LABEL = 80
@@ -183,6 +198,8 @@ data class AppState(
     val analyser: Boolean = false,
     val limiterThresholdDb: Double = -1.0,
     val guidedSetupSeen: Boolean = false,
+    /** The output last acted on, so restarting the EQ on the same output leaves the chosen preset alone. */
+    val lastOutputKey: String? = null,
     // Older versions kept these outside the preset. They're only read once, by migrated().
     val bassDb: Double = 0.0,
     val trebleDb: Double = 0.0,
@@ -269,6 +286,10 @@ data class AppState(
         return withCurve.copy(stateVersion = CURRENT_STATE_VERSION, current = clean)
             .withoutLegacyTone()
             .withLegacyCompressorMoved()
+            .let { state ->
+                fun merged(preset: Preset) = preset.copy(tone = preset.tone.withMergedBass())
+                state.copy(current = merged(state.current), presets = state.presets.map(::merged))
+            }
     }
 
     /** Moves settings saved by older versions into the current preset, so nobody's sound changes. */
@@ -332,6 +353,18 @@ object Profiles {
     fun presetIdFor(state: AppState, outputKey: String): String? {
         val forMode = if (supportsModes(outputKey)) state.outputProfiles[modeKey(outputKey, state.listeningMode)] else null
         return forMode ?: state.outputProfiles[outputKey]
+    }
+
+    /**
+     * The preset to load when the output changes, or null to leave the sound alone. A correction tuned for
+     * one output is wrong on another, so it isn't carried across, unless the user has edited it.
+     */
+    fun presetForNewOutput(state: AppState, previousKey: String?, newKey: String, find: (String) -> Preset?): Preset? {
+        val assigned = presetIdFor(state, newKey)?.let(find)
+        if (assigned != null) return assigned.takeIf { state.current.id != it.id }
+        val cameFromAssigned = previousKey != null && isAssigned(state, previousKey, state.current.id)
+        val isUnedited = find(state.current.id) == state.current
+        return if (cameFromAssigned && isUnedited) BuiltIns.flat else null
     }
 
     /** Whether [presetId] is assigned to this output under any mode. */

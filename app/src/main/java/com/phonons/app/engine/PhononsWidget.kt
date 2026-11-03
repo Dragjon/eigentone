@@ -30,9 +30,9 @@ class PhononsWidget : AppWidgetProvider() {
         private fun views(context: Context): RemoteViews {
             val state = Repo.state.value
             return RemoteViews(context.packageName, R.layout.widget_phonons).apply {
-                setTextViewText(R.id.widget_preset, if (state.enabled) state.current.name else "Off")
-                setTextViewText(R.id.widget_power, if (state.enabled) "Turn off" else "Turn on")
-                setTextViewText(R.id.widget_bypass, if (state.bypass) "Resume" else "Bypass")
+                setTextViewText(R.id.widget_preset, if (state.enabled) state.current.name else context.getString(R.string.ui_mode_off))
+                setTextViewText(R.id.widget_power, context.getString(if (state.enabled) R.string.engine_turn_off else R.string.widget_turn_on))
+                setTextViewText(R.id.widget_bypass, context.getString(if (state.bypass) R.string.engine_resume else R.string.widget_bypass))
                 setOnClickPendingIntent(
                     R.id.widget_preset,
                     PendingIntent.getActivity(context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE),

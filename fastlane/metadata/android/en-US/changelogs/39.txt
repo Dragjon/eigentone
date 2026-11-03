@@ -1,0 +1,4 @@
+- Bass and Bass tuner are now one Bass control with a frequency, and saved sounds stay the same
+- Removed the Tame bass and Tame harshness compressor styles, since the tamers do those jobs
+- Peak finder and sweep now say which is guided and which is manual
+- The help now explains what happens when output and per-app presets both apply

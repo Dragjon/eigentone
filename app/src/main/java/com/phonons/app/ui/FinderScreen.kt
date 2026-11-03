@@ -25,11 +25,11 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -71,6 +71,16 @@ fun FinderScreen(onSetEnabled: (Boolean) -> Unit, onClose: () -> Unit) {
     var start by remember { mutableStateOf(before.current) }
     var finding by remember { mutableStateOf(false) }
     var progress by remember { mutableIntStateOf(0) }
+    var finished by remember { mutableStateOf(false) }
+
+    DisposableEffect(step) {
+        Repo.comparing.value = step != FinderStep.INTRO
+        onDispose { Repo.comparing.value = false }
+    }
+    // Puts the sound back however this closes, because previews are level matched and aren't real sounds.
+    DisposableEffect(Unit) {
+        onDispose { if (!finished) Repo.update { it.copy(current = before.current, bypass = before.bypass) } }
+    }
 
     fun cancel() {
         Repo.update { it.copy(current = before.current, bypass = before.bypass) }
@@ -90,7 +100,8 @@ fun FinderScreen(onSetEnabled: (Boolean) -> Unit, onClose: () -> Unit) {
 
     BackHandler { cancel() }
 
-    ToolScreen(title = stringResource(R.string.ui_find_my_sound), onBack = ::cancel, spacing = 16.dp) {
+    val roundProgress = finder?.takeIf { step == FinderStep.COMPARE }?.let { progress.toFloat() / it.totalRounds }
+    ToolScreen(title = stringResource(R.string.ui_find_my_sound), onBack = ::cancel, spacing = 16.dp, progress = roundProgress) {
         when (step) {
             FinderStep.INTRO -> Intro(
                 outputLabel = output.label,
@@ -99,7 +110,6 @@ fun FinderScreen(onSetEnabled: (Boolean) -> Unit, onClose: () -> Unit) {
                 current = before.current,
                 onStart = ::begin,
                 onFind = { finding = true },
-                onCancel = ::cancel,
             )
             FinderStep.COMPARE -> finder?.let { active ->
                 Compare(
@@ -132,6 +142,7 @@ fun FinderScreen(onSetEnabled: (Boolean) -> Unit, onClose: () -> Unit) {
                     start = start,
                     outputKey = output.key,
                     onDone = {
+                        finished = true
                         Repo.commit()
                         onClose()
                     },
@@ -156,7 +167,6 @@ private fun Intro(
     current: Preset,
     onStart: (Preset) -> Unit,
     onFind: () -> Unit,
-    onCancel: () -> Unit,
 ) {
     Text(
         stringResource(R.string.ui_you_ll_compare_two_versions_of_your_musi),
@@ -185,14 +195,13 @@ private fun Intro(
         }
     }
     if (correction != null) {
-        val recommended = if (hasOwnSound) "" else " (recommended)"
         if (hasOwnSound) {
             FilledTonalButton(onClick = { onStart(correction) }, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.ui_correction, correction.name))
             }
         } else {
             Button(onClick = { onStart(correction) }, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.ui_correction_2, correction.name, recommended))
+                Text(stringResource(R.string.ui_correction_recommended, correction.name))
             }
         }
     } else if (hasOwnSound) {
@@ -210,7 +219,6 @@ private fun Intro(
         style = MaterialTheme.typography.bodySmall,
         color = Palette.TextDim,
     )
-    TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_not_now)) }
 }
 
 @Composable
@@ -238,13 +246,6 @@ private fun Compare(
         Text(round.trait.title, style = MaterialTheme.typography.titleLarge, color = Palette.Text, modifier = Modifier.weight(1f))
         Text(stringResource(R.string.ui_question_of, finder.roundNumber, finder.totalRounds), style = MaterialTheme.typography.bodySmall, color = Palette.TextDim)
     }
-    LinearProgressIndicator(
-        progress = { finder.roundNumber.toFloat() / finder.totalRounds },
-        modifier = Modifier.fillMaxWidth(),
-        color = Palette.Lit,
-        trackColor = Palette.Track,
-        drawStopIndicator = {},
-    )
     Text(round.trait.question, style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
     Text(
         stringResource(R.string.ui_switch_between_them_as_often_as_you_like),

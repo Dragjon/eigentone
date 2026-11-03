@@ -81,7 +81,7 @@ fun HearingScreen(onClose: () -> Unit) {
 
     ToolScreen(title = stringResource(R.string.ui_hearing_check), onBack = onClose, spacing = 16.dp, progress = testProgress) {
         when (step) {
-            HearingStep.INTRO -> Intro(onStart = { step = HearingStep.TONES }, onCancel = onClose)
+            HearingStep.INTRO -> Intro(onStart = { step = HearingStep.TONES })
             HearingStep.TONES -> {
                 LaunchedEffect(answers, replays) {
                     phase = TonePhase.WAITING
@@ -127,7 +127,7 @@ fun HearingScreen(onClose: () -> Unit) {
 }
 
 @Composable
-private fun Intro(onStart: () -> Unit, onCancel: () -> Unit) {
+private fun Intro(onStart: () -> Unit) {
     Text(
         stringResource(R.string.ui_you_ll_hear_quiet_tones_in_one_ear_at_a),
         style = MaterialTheme.typography.bodyLarge,
@@ -149,7 +149,6 @@ private fun Intro(onStart: () -> Unit, onCancel: () -> Unit) {
         color = Palette.TextDim,
     )
     Button(onClick = onStart, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.ui_start)) }
-    TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_not_now)) }
 }
 
 @Composable

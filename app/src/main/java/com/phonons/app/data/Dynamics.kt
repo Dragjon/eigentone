@@ -271,8 +271,6 @@ object Dynamics {
         return Compressor(enabled = true, low = band, mid = band, high = band)
     }
 
-    private val OFF = CompressorBand(enabled = false)
-
     /** Designed starting points to adjust by ear. They aren't measurements or anyone's known settings. */
     val styles = listOf(
         CompressorStyle(
@@ -288,25 +286,6 @@ object Dynamics {
                 low = CompressorBand(thresholdDb = -20.0, ratio = 3.0, attackMs = 30.0, releaseMs = 120.0, makeupDb = 3.0),
                 mid = CompressorBand(thresholdDb = -22.0, ratio = 2.5, attackMs = 30.0, releaseMs = 150.0, makeupDb = 2.0),
                 high = CompressorBand(thresholdDb = -24.0, ratio = 2.0, attackMs = 15.0, releaseMs = 150.0, makeupDb = 1.5),
-            ),
-        ),
-        CompressorStyle(
-            "Tame bass",
-            Compressor(
-                enabled = true,
-                low = CompressorBand(thresholdDb = -28.0, ratio = 4.0, attackMs = 10.0, releaseMs = 150.0, makeupDb = 2.0),
-                mid = OFF,
-                high = OFF,
-            ),
-        ),
-        CompressorStyle(
-            "Tame harshness",
-            Compressor(
-                enabled = true,
-                highCrossoverHz = 4000.0,
-                low = OFF,
-                mid = OFF,
-                high = CompressorBand(thresholdDb = -28.0, ratio = 3.0, attackMs = 3.0, releaseMs = 80.0),
             ),
         ),
         CompressorStyle(

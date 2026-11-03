@@ -27,18 +27,14 @@
     <string name="help_add_shared_title" formatted="false">Add a shared sound</string>
     <string name="help_analyser_body" formatted="false">Shows the level of each frequency behind the curve, only while this screen is open. Android requires microphone permission for this, but only levels of playing audio are read. The lowest bands look coarse.</string>
     <string name="help_analyser_title" formatted="false">Spectrum analyser</string>
-    <string name="help_auto_switch_body" formatted="false">Loads the assigned preset whenever this output connects.</string>
+    <string name="help_auto_switch_body" formatted="false">Loads the assigned preset whenever this output connects. If a per-app preset also applies, the latest change wins: connecting headphones loads the output\'s preset, and a different app starting to play loads that app\'s.</string>
     <string name="help_auto_switch_title" formatted="false">Switch automatically</string>
     <string name="help_backup_body" formatted="false">Saves your presets, your shapes, output and per-app choices, and favourites to a file. Ear correction and hearing checks are included. Other settings that aren\'t part of a preset, such as balance and night mode, aren\'t.</string>
     <string name="help_backup_title" formatted="false">Back up presets</string>
     <string name="help_balance_body" formatted="false">Shifts sound towards the left or right ear. Useful if one side sounds quieter to you.</string>
     <string name="help_balance_title" formatted="false">Balance</string>
-    <string name="help_bass_body" formatted="false">Raises or lowers everything below about 105 Hz. This is saved with the preset when you save or update it.</string>
+    <string name="help_bass_body" formatted="false">Raises or lowers the low end, up to the frequency set below it. This is saved with the preset when you save or update it.</string>
     <string name="help_bass_title" formatted="false">Bass</string>
-    <string name="help_bass_tuner_amount_body" formatted="false">Raises or lowers the low end up to the frequency you choose below. Use it when the fixed Bass control isn\'t the right range.</string>
-    <string name="help_bass_tuner_amount_title" formatted="false">Bass tuner amount</string>
-    <string name="help_bass_tuner_frequency_body" formatted="false">Where the bass tuner\'s change fades out. Low values affect only deep rumble, and higher values reach into punch and warmth.</string>
-    <string name="help_bass_tuner_frequency_title" formatted="false">Bass tuner frequency</string>
     <string name="help_battery_body" formatted="false">Battery optimisation can stop apps in the background. Allowing background use helps keep the EQ running when the phone is locked.</string>
     <string name="help_battery_title" formatted="false">Background use</string>
     <string name="help_compare_blind_body" formatted="false">Hides which sound is which until you\'ve chosen, in a random order, so a name can\'t sway you. Your choice is revealed at the end.</string>
@@ -141,7 +137,7 @@
     <string name="help_peak_finder_title" formatted="false">Find peaks for me</string>
     <string name="help_per_app_access_body" formatted="false">Android only reveals which app is playing to apps with notification access. Eigentone ignores your notifications and only checks the playing app, and that stays on your phone. Without it, everything else still works.</string>
     <string name="help_per_app_access_title" formatted="false">Why this access is needed</string>
-    <string name="help_per_app_body" formatted="false">Loads a preset when a chosen app starts playing, such as one sound for Spotify and another for YouTube.</string>
+    <string name="help_per_app_body" formatted="false">Loads a preset when a chosen app starts playing, such as one sound for Spotify and another for YouTube. If an output preset also applies, the latest change wins: a different app starting to play loads that app\'s preset, and connecting headphones loads the output\'s.</string>
     <string name="help_per_app_title" formatted="false">Per-app presets</string>
     <string name="help_power_body" formatted="false">The switch turns Eigentone on or off, and it keeps running in the background until you turn it off. Bypass temporarily removes the EQ and effects so you can compare the sound. It doesn\'t change your settings.</string>
     <string name="help_power_title" formatted="false">Power and Bypass</string>
@@ -149,7 +145,7 @@
     <string name="help_preamp_title" formatted="false">Preamp</string>
     <string name="help_q_body" formatted="false">How narrow the filter is. Low values change a wide range and sound gentle. High values target a small range, which suits fixing one problem frequency.</string>
     <string name="help_q_title" formatted="false">Q</string>
-    <string name="help_reset_body" formatted="false">Returns to Flat and clears night mode, balance, loudness and level settings. Your saved presets and output choices are kept.</string>
+    <string name="help_reset_body" formatted="false">Returns to Flat and clears night mode, balance, ear correction, loudness and level settings. Your saved presets, hearing checks and output choices are kept.</string>
     <string name="help_reset_title" formatted="false">Reset sound settings</string>
     <string name="help_restore_body" formatted="false">Adds presets, your shapes, per-app choices, ear correction and hearing checks from a backup file. Anything with the same identity is replaced, and the rest is kept.</string>
     <string name="help_restore_title" formatted="false">Restore presets</string>
@@ -183,7 +179,7 @@
     <string name="help_status_running_title" formatted="false">Running</string>
     <string name="help_stereo_width_body" formatted="false">Makes the sound feel wider by leaning small frequency ranges left and right in turn, while keeping bass centred. It\'s subtle by design, with no head tracking or surround channels. Higher values can make vocals feel less centred. This is saved with the preset.</string>
     <string name="help_stereo_width_title" formatted="false">Stereo width</string>
-    <string name="help_strength_body" formatted="false">More or less of everything this preset does to the tone. 100% is as saved, 0% is flat, and 150% exaggerates it. An easy way to soften a sound that\'s too much. Surround and preamp aren\'t affected.</string>
+    <string name="help_strength_body" formatted="false">More or less of everything this preset does to the tone. 100% is as saved, 0% is flat, and 150% exaggerates it. An easy way to soften a sound that\'s too much. Surround, preamp and cut-off filters aren\'t affected.</string>
     <string name="help_strength_title" formatted="false">Preset strength</string>
     <string name="help_surround_body" formatted="false">Makes the sound feel wider than your head, using your phone\'s own effect. It doesn\'t track head movement or create real surround channels. Higher values can make vocals feel less centred. This is saved with the preset.</string>
     <string name="help_surround_title" formatted="false">Virtual surround</string>
@@ -208,7 +204,7 @@
     <string name="help_vocals_body" formatted="false">Raises or lowers the range around 2.5 kHz, where voices and many instruments are easiest to pick out. This is saved with the preset.</string>
     <string name="help_vocals_title" formatted="false">Vocals</string>
     <string name="ui_a_correction_aims_for_a_neutral_sound_wh" formatted="false">A correction aims for a neutral sound, which isn\'t always what you\'ll enjoy. Use less of it, or add some bass or treble back.</string>
-    <string name="ui_a_guided_test_that_finds_peaks_and_dips" formatted="false">A guided test that finds peaks and dips in your headphones</string>
+    <string name="ui_a_guided_test_that_finds_peaks_and_dips" formatted="false">Guided: answer a few questions, and it finds peaks and dips</string>
     <string name="ui_a_headphone_correction_evens_out_your_mo" formatted="false">A headphone correction evens out your model\'s sound first, so your choices start from a balanced base. You\'ll compare the result with your current sound at the end.</string>
     <string name="ui_a_short_guided_listening_test" formatted="false">A short guided listening test</string>
     <string name="ui_a_tone_climbs_from_deep_bass_to_high_tre" formatted="false">A tone climbs from deep bass to high treble. It should stay about equally loud, so mark anywhere it jumps out or nearly disappears. Keep your volume low, and stop if it\'s ever uncomfortable.</string>
@@ -235,7 +231,6 @@
     <string name="ui_bands" formatted="false">Bands</string>
     <string name="ui_bass" formatted="false">Bass</string>
     <string name="ui_bass_to_mids" formatted="false">Bass to mids</string>
-    <string name="ui_bass_tuner_frequency" formatted="false">Bass tuner frequency</string>
     <string name="ui_battery_optimisation_may_stop_the_eq_whe" formatted="false">Battery optimisation may stop the EQ when locked.</string>
     <string name="ui_before_you_start" formatted="false">Before you start</string>
     <string name="ui_blind_comparison" formatted="false">Blind comparison</string>
@@ -272,7 +267,7 @@
     <string name="ui_engine" formatted="false">Engine</string>
     <string name="ui_export_eq_file" formatted="false">Export EQ file</string>
     <string name="ui_export_filters_file" formatted="false">Export filters file</string>
-    <string name="ui_find_and_fix_peaks_in_your_headphones_by" formatted="false">Find and fix peaks in your headphones by ear</string>
+    <string name="ui_find_and_fix_peaks_in_your_headphones_by" formatted="false">Manual: move a tone yourself, and mark peaks and dips</string>
     <string name="ui_find_headphones" formatted="false">Find headphones</string>
     <string name="ui_find_my_headphones_first" formatted="false">Find my headphones first</string>
     <string name="ui_find_my_headphones_first_recommended" formatted="false">Find my headphones first (recommended)</string>
@@ -383,7 +378,7 @@
     <string name="ui_switch_instantly_with_an_optional_blind" formatted="false">Switch instantly, with an optional blind test</string>
     <string name="ui_that_isn_t_a_valid_share_code" formatted="false">That isn\'t a valid share code.</string>
     <string name="ui_that_s_a_lot_of_spots_for_a_single_pair" formatted="false">That\'s a lot of spots for a single pair of headphones, and some may just be how your ears hear different notes. Compare carefully, and run this again if the result sounds worse.</string>
-    <string name="ui_the_sound_goes_back_to_flat_your_saved_p" formatted="false">The sound goes back to Flat. Your saved presets and output choices are kept.</string>
+    <string name="ui_the_sound_goes_back_to_flat_your_saved_p" formatted="false">The sound goes back to Flat, and night mode, balance, ear correction and level settings are cleared. Your saved presets, hearing checks and output choices are kept.</string>
     <string name="ui_the_start_and_end_are_the_same_so_night" formatted="false">The start and end are the same, so night mode won\'t turn on.</string>
     <string name="ui_these_narrow_filters_would_even_out_what" formatted="false">These narrow filters would even out what you noticed. Play some music and compare before keeping them.</string>
     <string name="ui_this_finds_what_you_hear_on_these_headph" formatted="false">This finds what you hear on these headphones. It isn\'t a measurement.</string>
@@ -441,7 +436,6 @@
     <string name="ui_listening_on" formatted="false">• Listening on: %1$s</string>
     <string name="ui_my_current_sound_recommended" formatted="false">My current sound: %1$s (recommended)</string>
     <string name="ui_correction" formatted="false">%1$s correction</string>
-    <string name="ui_correction_2" formatted="false">%1$s correction%2$s</string>
     <string name="ui_question_of" formatted="false">Question %1$s of %2$s</string>
     <string name="ui_play_version" formatted="false">Play version %1$s</string>
     <string name="ui_tap_to_hear" formatted="false">Tap to hear</string>
@@ -479,7 +473,6 @@
     <string name="ui_stands_out" formatted="false">Stands out</string>
     <string name="ui_same" formatted="false">Same</string>
     <string name="ui_weaker" formatted="false">Weaker</string>
-    <string name="ui_which_of_these_two_notes_is" formatted="false">Which of these two notes is %1$s?</string>
     <string name="ui_playing_second_note" formatted="false">Playing: second note</string>
     <string name="ui_playing_first_note" formatted="false">Playing: first note</string>
     <string name="ui_first" formatted="false">First</string>
@@ -508,7 +501,6 @@
     <string name="ui_high_shelf" formatted="false">High shelf</string>
     <string name="ui_high_pass" formatted="false">High pass</string>
     <string name="ui_low_pass" formatted="false">Low pass</string>
-    <string name="ui_bass_tuner" formatted="false">Bass tuner</string>
     <string name="ui_android_s_own_spatial_audio_is" formatted="false">Android\'s own spatial audio is on, and adds to this. Try one at a time.</string>
     <string name="ui_centre" formatted="false">Centre</string>
     <string name="ui_a_separate_eq_for_each_ear" formatted="false">A separate EQ for each ear, for %1$s</string>
@@ -634,4 +626,19 @@
         <item quantity="one" formatted="false">%1$s, tone %2$d. Part %3$d of %4$d, after %5$d answer.</item>
         <item quantity="other" formatted="false">%1$s, tone %2$d. Part %3$d of %4$d, after %5$d answers.</item>
     </plurals>
+    <string name="ui_no" formatted="false">No</string>
+    <string name="ui_correction_recommended" formatted="false">%1$s correction (recommended)</string>
+    <string name="ui_which_note_is_stronger" formatted="false">Which of these two notes is stronger?</string>
+    <string name="ui_which_note_is_weaker" formatted="false">Which of these two notes is weaker?</string>
+    <string name="engine_channel" formatted="false">Equaliser running</string>
+    <string name="engine_on" formatted="false">Equaliser on</string>
+    <string name="engine_resume" formatted="false">Resume</string>
+    <string name="engine_next_preset" formatted="false">Next preset</string>
+    <string name="engine_turn_off" formatted="false">Turn off</string>
+    <string name="ui_bass_frequency" formatted="false">Bass frequency</string>
+    <string name="ui_extra_bass" formatted="false">Extra bass at %1$s</string>
+    <string name="help_bass_frequency_title" formatted="false">Bass frequency</string>
+    <string name="help_bass_frequency_body" formatted="false">Where the bass change fades out. Low values affect only deep rumble, and higher values reach into punch and warmth.</string>
+    <string name="help_extra_bass_title" formatted="false">Extra bass</string>
+    <string name="help_extra_bass_body" formatted="false">A second bass setting kept from an earlier version, so this sound didn\'t change when the two bass controls became one. Set it to zero to remove it.</string>
 </resources>

@@ -46,6 +46,8 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         var lastEnabled: Boolean? = null
         var verified = false
         var verifiedSeparately = false
+        /** Why the last update failed. Cleared by the next one that works, so a recovery isn't still shown as a problem. */
+        var failure: String? = null
     }
 
     private val chains = LinkedHashMap<Int, Chain>()
@@ -253,10 +255,12 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
             // Lowering first and raising last keeps every moment during the update free of clipping.
             val started = System.nanoTime()
             val goingDown = chain.lastInput.isNaN() || step.inputDb < chain.lastInput
-            if (goingDown) pushInput(chain, step.inputDb, state.balance)
+            // Bypass is the plain sound to compare against, so it has no balance either.
+            val balance = if (off) 0.0 else state.balance
+            if (goingDown) pushInput(chain, step.inputDb, balance)
             pushBands(dp, map, /* channel = */ 0, step.left, chain.lastGains)
             pushBands(dp, map, /* channel = */ 1, step.right, chain.lastRightGains)
-            if (!goingDown) pushInput(chain, step.inputDb, state.balance)
+            if (!goingDown) pushInput(chain, step.inputDb, balance)
             logMove(chain, step.done && dynamicsStep.done)
             val tookMs = (System.nanoTime() - started) / 1_000_000
             if (comparing && tookMs >= LOG_SWITCH_MS) Log.i(TAG, "Compare switch on ${chain.label} took $tookMs ms")
@@ -293,9 +297,12 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
                 dp.enabled = wanted
                 chain.lastEnabled = wanted
             }
+            chain.failure = null
         } catch (e: Exception) {
             Log.w(TAG, "Could not update ${chain.label}", e)
-            error = "Lost connection to ${chain.label}: ${e.message}"
+            chain.failure = "Lost connection to ${chain.label}: ${e.message}"
+            // Otherwise the settle loop would keep retrying a failing call many times a second.
+            chain.moving = false
         }
         pushSurround(chain, target)
     }
@@ -432,7 +439,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
                 bandCount = mapper?.bandCount ?: 0,
                 hasControl = control,
                 sessions = if (activeMode == EngineMode.SESSIONS) chains.values.map { it.label } else emptyList(),
-                error = error,
+                error = chains.values.firstNotNullOfOrNull { it.failure } ?: error,
                 spatialError = spatialError,
                 rebuilds = rebuilds,
                 readback = readback,

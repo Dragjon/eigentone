@@ -121,6 +121,7 @@ import com.phonons.app.data.Processing
 import com.phonons.app.data.Profiles
 import com.phonons.app.data.Repo
 import com.phonons.app.data.ShapeText
+import com.phonons.app.data.Tone
 import com.phonons.app.dsp.AutoEqParser
 import com.phonons.app.dsp.Eq
 import com.phonons.app.dsp.Filter
@@ -737,35 +738,44 @@ private fun SoundTab(state: AppState) {
 @Composable
 private fun ToneSection(state: AppState) {
     val tone = state.current.tone
-    val modified = tone.bassDb != 0.0 || tone.trebleDb != 0.0 || tone.vocalsDb != 0.0 || tone.bassTunerDb != 0.0
+    val modified = tone.bassDb != 0.0 || tone.trebleDb != 0.0 || tone.vocalsDb != 0.0 || tone.bassTunerDb != 0.0 ||
+        tone.bassHz != Tone.DEFAULT_BASS_HZ
     SettingsSection(
         stringResource(R.string.ui_tone),
         trailing = {
             if (modified) {
                 TextButton(onClick = {
-                    Repo.editTone { it.copy(bassDb = 0.0, trebleDb = 0.0, vocalsDb = 0.0, bassTunerDb = 0.0) }
+                    Repo.editTone { it.copy(bassDb = 0.0, bassHz = Tone.DEFAULT_BASS_HZ, trebleDb = 0.0, vocalsDb = 0.0, bassTunerDb = 0.0) }
                     Repo.commit()
                 }) { Text(stringResource(R.string.ui_reset_tone)) }
             }
         },
     ) {
         ToneSlider(stringResource(R.string.ui_bass), Help.bass, tone.bassDb) { v -> Repo.editTone { it.copy(bassDb = v) } }
+        // Only means something once there's a bass change to place.
+        if (tone.bassDb != 0.0) {
+            SliderSetting(
+                title = stringResource(R.string.ui_bass_frequency),
+                tip = Help.bassFrequency,
+                readout = formatHz(tone.bassHz),
+                value = tone.bassHz.toFloat(),
+                range = 30f..250f,
+                default = Tone.DEFAULT_BASS_HZ.toFloat(),
+                onChange = { v -> Repo.editTone { it.copy(bassHz = v.toDouble()) } },
+                onFinished = Repo::commit,
+            )
+        }
         RowDivider()
         ToneSlider(stringResource(R.string.help_vocals_title), Help.vocals, tone.vocalsDb) { v -> Repo.editTone { it.copy(vocalsDb = v) } }
         RowDivider()
         ToneSlider(stringResource(R.string.ui_treble), Help.treble, tone.trebleDb) { v -> Repo.editTone { it.copy(trebleDb = v) } }
-        RowDivider()
-        ToneSlider(stringResource(R.string.ui_bass_tuner), Help.bassTunerAmount, tone.bassTunerDb) { v -> Repo.editTone { it.copy(bassTunerDb = v) } }
-        SliderSetting(
-            title = stringResource(R.string.ui_bass_tuner_frequency),
-            tip = Help.bassTunerFrequency,
-            readout = formatHz(tone.bassTunerHz),
-            value = tone.bassTunerHz.toFloat(),
-            range = 30f..250f,
-            default = 80f,
-            onChange = { v -> Repo.editTone { it.copy(bassTunerHz = v.toDouble()) } },
-            onFinished = Repo::commit,
-        )
+        // Only on a sound from an earlier version that used both bass controls. Setting it to zero retires it.
+        if (tone.bassTunerDb != 0.0) {
+            RowDivider()
+            ToneSlider(stringResource(R.string.ui_extra_bass, formatHz(tone.bassTunerHz)), Help.extraBass, tone.bassTunerDb) { v ->
+                Repo.editTone { it.copy(bassTunerDb = v) }
+            }
+        }
     }
 }
 
@@ -1642,13 +1652,13 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
     DiagnosticsSection(status, output)
 
     SettingsSection(stringResource(R.string.ui_status)) {
-        Fact(stringResource(R.string.help_status_running_title), Help.statusRunning, if (status.running) stringResource(R.string.ui_yes) else "No")
+        Fact(stringResource(R.string.help_status_running_title), Help.statusRunning, if (status.running) stringResource(R.string.ui_yes) else stringResource(R.string.ui_no))
         RowDivider()
         Fact(stringResource(R.string.help_status_mode_title), Help.statusMode, status.mode)
         RowDivider()
         Fact(stringResource(R.string.help_status_bands_title), Help.statusBands, if (status.bandCount > 0) "${status.bandCount}" else stringResource(R.string.ui_none))
         RowDivider()
-        Fact(stringResource(R.string.help_status_control_title), Help.statusControl, if (status.hasControl) stringResource(R.string.ui_yes) else "No")
+        Fact(stringResource(R.string.help_status_control_title), Help.statusControl, if (status.hasControl) stringResource(R.string.ui_yes) else stringResource(R.string.ui_no))
         RowDivider()
         Fact(stringResource(R.string.help_status_readback_title), Help.statusReadback, status.readback ?: stringResource(R.string.ui_not_checked_yet))
         RowDivider()

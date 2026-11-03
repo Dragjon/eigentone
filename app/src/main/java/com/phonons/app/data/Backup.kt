@@ -118,6 +118,7 @@ object BackupCodec {
         val bands = tone.graphicBands.takeIf { it in GraphicEq.BAND_OPTIONS } ?: GraphicEq.DEFAULT_BANDS
         return Tone(
             bassDb = safe(tone.bassDb, 0.0).coerceIn(-toneLimit, toneLimit),
+            bassHz = safe(tone.bassHz, Tone.DEFAULT_BASS_HZ).coerceIn(30.0, 250.0),
             trebleDb = safe(tone.trebleDb, 0.0).coerceIn(-toneLimit, toneLimit),
             vocalsDb = safe(tone.vocalsDb, 0.0).coerceIn(-toneLimit, toneLimit),
             bassTunerDb = safe(tone.bassTunerDb, 0.0).coerceIn(-toneLimit, toneLimit),
@@ -134,7 +135,7 @@ object BackupCodec {
             shape = tone.shape?.takeIf { it.name.isNotBlank() }?.let { shape ->
                 AppliedShape(shape.name.take(Tone.MAX_SHAPE_LABEL), shape.faders.take(bands).map { GraphicEq.snap(safe(it, 0.0)) })
             },
-        )
+        ).withMergedBass()
     }
 
     private fun sanitise(f: Filter) = f.copy(

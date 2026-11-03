@@ -53,8 +53,13 @@ object Processing {
     private const val VOCALS_HZ = 2500.0
     private const val VOCALS_Q = 0.7
 
-    fun toneFilters(bassDb: Double, trebleDb: Double, vocalsDb: Double = 0.0): List<Filter> = listOfNotNull(
-        if (bassDb != 0.0) Filter(-1, FilterType.LOW_SHELF, 105.0, bassDb, SHELF_Q) else null,
+    fun toneFilters(
+        bassDb: Double,
+        trebleDb: Double,
+        vocalsDb: Double = 0.0,
+        bassHz: Double = Tone.DEFAULT_BASS_HZ,
+    ): List<Filter> = listOfNotNull(
+        if (bassDb != 0.0) Filter(-1, FilterType.LOW_SHELF, bassHz, bassDb, SHELF_Q) else null,
         if (trebleDb != 0.0) Filter(-2, FilterType.HIGH_SHELF, 8000.0, trebleDb, SHELF_Q) else null,
         if (vocalsDb != 0.0) Filter(-6, FilterType.BELL, VOCALS_HZ, vocalsDb, VOCALS_Q) else null,
     )
@@ -91,7 +96,7 @@ object Processing {
                 tone.graphicBands,
             ) +
             bassTunerFilters(tone.bassTunerDb * scale, tone.bassTunerHz) +
-            toneFilters(tone.bassDb * scale, tone.trebleDb * scale, tone.vocalsDb * scale)
+            toneFilters(tone.bassDb * scale, tone.trebleDb * scale, tone.vocalsDb * scale, tone.bassHz)
     }
 
     /** The preset plus loudness compensation, which follows the volume rather than the preset. */

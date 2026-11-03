@@ -37,7 +37,7 @@ class PhononsTile : TileService() {
     private fun render(on: Boolean) {
         val tile = qsTile ?: return
         tile.state = if (on) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
-        tile.subtitle = if (on) Repo.state.value.current.name else "Off"
+        tile.subtitle = if (on) Repo.state.value.current.name else getString(com.phonons.app.R.string.ui_mode_off)
         tile.updateTile()
     }
 }

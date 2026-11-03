@@ -1,0 +1,8 @@
+- Fixed the hearing check and output settings using the wrong output while the EQ is off
+- Turning the EQ off and on, or using an app shortcut, keeps the preset you chose
+- Automatic preset changes wait until a comparison or test is finished
+- Blind comparisons no longer show the answer in the notification
+- Rotating the phone no longer restarts a test, and Find my sound always restores your sound
+- Problem messages clear once the problem is over
+- Bypass no longer keeps the balance setting
+- Removed the extra Not now button from test intro pages

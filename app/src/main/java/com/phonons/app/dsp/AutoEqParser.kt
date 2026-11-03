@@ -42,7 +42,7 @@ object AutoEqParser {
         var preamp = 0.0
         val filters = mutableListOf<Filter>()
         for (line in text.lineSequence()) {
-            preampRegex.find(line)?.let { preamp = it.groupValues[1].toDoubleOrNull() ?: preamp }
+            preampRegex.find(line)?.let { preamp = (it.groupValues[1].toDoubleOrNull() ?: preamp).coerceIn(-MAX_IMPORT_GAIN, MAX_IMPORT_GAIN) }
             val m = filterRegex.find(line) ?: continue
             if (filters.size == MAX_FILTERS) break
             val type = when (m.groupValues[2].uppercase()) {

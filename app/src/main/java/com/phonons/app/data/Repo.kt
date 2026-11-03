@@ -44,6 +44,12 @@ object Repo {
     /** Two sounds are being compared, so switching between them skips the morph. Never saved. */
     val comparing = MutableStateFlow(false)
 
+    /**
+     * A tool is using the live sound and will put it back, so nothing automatic should change it meanwhile.
+     * An A/B would otherwise switch to a third sound without saying so.
+     */
+    val toolBusy: Boolean get() = comparing.value || hearingCheckRunning.value
+
     /** Whether the time of day is inside the night mode schedule. Set by the service. */
     val scheduledNight = MutableStateFlow(false)
 
@@ -171,6 +177,16 @@ object Repo {
     /** Renames a user preset, including the working copy if it's the one in use. */
     fun renamePreset(id: String, name: String) {
         _state.update { s -> s.renamedPreset(id, name) }
+        rewriteHistory(id) { it.copy(name = name) }
+    }
+
+    /** Undo steps hold whole presets, so details filed outside the sound have to follow them. */
+    @Synchronized
+    private fun rewriteHistory(id: String, change: (Preset) -> Preset) {
+        for (stack in listOf(undoStack, redoStack)) {
+            for (i in stack.indices) if (stack[i].id == id) stack[i] = change(stack[i])
+        }
+        if (committed.id == id) committed = change(committed)
     }
 
     /** Files a user preset in a folder, including the working copy if it's the one in use. */
@@ -182,6 +198,7 @@ object Repo {
                 current = if (s.current.id == id) s.current.copy(folder = cleaned) else s.current,
             )
         }
+        rewriteHistory(id) { it.copy(folder = cleaned) }
     }
 
     /** Returns the sound to a clean start. Presets and output choices are kept. */
@@ -274,6 +291,7 @@ object Repo {
     fun onPlayingAppChanged(packageName: String?) {
         if (playingApp.value == packageName) return
         playingApp.value = packageName
+        if (toolBusy) return
         val state = _state.value
         val preset = packageName?.let { state.appProfiles[it] }?.let(::findPreset) ?: return
         if (state.current.id != preset.id) loadPreset(preset)
@@ -281,6 +299,7 @@ object Repo {
 
     /** Moves through favourites, or every preset when there are none. */
     fun nextPreset() {
+        if (toolBusy) return
         val state = _state.value
         val all = BuiltIns.availableFor(listOf(output.value.key)) + state.presets
         val cycle = all.filter { it.id in state.favorites }.ifEmpty { all }
@@ -296,7 +315,7 @@ object Repo {
         if (state.current.id != preset.id) loadPreset(preset)
     }
 
-    /** Returns false if the text was not a valid backup. Tone and effect settings aren't included. */
+    /** Returns false if the text was not a valid backup. Settings outside presets aren't included. */
     fun restoreBackup(text: String): Boolean {
         val backup = BackupCodec.decode(text) ?: return false
         _state.update { BackupCodec.merge(it, backup) }

@@ -130,7 +130,7 @@ fun PeakFinderScreen(onClose: () -> Unit) {
 
     ToolScreen(title = stringResource(R.string.ui_find_peaks_for_me), onBack = onClose, spacing = 14.dp, progress = questionProgress) {
         when (stage) {
-            FinderStage.INTRO -> Intro(failed, onStart = { stage = FinderStage.QUESTIONS }, onCancel = onClose)
+            FinderStage.INTRO -> Intro(failed, onStart = { stage = FinderStage.QUESTIONS })
             FinderStage.QUESTIONS -> finder.question?.let { question ->
                 Questions(
                     finder = finder,
@@ -169,7 +169,7 @@ fun PeakFinderScreen(onClose: () -> Unit) {
 }
 
 @Composable
-private fun Intro(failed: Boolean, onStart: () -> Unit, onCancel: () -> Unit) {
+private fun Intro(failed: Boolean, onStart: () -> Unit) {
     Text(
         stringResource(R.string.ui_you_ll_hear_a_note_alternating, PeakFinder.spots().size),
         style = MaterialTheme.typography.bodyLarge,
@@ -191,7 +191,6 @@ private fun Intro(failed: Boolean, onStart: () -> Unit, onCancel: () -> Unit) {
     )
     if (failed) Text(stringResource(R.string.ui_this_phone_wouldn_t_play_the_tone), style = MaterialTheme.typography.bodyMedium, color = Palette.Danger)
     Button(onClick = onStart, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.ui_start)) }
-    TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_not_now)) }
 }
 
 @Composable
@@ -232,8 +231,7 @@ private fun Questions(
             AnswerButton(stringResource(R.string.ui_weaker), ready) { onSpot(SpotAnswer.WEAKER) }
         }
         is PeakFinder.Question.Narrow -> {
-            val word = if (question.answer == SpotAnswer.STANDS_OUT) "stronger" else "weaker"
-            Text(stringResource(R.string.ui_which_of_these_two_notes_is, word), style = MaterialTheme.typography.titleMedium, color = Palette.Text)
+            Text(stringResource(if (question.answer == SpotAnswer.STANDS_OUT) R.string.ui_which_note_is_stronger else R.string.ui_which_note_is_weaker), style = MaterialTheme.typography.titleMedium, color = Palette.Text)
             Text(
                 if (note % 2 == 0) stringResource(R.string.ui_playing_first_note) else stringResource(R.string.ui_playing_second_note),
                 style = MaterialTheme.typography.bodyMedium,
