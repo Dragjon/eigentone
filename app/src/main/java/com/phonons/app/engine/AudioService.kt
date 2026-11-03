@@ -47,6 +47,7 @@ class AudioService : Service() {
         val night: Boolean,
         val suspended: Boolean,
         val comparing: Boolean,
+        val outputKey: String,
     )
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -129,10 +130,13 @@ class AudioService : Service() {
         }
         scope.launch {
             combine(
-                Repo.state, Repo.attenuationDb, Repo.scheduledNight, Repo.hearingCheckRunning, Repo.comparing,
-            ) { state, attenuation, night, suspended, comparing -> Inputs(state, attenuation, night, suspended, comparing) }
+                Repo.state, Repo.attenuationDb, Repo.scheduledNight, Repo.hearingCheckRunning,
+                combine(Repo.comparing, Repo.output) { comparing, output -> comparing to output.key },
+            ) { state, attenuation, night, suspended, (comparing, outputKey) ->
+                Inputs(state, attenuation, night, suspended, comparing, outputKey)
+            }
                 .conflate()
-                .collect { (state, attenuation, night, suspended, comparing) ->
+                .collect { (state, attenuation, night, suspended, comparing, outputKey) ->
                     if (!state.enabled) {
                         stopSelf()
                         return@collect
@@ -141,6 +145,7 @@ class AudioService : Service() {
                     engine.scheduledNight = night
                     engine.suspended = suspended
                     engine.comparing = comparing
+                    engine.outputKey = outputKey
                     engine.apply(state)
                     keepSettling()
                     updateNotification(state)
@@ -207,6 +212,7 @@ class AudioService : Service() {
         val previous = Repo.output.value
         val info = currentOutput()
         Repo.output.value = info
+        Repo.update { it.withLegacyEarsMovedTo(info) }
         if (!starting && previous == info) return
         val state = Repo.state.value
         if (!state.autoSwitch) return

@@ -290,7 +290,7 @@ private fun Listen(
         color = Palette.TextDim,
     )
     if (silent) {
-        Text("Phonons is off, so both will sound the same until it's on.", style = MaterialTheme.typography.bodyMedium, color = Palette.Danger)
+        Text("Eigentone is off, so both will sound the same until it's on.", style = MaterialTheme.typography.bodyMedium, color = Palette.Danger)
     } else {
         NothingPlayingHint()
     }

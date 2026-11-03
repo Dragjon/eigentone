@@ -1,0 +1,1 @@
+Phonons is now Eigentone. Ear correction is saved per pair of headphones and turns on when they connect, and the EQ graph shows a separate curve for each ear. You can also compare an edited preset with its saved version.

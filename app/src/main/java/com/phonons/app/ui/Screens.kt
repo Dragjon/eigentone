@@ -244,7 +244,7 @@ private fun TopBar(state: AppState, status: EngineStatus, onSetEnabled: (Boolean
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text("Phonons", style = MaterialTheme.typography.titleLarge, color = Palette.Text)
+            Text("Eigentone", style = MaterialTheme.typography.titleLarge, color = Palette.Text)
             val problem = state.enabled && (status.error != null || !status.hasControl)
             Text(
                 statusLine(state, status),
@@ -259,7 +259,7 @@ private fun TopBar(state: AppState, status: EngineStatus, onSetEnabled: (Boolean
         Switch(
             checked = state.enabled,
             onCheckedChange = onSetEnabled,
-            modifier = Modifier.semantics { contentDescription = "Phonons" },
+            modifier = Modifier.semantics { contentDescription = "Eigentone" },
         )
     }
 }
@@ -297,6 +297,9 @@ private fun EqTab(state: AppState) {
     val selected = filters.firstOrNull { it.id == selectedId }
     val attenuation by Repo.attenuationDb.collectAsStateWithLifecycle()
     val curveFilters = remember(state, attenuation) { Processing.effectiveFilters(state, attenuation) }
+    val graphOutput by Repo.output.collectAsStateWithLifecycle()
+    val graphEars = state.earsFor(graphOutput.key)?.takeIf { it.enabled && !state.bypass }
+    val earCurves = remember(curveFilters, graphEars) { graphEars?.let { Processing.earCurves(curveFilters, it) } }
     val spectrumState = Repo.spectrum.collectAsStateWithLifecycle()
     AnalyserEffect(state.analyser)
 
@@ -311,7 +314,7 @@ private fun EqTab(state: AppState) {
         ) {
             Text("New here? Find your sound", style = MaterialTheme.typography.titleMedium, color = Palette.Text)
             Text(
-                "Compare two versions of a song a few times, and Phonons builds a preset from what you prefer.",
+                "Compare two versions of a song a few times, and Eigentone builds a preset from what you prefer.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Palette.TextDim,
             )
@@ -334,7 +337,8 @@ private fun EqTab(state: AppState) {
             // Graphic mode has its own faders, so the parametric nodes would only get in the way.
             filters = if (graphicMode) emptyList() else filters,
             heightDp = if (graphicMode) 170 else 260,
-            curveFilters = curveFilters,
+            curveFilters = earCurves?.first ?: curveFilters,
+            rightCurveFilters = earCurves?.second,
             spectrum = { spectrumState.value },
             selectedId = selectedId,
             dimmed = !state.enabled || state.bypass,
@@ -715,27 +719,52 @@ private fun SpaceSection(state: AppState) {
             origin = 0f,
             onChange = { v -> Repo.update { it.copy(balance = v.toDouble()) } },
         )
-        // Offered until it's used, so leaving the hearing check without choosing doesn't lose it.
-        val available = remember(state.hearing) { state.hearing?.result()?.earCorrection() }
-        if (state.earCorrection == null && available != null) {
-            val record = state.hearing
+        EarCorrectionRows(state)
+    }
+}
+
+/** This output's correction, or the offer to make one from its latest hearing check. */
+@Composable
+private fun EarCorrectionRows(state: AppState) {
+    val output by Repo.output.collectAsStateWithLifecycle()
+    val key = output.key
+    val ears = state.earsFor(key)
+    val record = state.hearings[key]
+    val available = remember(record) { record?.result()?.earCorrection() }
+    fun setEars(new: com.phonons.app.data.EarCorrection?) = Repo.update {
+        it.copy(earCorrections = if (new == null) it.earCorrections - key else it.earCorrections + (key to new))
+    }
+
+    if (Profiles.supportsModes(key)) {
+        if (ears != null) {
+            RowDivider()
+            SwitchSetting("Ear correction", Help.earCorrection, ears.enabled, detail = "A separate EQ for each ear, for ${output.label}") { on ->
+                setEars(ears.copy(enabled = on))
+            }
+            EarCurvesGraph(ears, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            RowDivider()
+            ActionRow("Remove ear correction", Help.earCorrection) { setEars(null) }
+        } else if (available != null && record != null) {
+            // Offered until it's used, so leaving the hearing check without choosing doesn't lose it.
             RowDivider()
             ActionRow(
                 "Correct each ear",
                 Help.earCorrection,
-                detail = "From your hearing check with ${record?.headphones} on " +
-                    java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(record?.measuredAt ?: 0L)) +
-                    ". Best with the same headphones.",
-            ) { Repo.update { it.copy(earCorrection = available) } }
+                detail = "For ${output.label}, from your hearing check on " +
+                    java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(record.measuredAt)) + ".",
+            ) { setEars(available) }
+            EarCurvesGraph(available, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         }
-        state.earCorrection?.let { ears ->
-            RowDivider()
-            SwitchSetting("Ear correction", Help.earCorrection, ears.enabled, detail = "A separate EQ for each ear") { on ->
-                Repo.update { it.copy(earCorrection = ears.copy(enabled = on)) }
-            }
-            RowDivider()
-            ActionRow("Remove ear correction", Help.earCorrection) { Repo.update { it.copy(earCorrection = null) } }
-        }
+    }
+    val others = (state.earCorrections.keys - key).map { state.hearings[it]?.headphones ?: it.substringAfter(':') }
+    if (others.isNotEmpty()) {
+        RowDivider()
+        Text(
+            "Ear correction is also saved for ${others.joinToString()}, and turns on when connected.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Palette.TextDim,
+            modifier = Modifier.padding(16.dp),
+        )
     }
 }
 
@@ -1148,7 +1177,7 @@ private fun ManageSection(state: AppState) {
                 when {
                     text == null -> "Could not read that file."
                     Repo.restoreBackup(text) -> "Backup restored."
-                    else -> "That isn't a Phonons backup."
+                    else -> "That isn't an Eigentone backup."
                 },
             )
         }
@@ -1178,7 +1207,7 @@ private fun ManageSection(state: AppState) {
         RowDivider()
         ActionRow("Export EQ file", Help.exportFile) { eqExporter.launch("${state.current.name} GraphicEQ.txt") }
         RowDivider()
-        ActionRow("Back up presets", Help.backup) { exporter.launch("phonons-backup.json") }
+        ActionRow("Back up presets", Help.backup) { exporter.launch("eigentone-backup.json") }
         RowDivider()
         ActionRow("Restore presets", Help.restore) {
             restorer.launch(arrayOf("application/json", "text/*", "application/octet-stream"))

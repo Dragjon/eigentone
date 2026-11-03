@@ -1,4 +1,6 @@
-# Phonons
+# Eigentone
+
+*Eigentones are the natural resonant tones of an enclosed space. "Eigen" is German for "own", so the name reads as "your own tone".*
 
 A free system-wide equaliser for Android 14 and newer. No ads, no account, and no tracking. It runs in the background using Android's `DynamicsProcessing` effect, so it works with Spotify, YouTube and most other apps without root.
 
@@ -8,10 +10,10 @@ A free system-wide equaliser for Android 14 and newer. No ads, no account, and n
 - **Parametric EQ** with up to 20 filters.
 - **Shape library** of 595 curves, searchable by genre, instrument, situation or problem. Hear each on your music before keeping it, and layer them.
 - **Your own shapes**, typed in from any other app's EQ.
-- **Headphone correction** from AutoEq's published measurements, with a strength control. Phonons offers one when headphones connect.
+- **Headphone correction** from AutoEq's published measurements, with a strength control. Eigentone offers one when headphones connect.
 - **Compare two sounds**, switching instantly at matched loudness, with an optional blind test.
 - **Find my sound**, a guided A/B listening test that has to beat your current sound before you keep it.
-- **Hearing check** that builds a gentle curve for how you hear, with a separate EQ for each ear if they differ. It isn't a medical test.
+- **Hearing check** that builds a gentle curve for how you hear, with a separate EQ for each ear if they differ, saved per pair of headphones and drawn as a curve for each ear. It isn't a medical test.
 - **EQ files**: import ParametricEQ and GraphicEQ files, and export any sound as a 127-point GraphicEQ file. Imported GraphicEQ curves keep every point rather than being rounded to faders.
 - **Presets** that load automatically per output, per earbud noise mode and per app.
 - **Multiband compressor**, free and fully adjustable, with three bands, adjustable crossovers, a live response curve and starting styles.
@@ -20,23 +22,23 @@ A free system-wide equaliser for Android 14 and newer. No ads, no account, and n
 
 ## Privacy
 
-Phonons has no ads, analytics or account, and it sends nothing about you anywhere.
+Eigentone has no ads, analytics or account, and it sends nothing about you anywhere.
 
 | Permission | Why | When |
 |---|---|---|
 | Internet | Downloads headphone profiles from AutoEq's public GitHub repository | Only when you ask for a correction |
 | Microphone | Android requires it for the spectrum analyser, which reads the level of playing audio and doesn't record the microphone | Only if you turn the analyser on |
 | Notification access | The only way Android reveals which app is playing, for per-app presets. Notifications are ignored | Only if you grant it |
-| Notifications, background and start at boot | Keep the EQ running, with a visible notification | While Phonons is on |
+| Notifications, background and start at boot | Keep the EQ running, with a visible notification | While Eigentone is on |
 
 Crash reports stay on the phone. You choose whether to share one from the System tab.
 
 ## Install
 
-Copy the latest `Phonons-<version>.apk` to the phone and open it, or use USB debugging:
+Copy the latest `Eigentone-<version>.apk` to the phone and open it, or use USB debugging:
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Phonons-0.14.1.apk
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.15.0.apk
 ```
 
 ## Build
@@ -56,6 +58,8 @@ Back up `phonons-release.jks` and `keystore.properties`. They are excluded from 
 - `engine/`: the `DynamicsProcessing` wrapper, foreground service, tile, widget, hearing check tones and playing-app detection.
 - `data/`: saved state, presets, undo, share codes and the listening test logic.
 - `ui/`: the Compose interface.
+
+The app was first called Phonons. The package name (`com.phonons.app`) and class names still use it, because Android treats a new application ID as a different app. It should change once, just before the first public release.
 
 ## Credits
 
@@ -77,15 +81,15 @@ The **shape library** (`dsp/ShapeLibrary.kt`, `dsp/ShapeData.kt`) has 595 graphi
 
 The **hearing check** finds a threshold per frequency and ear with a "down 10, up 5" method, capped at -15 dBFS. Levels are relative to the phone's volume, so only the differences between them are used, and the curve corrects half of those.
 
-**Ear correction** uses the same results. If the ears differ by 10 dB or more at any frequency, it can add a separate curve to each audio channel that closes half of the gap. Both ears share one input level, because separate levels would shift the balance across every frequency. It belongs to the listener rather than the sound, so it stays on across presets. The latest check's results are saved, so it can be turned on later from the Space settings.
+**Ear correction** uses the same results. If the ears differ by 10 dB or more at any frequency, it can add a separate curve to each audio channel that closes half of the gap. Both ears share one input level, because separate levels would shift the balance across every frequency. It stays on across presets, but a check also measures the headphones, so each output keeps its own correction and latest results, and it turns on when that output connects. The phone speaker never gets one, because it can't reach each ear separately.
 
 ## Known limits
 
-- **EQ in the headphones adds to Phonons**, because it runs on the headphones themselves. Phonons reminds you to set it flat, and it can't read or change it.
+- **EQ in the headphones adds to Eigentone**, because it runs on the headphones themselves. Eigentone reminds you to set it flat, and it can't read or change it.
 - **3D surround** is Android's virtualizer forced to binaural mode. It widens stereo, with no head tracking or real surround channels. On a Galaxy A54 it reads `mode=0` while audibly working.
 - **Reverb** was removed. On session 0 the public API only provides an auxiliary reverb, which receives no audio, and Android 16 blocks the method needed to control the insert version.
 - **Noise-mode profiles** are chosen by hand, because Android can't read the earbuds' mode.
-- **Session 0 is deprecated** by Android and varies by phone. Phonons falls back to per-app mode, and the System tab shows what the phone accepted.
+- **Session 0 is deprecated** by Android and varies by phone. Eigentone falls back to per-app mode, and the System tab shows what the phone accepted.
 
 ## Shelved: Studio mode
 

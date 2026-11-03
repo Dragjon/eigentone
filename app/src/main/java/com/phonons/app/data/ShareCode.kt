@@ -10,7 +10,10 @@ import kotlinx.serialization.json.Json
 
 /** Turns a preset into a short text code that can be sent to someone and pasted back in. */
 object ShareCode {
-    private const val PREFIX = "phonons1:"
+    private const val PREFIX = "eigentone1:"
+
+    /** From when the app had an earlier name, so codes already sent to people still work. */
+    private const val OLD_PREFIX = "phonons1:"
     private const val MAX_CODE_CHARS = 64 * 1024
     private const val MAX_JSON_BYTES = 256 * 1024
 
@@ -25,7 +28,9 @@ object ShareCode {
 
     /** Returns null for anything that isn't a valid code. Codes are checked, since anyone could edit one. */
     fun decode(code: String): Preset? {
-        val body = code.trim().substringAfter(PREFIX, "").filterNot(Char::isWhitespace)
+        val text = code.trim()
+        val body = (if (PREFIX in text) text.substringAfter(PREFIX, "") else text.substringAfter(OLD_PREFIX, ""))
+            .filterNot(Char::isWhitespace)
         if (body.isEmpty() || body.length > MAX_CODE_CHARS) return null
         return try {
             val text = inflate(Base64.getUrlDecoder().decode(body)) ?: return null

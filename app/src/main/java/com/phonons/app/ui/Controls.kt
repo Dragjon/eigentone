@@ -360,7 +360,7 @@ private fun ValueTrack(
     }
 }
 
-/** Names of the connected audio outputs, kept current as devices come and go, even while Phonons is off. */
+/** Names of the connected audio outputs, kept current as devices come and go, even while Eigentone is off. */
 @Composable
 fun rememberConnectedOutputNames(): List<String> {
     val context = LocalContext.current
@@ -398,12 +398,12 @@ fun rememberMusicActive(): Boolean {
     return active
 }
 
-/** Phonons changes another app's sound and plays nothing itself, which isn't obvious in a listening test. */
+/** Eigentone changes another app's sound and plays nothing itself, which isn't obvious in a listening test. */
 @Composable
 fun NothingPlayingHint(modifier: Modifier = Modifier) {
     if (rememberMusicActive()) return
     Text(
-        "Nothing is playing. Start your music app to hear this, because Phonons only changes its sound.",
+        "Nothing is playing. Start your music app to hear this, because Eigentone only changes its sound.",
         style = MaterialTheme.typography.bodySmall,
         color = Palette.Text,
         modifier = modifier,

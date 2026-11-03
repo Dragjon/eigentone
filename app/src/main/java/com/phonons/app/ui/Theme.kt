@@ -29,6 +29,8 @@ object Palette {
     val Amber = Color(0xFFFFB454)
     val OnAmber = Color(0xFF1E1404)
     val Danger = Color(0xFFFF8A80)
+    /** The right ear's curve, beside Amber for the left. Also dashed, so colour isn't the only difference. */
+    val RightEar = Color(0xFF7CC8FF)
 }
 
 private val Colors = darkColorScheme(

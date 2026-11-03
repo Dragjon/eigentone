@@ -363,7 +363,7 @@ fun ShapeBrowser(onClose: () -> Unit) {
                     hear(picked, amount)
                 },
                 silentReason = when {
-                    !state.enabled -> "Phonons is off, so you won't hear this until it's on."
+                    !state.enabled -> "Eigentone is off, so you won't hear this until it's on."
                     state.bypass -> "Bypass is on, so you won't hear this until it's off."
                     else -> null
                 },

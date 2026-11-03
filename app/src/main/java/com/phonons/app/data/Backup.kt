@@ -15,6 +15,8 @@ data class Backup(
     val customShapes: List<CustomShape> = emptyList(),
     val favoriteShapes: Set<String> = emptySet(),
     val appProfiles: Map<String, String> = emptyMap(),
+    val earCorrections: Map<String, EarCorrection> = emptyMap(),
+    val hearings: Map<String, HearingRecord> = emptyMap(),
     val earCorrection: EarCorrection? = null,
     val hearing: HearingRecord? = null,
     val compressor: Compressor? = null,
@@ -40,6 +42,8 @@ object BackupCodec {
             customShapes = state.customShapes,
             favoriteShapes = state.favoriteShapes,
             appProfiles = state.appProfiles,
+            earCorrections = state.earCorrections,
+            hearings = state.hearings,
             earCorrection = state.earCorrection,
             hearing = state.hearing,
             compressor = state.compressor,
@@ -55,17 +59,11 @@ object BackupCodec {
                 .filter { it.id.startsWith("user:") && it.name.isNotBlank() }
                 .map(::sanitise),
             customShapes = backup.customShapes.mapNotNull(::sanitise),
-            hearing = backup.hearing?.let { record ->
-                record.copy(
-                    left = ShapeText.cleanCurve(record.left, MAX_HEARING_DB),
-                    right = ShapeText.cleanCurve(record.right, MAX_HEARING_DB),
-                    headphones = record.headphones.take(MAX_NAME),
-                )
-            },
+            hearing = backup.hearing?.let(::sanitise),
             compressor = backup.compressor?.clamped(),
-            earCorrection = backup.earCorrection?.let { ears ->
-                ears.copy(left = ShapeText.cleanCurve(ears.left, MAX_EAR_DB), right = ShapeText.cleanCurve(ears.right, MAX_EAR_DB))
-            },
+            earCorrections = backup.earCorrections.mapValues { sanitise(it.value) },
+            hearings = backup.hearings.mapValues { sanitise(it.value) },
+            earCorrection = backup.earCorrection?.let(::sanitise),
         )
     } catch (e: Exception) {
         null
@@ -84,11 +82,22 @@ object BackupCodec {
             customShapes = state.customShapes.filterNot { it.id in incomingShapes } + backup.customShapes,
             favoriteShapes = state.favoriteShapes + backup.favoriteShapes,
             appProfiles = state.appProfiles + backup.appProfiles.filterValues { it in known },
+            earCorrections = state.earCorrections + backup.earCorrections,
+            hearings = state.hearings + backup.hearings,
             earCorrection = backup.earCorrection ?: state.earCorrection,
             hearing = backup.hearing ?: state.hearing,
             compressor = backup.compressor ?: state.compressor,
         )
     }
+
+    private fun sanitise(ears: EarCorrection) =
+        ears.copy(left = ShapeText.cleanCurve(ears.left, MAX_EAR_DB), right = ShapeText.cleanCurve(ears.right, MAX_EAR_DB))
+
+    private fun sanitise(record: HearingRecord) = record.copy(
+        left = ShapeText.cleanCurve(record.left, MAX_HEARING_DB),
+        right = ShapeText.cleanCurve(record.right, MAX_HEARING_DB),
+        headphones = record.headphones.take(MAX_NAME),
+    )
 
     /** Returns null if nothing usable is left, as a shape with no points can't be shown or applied. */
     private fun sanitise(shape: CustomShape): CustomShape? {

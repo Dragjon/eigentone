@@ -1,10 +1,10 @@
-Phonons is a free equaliser that changes the sound of apps across your phone, including Spotify and YouTube, without root. No ads, no account and no tracking.
+Eigentone is a free equaliser that changes the sound of apps across your phone, including Spotify and YouTube, without root. No ads, no account and no tracking.
 
 Find your sound
 - Correct your headphones using AutoEq's published measurements, offered when they connect
 - A guided A/B listening test, where the result has to beat what you already have
 - Compare any two sounds instantly at matched loudness, with an optional blind test
-- A hearing check that builds a gentle curve for how you hear, with a separate EQ for each ear if they differ (not a medical test)
+- A hearing check that builds a gentle curve for how you hear, with a separate EQ for each ear if they differ, saved per pair of headphones (not a medical test)
 
 Shape it yourself
 - Graphic EQ with 10, 15 or 31 faders, and draw a curve with one sweep
@@ -23,6 +23,6 @@ Made for daily use
 - Quick Settings tile and home-screen widget
 
 Good to know
-- EQ in a headphone app adds to Phonons, so it's best set to flat
+- EQ in a headphone app adds to Eigentone, so it's best set to flat
 - Android allows this effect on most apps, but it varies by phone
 - Reverb and head tracking aren't offered, because Android doesn't allow them to work reliably without root

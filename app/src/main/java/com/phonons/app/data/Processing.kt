@@ -110,13 +110,21 @@ object Processing {
         }
     }
 
-    fun target(state: AppState, attenuationDb: Double, scheduledNight: Boolean = false): ProcessingTarget {
+    /** Each ear's filters: the same sound, plus that ear's own correction. */
+    fun earCurves(filters: List<Filter>, ears: EarCorrection): Pair<List<Filter>, List<Filter>> =
+        (filters + curveFilter(EAR_CURVE_ID, ears.left)) to (filters + curveFilter(EAR_CURVE_ID, ears.right))
+
+    fun target(
+        state: AppState,
+        attenuationDb: Double,
+        scheduledNight: Boolean = false,
+        outputKey: String = "",
+    ): ProcessingTarget {
         val filters = effectiveFilters(state, attenuationDb)
         val input = inputOf(state.current, filters, state.autoHeadroom)
         if (!state.bypass) {
-            val ears = state.earCorrection?.takeIf { it.enabled }
-            val left = if (ears == null) filters else filters + curveFilter(EAR_CURVE_ID, ears.left)
-            val right = if (ears == null) filters else filters + curveFilter(EAR_CURVE_ID, ears.right)
+            val ears = state.earsFor(outputKey)?.takeIf { it.enabled }
+            val (left, right) = if (ears == null) filters to filters else earCurves(filters, ears)
             // One level for both ears. Separate levels would shift the balance across every frequency.
             val shared = if (ears == null) {
                 input

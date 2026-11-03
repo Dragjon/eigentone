@@ -66,6 +66,9 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
     /** Set by the service before [apply]. Takes the sound out of the path during the hearing check. */
     var suspended = false
 
+    /** Set by the service before [apply]. Which output is in use, since ear correction belongs to one. */
+    var outputKey = ""
+
     /** Set by the service before [apply]. Two sounds are being compared, so changes shouldn't blur together. */
     var comparing = false
 
@@ -217,6 +220,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
             if (suspended) state.copy(bypass = true, matchBypass = false) else state,
             attenuationDb,
             scheduledNight,
+            outputKey,
         )
         try {
             val gains = map.gains(target.filters)

@@ -166,7 +166,7 @@ fun ShareRows(snack: (String) -> Unit) {
     ActionRow("Share this sound", Help.share) {
         val preset = Repo.state.value.current
         val send = Intent(Intent.ACTION_SEND).setType("text/plain")
-            .putExtra(Intent.EXTRA_SUBJECT, "${preset.name} for Phonons")
+            .putExtra(Intent.EXTRA_SUBJECT, "${preset.name} for Eigentone")
             .putExtra(Intent.EXTRA_TEXT, ShareCode.encode(preset))
         context.startActivity(Intent.createChooser(send, "Share ${preset.name}"))
     }
@@ -228,7 +228,7 @@ fun PerAppSection(state: AppState) {
             ActionRow(
                 "Allow per-app presets",
                 Help.perAppAccess,
-                detail = "Android lists this under notification access. Phonons only checks which app is playing.",
+                detail = "Android lists this under notification access. Eigentone only checks which app is playing.",
             ) { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
             return@SettingsSection
         }
@@ -302,14 +302,14 @@ fun DiagnosticsSection(status: EngineStatus, output: OutputInfo) {
                 if (rivals.isNotEmpty()) add("Other audio effect apps: ${rivals.joinToString()}")
             }.joinToString("\n")
             context.getSystemService(ClipboardManager::class.java)
-                .setPrimaryClip(ClipData.newPlainText("Phonons status", text))
+                .setPrimaryClip(ClipData.newPlainText("Eigentone status", text))
             copied = true
         }
         crash?.let { report ->
             RowDivider()
-            ActionRow("Share crash report", Help.crashReport, detail = "Phonons crashed recently. Nothing is sent unless you choose to.") {
+            ActionRow("Share crash report", Help.crashReport, detail = "Eigentone crashed recently. Nothing is sent unless you choose to.") {
                 val send = Intent(Intent.ACTION_SEND).setType("text/plain")
-                    .putExtra(Intent.EXTRA_SUBJECT, "Phonons crash report")
+                    .putExtra(Intent.EXTRA_SUBJECT, "Eigentone crash report")
                     .putExtra(Intent.EXTRA_TEXT, report)
                 context.startActivity(Intent.createChooser(send, "Share crash report"))
             }

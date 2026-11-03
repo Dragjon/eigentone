@@ -376,10 +376,10 @@ class NewFeaturesTest {
     @Test
     fun aSavedHearingCheckSurvivesRestarts() {
         val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-        val state = AppState(hearing = HearingRecord.of(unevenEars, "Buds", 1L))
+        val state = AppState(hearings = mapOf(BUDS to HearingRecord.of(unevenEars, "Buds", 1L)))
         val loaded = json.decodeFromString(AppState.serializer(), json.encodeToString(AppState.serializer(), state))
-        assertNotNull(loaded.hearing!!.result()!!.earCorrection())
-        assertNull(json.decodeFromString(AppState.serializer(), "{}").hearing)
+        assertNotNull(loaded.hearings.getValue(BUDS).result()!!.earCorrection())
+        assertTrue(json.decodeFromString(AppState.serializer(), "{}").hearings.isEmpty())
     }
 
     @Test
@@ -391,20 +391,21 @@ class NewFeaturesTest {
     @Test
     fun resettingTheSoundKeepsTheMeasurement() {
         val record = HearingRecord.of(unevenEars, "Buds", 1L)
-        assertEquals(record, AppState(hearing = record).resetSound().hearing)
+        assertEquals(record, AppState(hearings = mapOf(BUDS to record)).resetSound().hearings[BUDS])
     }
 
     @Test
     fun aBackupKeepsTheHearingCheckAndCantBreakIt() {
         val record = HearingRecord.of(unevenEars, "Buds", 5L)
-        val restored = BackupCodec.merge(AppState(), BackupCodec.decode(BackupCodec.encode(AppState(hearing = record)))!!)
-        assertEquals(record, restored.hearing)
+        val state = AppState(hearings = mapOf(BUDS to record))
+        val restored = BackupCodec.merge(AppState(), BackupCodec.decode(BackupCodec.encode(state))!!)
+        assertEquals(record, restored.hearings[BUDS])
 
         // Ears that don't match would otherwise crash when the correction is worked out.
-        val edited = """{"hearing":{"left":[{"hz":1000.0,"db":-60.0}],"right":[{"hz":2000.0,"db":-40.0}]}}"""
-        assertNull(BackupCodec.decode(edited)!!.hearing!!.result())
-        val empty = """{"hearing":{"left":[],"right":[]}}"""
-        assertNull(BackupCodec.decode(empty)!!.hearing!!.result())
+        val edited = """{"hearings":{"Bluetooth:Buds":{"left":[{"hz":1000.0,"db":-60.0}],"right":[{"hz":2000.0,"db":-40.0}]}}}"""
+        assertNull(BackupCodec.decode(edited)!!.hearings.getValue(BUDS).result())
+        val empty = """{"hearings":{"Bluetooth:Buds":{"left":[],"right":[]}}}"""
+        assertNull(BackupCodec.decode(empty)!!.hearings.getValue(BUDS).result())
     }
 
     @Test
@@ -482,6 +483,18 @@ class NewFeaturesTest {
             assertEquals(if (flipped) boomy else quiet, comparison.presetFor(0))
             assertEquals(if (flipped) quiet else boomy, comparison.presetFor(1))
         }
+    }
+
+    @Test
+    fun shareCodesFromTheOldNameStillWork() {
+        val preset = Preset("user:x", "Mine", tone = Tone(bassDb = 3.0))
+        val code = ShareCode.encode(preset)
+        assertTrue(code.startsWith("eigentone1:"))
+        val old = code.replace("eigentone1:", "phonons1:")
+        assertEquals("Mine", ShareCode.decode(old)!!.name)
+        assertEquals(3.0, ShareCode.decode("Try this: $old")!!.tone.bassDb, 0.0)
+        assertNull(ShareCode.decode("phonons1:"))
+        assertNull(ShareCode.decode("no code here"))
     }
 
     @Test
@@ -683,6 +696,8 @@ class NewFeaturesTest {
         assertEquals(6.0, extreme.right.single().db, 0.0)
     }
 
+    private val BUDS = "Bluetooth:Buds"
+
     private val ears = EarCorrection(
         left = listOf(ShapePoint(1000.0, -3.0)),
         right = listOf(ShapePoint(1000.0, 3.0)),
@@ -690,8 +705,8 @@ class NewFeaturesTest {
 
     @Test
     fun earCorrectionGivesEachChannelItsOwnCurveAndOneLevel() {
-        val state = AppState(earCorrection = ears, autoHeadroom = true)
-        val target = Processing.target(state, 0.0)
+        val state = AppState(earCorrections = mapOf(BUDS to ears), autoHeadroom = true)
+        val target = Processing.target(state, 0.0, outputKey = BUDS)
         assertEquals(-3.0, Eq.curveDb(target.filters, 1000.0), 0.001)
         assertEquals(3.0, Eq.curveDb(target.rightFilters, 1000.0), 0.001)
         // Headroom comes from the ear with the larger boost, and applies to both.
@@ -699,15 +714,33 @@ class NewFeaturesTest {
     }
 
     @Test
+    fun earCorrectionOnlyAppliesToItsOwnHeadphones() {
+        val state = AppState(earCorrections = mapOf(BUDS to ears))
+        val other = Processing.target(state, 0.0, outputKey = "Bluetooth:Other")
+        assertTrue(other.filters === other.rightFilters)
+        assertEquals(0.0, other.inputDb, 0.0)
+    }
+
+    @Test
+    fun aPhoneSpeakerNeverGetsEarCorrection() {
+        val state = AppState(earCorrections = mapOf("speaker" to ears))
+        assertNull(state.earsFor("speaker"))
+        val speaker = Processing.target(state, 0.0, outputKey = "speaker")
+        assertTrue(speaker.filters === speaker.rightFilters)
+    }
+
+    @Test
     fun earCorrectionStepsAsideWhenOffOrBypassed() {
         val plain = Processing.target(AppState(), 0.0)
         assertTrue(plain.filters === plain.rightFilters)
 
-        val disabled = Processing.target(AppState(earCorrection = ears.copy(enabled = false)), 0.0)
+        val off = AppState(earCorrections = mapOf(BUDS to ears.copy(enabled = false)))
+        val disabled = Processing.target(off, 0.0, outputKey = BUDS)
         assertTrue(disabled.filters === disabled.rightFilters)
 
         for (match in listOf(true, false)) {
-            val bypassed = Processing.target(AppState(earCorrection = ears, bypass = true, matchBypass = match), 0.0)
+            val state = AppState(earCorrections = mapOf(BUDS to ears), bypass = true, matchBypass = match)
+            val bypassed = Processing.target(state, 0.0, outputKey = BUDS)
             assertTrue(bypassed.filters.isEmpty())
             assertTrue(bypassed.rightFilters.isEmpty())
         }
@@ -715,20 +748,57 @@ class NewFeaturesTest {
 
     @Test
     fun earCorrectionSurvivesPresetChangesButNotAReset() {
-        val state = AppState(earCorrection = ears)
-        assertEquals(ears, state.copy(current = libertyBass).earCorrection)
-        assertNull(state.resetSound().earCorrection)
+        val state = AppState(earCorrections = mapOf(BUDS to ears))
+        assertEquals(ears, state.copy(current = libertyBass).earsFor(BUDS))
+        assertNull(state.resetSound().earsFor(BUDS))
+    }
+
+    @Test
+    fun aCorrectionFromBeforeHeadphonesWereTrackedMovesToTheFirstHeadphones() {
+        val old = AppState(earCorrection = ears)
+        // The speaker can't use it, so it waits.
+        assertEquals(old, old.withLegacyEarsMovedTo(OutputInfo("speaker", "Phone speaker")))
+
+        val moved = old.withLegacyEarsMovedTo(OutputInfo(BUDS, "Buds"))
+        assertEquals(ears, moved.earsFor(BUDS))
+        assertNull(moved.earCorrection)
+        assertEquals(moved, moved.withLegacyEarsMovedTo(OutputInfo("Bluetooth:Other", "Other")))
+    }
+
+    @Test
+    fun aCorrectionFromAnOlderCheckWaitsForTheHeadphonesItNames() {
+        val record = HearingRecord.of(unevenEars, "Buds", 1L)
+        val old = AppState(earCorrection = ears, hearing = record)
+        assertEquals(old, old.withLegacyEarsMovedTo(OutputInfo("Bluetooth:Other", "Other")))
+
+        val moved = old.withLegacyEarsMovedTo(OutputInfo(BUDS, "Buds"))
+        assertEquals(ears, moved.earsFor(BUDS))
+        assertEquals(record, moved.hearings[BUDS])
+        assertNull(moved.hearing)
+    }
+
+    @Test
+    fun movingAnOldCorrectionNeverReplacesANewerOne() {
+        val newer = ears.copy(left = listOf(ShapePoint(500.0, 1.0)))
+        val state = AppState(earCorrection = ears, earCorrections = mapOf(BUDS to newer))
+        assertEquals(newer, state.withLegacyEarsMovedTo(OutputInfo(BUDS, "Buds")).earsFor(BUDS))
     }
 
     @Test
     fun backupKeepsEarCorrectionAndChecksIt() {
-        val restored = BackupCodec.merge(AppState(), BackupCodec.decode(BackupCodec.encode(AppState(earCorrection = ears)))!!)
-        assertEquals(ears, restored.earCorrection)
+        val state = AppState(earCorrections = mapOf(BUDS to ears))
+        val restored = BackupCodec.merge(AppState(), BackupCodec.decode(BackupCodec.encode(state))!!)
+        assertEquals(ears, restored.earsFor(BUDS))
         // A backup without one doesn't remove the one already in use.
-        assertEquals(ears, BackupCodec.merge(AppState(earCorrection = ears), BackupCodec.decode("{}")!!).earCorrection)
+        assertEquals(ears, BackupCodec.merge(state, BackupCodec.decode("{}")!!).earsFor(BUDS))
 
-        val edited = """{"earCorrection":{"left":[{"hz":1000.0,"db":90.0}],"right":[]}}"""
-        assertEquals(6.0, BackupCodec.decode(edited)!!.earCorrection!!.left.single().db, 0.0)
+        val edited = """{"earCorrections":{"Bluetooth:Buds":{"left":[{"hz":1000.0,"db":90.0}],"right":[]}}}"""
+        assertEquals(6.0, BackupCodec.decode(edited)!!.earCorrections.getValue(BUDS).left.single().db, 0.0)
+
+        // A backup from before these were per headphone still works.
+        val older = """{"earCorrection":{"left":[{"hz":1000.0,"db":90.0}],"right":[]}}"""
+        val merged = BackupCodec.merge(AppState(), BackupCodec.decode(older)!!)
+        assertEquals(6.0, merged.withLegacyEarsMovedTo(OutputInfo(BUDS, "Buds")).earsFor(BUDS)!!.left.single().db, 0.0)
     }
 
     @Test

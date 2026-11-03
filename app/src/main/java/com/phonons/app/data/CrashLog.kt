@@ -33,7 +33,7 @@ object CrashLog {
 
     fun deviceSummary(context: Context): String {
         val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        return "Phonons $version on ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE}"
+        return "Eigentone $version on ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE}"
     }
 
     private fun file(context: Context) = File(context.filesDir, FILE)

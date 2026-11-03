@@ -7,7 +7,7 @@ data class Tip(val title: String, val body: String)
 object Help {
     val power = Tip(
         "Power and Bypass",
-        "The switch turns Phonons on or off, and it keeps running in the background until you turn it off. Bypass temporarily removes the EQ and effects so you can compare the sound. It doesn't change your settings.",
+        "The switch turns Eigentone on or off, and it keeps running in the background until you turn it off. Bypass temporarily removes the EQ and effects so you can compare the sound. It doesn't change your settings.",
     )
 
     val analyser = Tip(
@@ -40,7 +40,7 @@ object Help {
     )
     val finder = Tip(
         "Find my sound",
-        "A short listening test. You pick your favourite of two versions a few times, and Phonons builds a preset from your answers. Nothing is kept unless you save it.",
+        "A short listening test. You pick your favourite of two versions a few times, and Eigentone builds a preset from your answers. Nothing is kept unless you save it.",
     )
     val bassTunerAmount = Tip(
         "Bass tuner amount",
@@ -82,7 +82,7 @@ object Help {
     )
     val nightSchedule = Tip(
         "Night mode schedule",
-        "Turns night mode on at the times you choose. It only works while Phonons is running, and it won't lower a stronger setting you've chosen above.",
+        "Turns night mode on at the times you choose. It only works while Eigentone is running, and it won't lower a stronger setting you've chosen above.",
     )
     val nightScheduleAmount = Tip("Scheduled strength", "How strong night mode is during the scheduled hours.")
     val nightScheduleStart = Tip("Starts at", "The time night mode turns on. Move this in half-hour steps.")
@@ -107,7 +107,7 @@ object Help {
     )
     val perAppAccess = Tip(
         "Why this access is needed",
-        "Android only reveals which app is playing to apps with notification access. Phonons ignores your notifications and only checks the playing app, and that stays on your phone. Without it, everything else still works.",
+        "Android only reveals which app is playing to apps with notification access. Eigentone ignores your notifications and only checks the playing app, and that stays on your phone. Without it, everything else still works.",
     )
     val diagnostics = Tip("Status details", "Copies technical details about your phone and the audio engine, for reporting a problem. Nothing is sent anywhere unless you paste it somewhere.")
     val crashReport = Tip("Crash report", "A technical record of the last crash, kept only on this phone. You choose whether to share it, and deleting it removes it.")
@@ -153,7 +153,7 @@ object Help {
     )
     val noiseMode = Tip(
         "Earbud noise mode",
-        "Earbuds can sound different in each mode, so each can have its own preset. Phonons can't read the mode from your earbuds, so set it here to match. A mode with no preset uses this output's main one.",
+        "Earbuds can sound different in each mode, so each can have its own preset. Eigentone can't read the mode from your earbuds, so set it here to match. A mode with no preset uses this output's main one.",
     )
     val autoSwitch = Tip("Switch automatically", "Loads the assigned preset whenever this output connects.")
     val favorites = Tip(
@@ -200,20 +200,20 @@ object Help {
     )
     val earCorrection = Tip(
         "Ear correction",
-        "A separate EQ for each ear, from the hearing check. It closes half of the gap between your ears at each frequency, and stays on when you change preset. Fit can affect the result, so repeat the check if it sounds off. Your latest check is kept, so you can turn this on later or again after removing it.",
+        "A separate EQ for each ear, from the hearing check. It closes half of the gap between your ears at each frequency, and stays on when you change preset. A check also measures the headphones, so each pair keeps its own, which turns on when they connect. Fit can affect the result, so repeat the check if it sounds off. Each pair's latest check is kept, so you can turn this on later or again after removing it.",
     )
     val backup = Tip(
         "Back up presets",
-        "Saves your presets, your shapes, output and per-app choices, and favourites to a file. Ear correction, your latest hearing check and compressor settings are included. Other settings that aren't part of a preset, such as balance and night mode, aren't.",
+        "Saves your presets, your shapes, output and per-app choices, and favourites to a file. Ear correction, hearing checks and compressor settings are included. Other settings that aren't part of a preset, such as balance and night mode, aren't.",
     )
     val restore = Tip(
         "Restore presets",
-        "Adds presets, your shapes, per-app choices, ear correction, your latest hearing check and compressor settings from a backup file. Anything with the same identity is replaced, and the rest is kept.",
+        "Adds presets, your shapes, per-app choices, ear correction, hearing checks and compressor settings from a backup file. Anything with the same identity is replaced, and the rest is kept.",
     )
 
     val engineMode = Tip(
         "Engine",
-        "Global covers every app Android allows, and Auto tries it first. If the EQ makes no difference, try Per app, which only covers players that announce their audio. Those players must start after Phonons.",
+        "Global covers every app Android allows, and Auto tries it first. If the EQ makes no difference, try Per app, which only covers players that announce their audio. Those players must start after Eigentone.",
     )
     val lowLatency = Tip("Low latency", "Reduces processing delay for games and video, but bass control gets less precise.")
     val startOnBoot = Tip("Start automatically", "Turns the EQ back on after a phone restart or app update, if it was on before.")
@@ -221,10 +221,10 @@ object Help {
 
     val statusRunning = Tip("Running", "Whether the audio effect is currently loaded.")
     val statusMode = Tip("Mode", "Which audio route is in use. Global applies to all apps it can reach, and Per app applies to individual players.")
-    val statusBands = Tip("EQ bands", "How finely your curve is reproduced. More is more accurate, and 128 is the most Phonons asks for.")
-    val statusControl = Tip("In control", "Whether Phonons controls the effect. If another audio app takes over, Phonons' settings may stop applying.")
-    val statusReadback = Tip("Bands accepted", "Phonons reads its settings back from Android to confirm they were applied. All bands should match, such as 128/128.")
-    val statusRepairs = Tip("Repairs", "How many times Phonons has rebuilt the effect after losing it since it last started, such as when Android's audio system restarts. Occasional repairs are fine, but a rising number suggests a problem on this phone.")
-    val statusOutput = Tip("Output", "Where Phonons thinks audio is going. This decides which preset loads.")
-    val statusApps = Tip("Attached apps", "The players Phonons is processing in Per app mode.")
+    val statusBands = Tip("EQ bands", "How finely your curve is reproduced. More is more accurate, and 128 is the most Eigentone asks for.")
+    val statusControl = Tip("In control", "Whether Eigentone controls the effect. If another audio app takes over, Eigentone's settings may stop applying.")
+    val statusReadback = Tip("Bands accepted", "Eigentone reads its settings back from Android to confirm they were applied. All bands should match, such as 128/128.")
+    val statusRepairs = Tip("Repairs", "How many times Eigentone has rebuilt the effect after losing it since it last started, such as when Android's audio system restarts. Occasional repairs are fine, but a rising number suggests a problem on this phone.")
+    val statusOutput = Tip("Output", "Where Eigentone thinks audio is going. This decides which preset loads.")
+    val statusApps = Tip("Attached apps", "The players Eigentone is processing in Per app mode.")
 }

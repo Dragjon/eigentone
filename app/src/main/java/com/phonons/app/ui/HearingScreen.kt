@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
@@ -32,12 +33,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.phonons.app.data.CustomShape
 import com.phonons.app.data.HearingRecord
 import com.phonons.app.data.HearingResult
 import com.phonons.app.data.HearingTest
+import com.phonons.app.data.Profiles
 import com.phonons.app.data.Repo
 import com.phonons.app.dsp.GraphicEq
 import com.phonons.app.dsp.GraphicShape
@@ -125,8 +128,9 @@ fun HearingScreen(onClose: () -> Unit) {
                                 val finished = test.result()
                                 result = finished
                                 // Saved now, so ear correction can still be chosen after leaving this screen.
-                                val record = HearingRecord.of(finished, Repo.output.value.label, System.currentTimeMillis())
-                                Repo.update { it.copy(hearing = record) }
+                                val output = Repo.output.value
+                                val record = HearingRecord.of(finished, output.label, System.currentTimeMillis())
+                                Repo.update { it.copy(hearings = it.hearings + (output.key to record)) }
                                 step = HearingStep.RESULT
                             }
                         },
@@ -231,7 +235,9 @@ private fun Tones(
 @Composable
 private fun Result(result: HearingResult, onClose: () -> Unit) {
     val points = remember(result) { result.shapePoints() }
-    val ears = remember(result) { result.earCorrection() }
+    // Kept from when the check finished, in case the headphones are disconnected on this screen.
+    val output = remember(result) { Repo.output.value }
+    val ears = remember(result) { result.earCorrection()?.takeIf { Profiles.supportsModes(output.key) } }
     var earsApplied by remember { mutableStateOf(false) }
     val hasCurve = points.any { it.db != 0.0 }
     fun save(): CustomShape {
@@ -306,14 +312,20 @@ private fun Result(result: HearingResult, onClose: () -> Unit) {
     }
     if (ears != null) {
         Text(
-            "Your ears differed by up to ${result.largestEarDifferenceDb().toInt()} dB at some frequencies, which can also come from fit. Phonons can close half of that gap, frequency by frequency, with a separate EQ for each ear. You can also do this later from the Sound tab, under Space.",
+            "Your ears differed by up to ${result.largestEarDifferenceDb().toInt()} dB at some frequencies, which can also come from fit. Eigentone can close half of that gap, frequency by frequency, with a separate EQ for each ear. It's saved for ${output.label}, and you can also do this later from the Sound tab, under Space.",
             style = MaterialTheme.typography.bodyMedium,
             color = Palette.Text,
+        )
+        EarCurvesGraph(
+            ears,
+            Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(Palette.Surface),
         )
         FilledTonalButton(
             enabled = !earsApplied,
             onClick = {
-                Repo.update { it.copy(earCorrection = ears) }
+                Repo.update { it.copy(earCorrections = it.earCorrections + (output.key to ears)) }
                 earsApplied = true
             },
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),

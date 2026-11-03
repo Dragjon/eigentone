@@ -145,8 +145,12 @@ data class AppState(
     val nightSchedule: NightSchedule = NightSchedule(),
     /** Evens out loud and quiet tracks, from 0 to 1. Night mode takes priority when both are on. */
     val leveller: Double = 0.0,
+    /** Output key to its correction. A hearing check measures the headphones too, so each has its own. */
+    val earCorrections: Map<String, EarCorrection> = emptyMap(),
+    /** Output key to its latest finished check, so a correction can still be turned on after leaving it. */
+    val hearings: Map<String, HearingRecord> = emptyMap(),
+    /** From before these were per headphone. Moved by [withLegacyEarsMovedTo] when the headphones are known. */
     val earCorrection: EarCorrection? = null,
-    /** The latest finished hearing check, so ear correction can still be turned on after leaving it. */
     val hearing: HearingRecord? = null,
     val compressor: Compressor = Compressor(),
     /** Which one-time updates this saved state has had. A fresh install starts at the latest. */
@@ -168,6 +172,27 @@ data class AppState(
         current = if (current.id == id) current.copy(name = name) else current,
     )
 
+    /** This output's correction. A phone speaker can't reach each ear separately, so it never has one. */
+    fun earsFor(outputKey: String): EarCorrection? =
+        if (Profiles.supportsModes(outputKey)) earCorrections[outputKey] else null
+
+    /**
+     * Files a correction from before these were per headphone under the output it belongs to. A saved
+     * check names its headphones, so it waits for them. Without one, the first headphones get it, since
+     * the correction was already in use on whatever was connected.
+     */
+    fun withLegacyEarsMovedTo(output: OutputInfo): AppState {
+        if (earCorrection == null && hearing == null) return this
+        val belongsHere = if (hearing != null) hearing.headphones == output.label else Profiles.supportsModes(output.key)
+        if (!belongsHere) return this
+        return copy(
+            earCorrections = earCorrection?.let { mapOf(output.key to it) + earCorrections } ?: earCorrections,
+            hearings = hearing?.let { mapOf(output.key to it) + hearings } ?: hearings,
+            earCorrection = null,
+            hearing = null,
+        )
+    }
+
     /** Keeps presets, output choices and power, and clears everything that shapes the sound. */
     fun resetSound(): AppState {
         val defaults = AppState()
@@ -181,6 +206,7 @@ data class AppState(
             nightSchedule = defaults.nightSchedule,
             leveller = defaults.leveller,
             balance = defaults.balance,
+            earCorrections = defaults.earCorrections,
             earCorrection = defaults.earCorrection,
             compressor = defaults.compressor,
             loudness = defaults.loudness,
