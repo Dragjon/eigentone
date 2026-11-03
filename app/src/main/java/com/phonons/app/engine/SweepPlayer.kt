@@ -23,6 +23,9 @@ class SweepPlayer(context: Context) {
 
     @Volatile var hz = Sweep.hzAt(0.0)
     @Volatile var levelDb = Sweep.DEFAULT_LEVEL_DB
+
+    /** Fades out while still running, to put a gap between separate notes. */
+    @Volatile var muted = false
     @Volatile private var sounding = false
     private var thread: Thread? = null
 
@@ -65,7 +68,7 @@ class SweepPlayer(context: Context) {
         try {
             track.play()
             while (sounding || !oscillator.isSilent) {
-                oscillator.fill(buffer, hz, levelDb, sounding)
+                oscillator.fill(buffer, hz, levelDb, sounding && !muted)
                 if (track.write(buffer, 0, buffer.size, AudioTrack.WRITE_BLOCKING) < 0) break
             }
             track.stop()

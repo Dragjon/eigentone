@@ -91,7 +91,7 @@ object Help {
     val addShared = Tip("Add a shared sound", "Paste a code someone shared with you. It's added as a new preset, and your others are kept.")
     val sweep = Tip(
         "Frequency sweep",
-        "Plays a tone that climbs through the frequencies. Mark where it jumps out or nearly disappears, and Eigentone adds narrow filters there. It finds what your ears notice, and isn't a measurement. Sweeps also reveal rattles and resonances that music can hide.",
+        "Plays a tone that climbs through the frequencies. Mark where it jumps out or nearly disappears, and Eigentone adds narrow filters there. It finds what your ears notice, and isn't a measurement. Sweeps also reveal rattles and resonances that music can hide. If a moving tone is hard to judge, pause and compare the spot with nearby notes.",
     )
     val sweepLevel = Tip("Tone level", "How loud the tone is, before your phone's volume. It can't go above a set limit, so it stays gentle at a normal volume.")
     val sweepHearEq = Tip(

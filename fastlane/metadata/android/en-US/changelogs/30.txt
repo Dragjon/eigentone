@@ -1,0 +1,1 @@
+The frequency sweep can now compare a spot with the notes just beside it, which makes narrow peaks and dips much easier to hear.

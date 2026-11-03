@@ -46,6 +46,9 @@ import java.util.Locale
 import kotlinx.coroutines.delay
 
 private const val TICK_MS = 50L
+private const val NOTE_MS = 450L
+private const val NOTE_GAP_MS = 80L
+private const val NOTE_GLIDE_MS = 110L
 
 private val MarksSaver = Saver<List<SweepMark>, DoubleArray>(
     save = { marks -> marks.flatMap { listOf(it.hz, it.gainDb) }.toDoubleArray() },
@@ -68,6 +71,8 @@ fun SweepScreen(onClose: () -> Unit) {
     var hearEq by rememberSaveable { mutableStateOf(false) }
     var marks by rememberSaveable(stateSaver = MarksSaver) { mutableStateOf(emptyList<SweepMark>()) }
     var failed by remember { mutableStateOf(false) }
+    var comparing by rememberSaveable { mutableStateOf(false) }
+    var heardTone by remember { mutableDoubleStateOf(0.0) }
     val hz = Sweep.hzAt(position)
     val room = Sweep.roomFor(state.current.filters)
 
@@ -82,7 +87,31 @@ fun SweepScreen(onClose: () -> Unit) {
         }
         onDispose { if (playing) player.stop() }
     }
-    LaunchedEffect(hz) { player.hz = hz }
+    LaunchedEffect(hz, comparing) { if (!comparing) player.hz = hz }
+    // Separate notes with short gaps, with the spot itself every other note.
+    LaunchedEffect(playing, comparing, hz) {
+        if (!playing || !comparing) {
+            player.muted = false
+            return@LaunchedEffect
+        }
+        try {
+            val tones = Sweep.nearbyTones(hz)
+            var next = 0
+            while (true) {
+                val tone = tones[next % tones.size]
+                player.muted = true
+                delay(NOTE_GAP_MS)
+                player.hz = tone
+                delay(NOTE_GLIDE_MS)
+                player.muted = false
+                heardTone = tone
+                delay(NOTE_MS)
+                next++
+            }
+        } finally {
+            player.muted = false
+        }
+    }
     LaunchedEffect(levelDb) { player.levelDb = levelDb }
     LaunchedEffect(playing, climbing) {
         while (playing && climbing) {
@@ -131,6 +160,7 @@ fun SweepScreen(onClose: () -> Unit) {
                 value = position.toFloat(),
                 onValueChange = {
                     climbing = false
+                    heardTone = Sweep.hzAt(it.toDouble())
                     position = it.toDouble()
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -142,6 +172,7 @@ fun SweepScreen(onClose: () -> Unit) {
                         if (playing) {
                             player.stop()
                             climbing = false
+                            comparing = false
                         }
                         playing = !playing
                     },
@@ -149,9 +180,27 @@ fun SweepScreen(onClose: () -> Unit) {
                 ) { Text(if (playing) "Stop tone" else "Start tone") }
                 FilledTonalButton(
                     enabled = playing && position < 1.0,
-                    onClick = { climbing = !climbing },
+                    onClick = {
+                        comparing = false
+                        climbing = !climbing
+                    },
                     modifier = Modifier.weight(1f).heightIn(min = 52.dp),
                 ) { Text(if (climbing) "Pause climb" else "Climb") }
+            }
+            FilledTonalButton(
+                enabled = playing,
+                onClick = {
+                    climbing = false
+                    comparing = !comparing
+                },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+            ) { Text(if (comparing) "Stop comparing" else "Compare with nearby notes") }
+            if (comparing && playing) {
+                Text(
+                    "Now: ${GraphicEq.formatFrequency(kotlin.math.round(heardTone))}${if (heardTone == hz) ", your spot" else ""}. Your spot plays every other note. If it stands out from the notes beside it, mark it too loud. If it sinks below them, mark it too quiet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Palette.Text,
+                )
             }
             if (failed) {
                 Text("This phone wouldn't play the tone.", style = MaterialTheme.typography.bodyMedium, color = Palette.Danger)

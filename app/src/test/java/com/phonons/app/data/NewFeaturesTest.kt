@@ -154,6 +154,22 @@ class NewFeaturesTest {
     }
 
     @Test
+    fun nearbyNotesAlternateAroundTheSpot() {
+        val tones = Sweep.nearbyTones(1000.0)
+        assertEquals(4, tones.size)
+        assertEquals(1000.0, tones[0], 0.0)
+        assertEquals(1000.0, tones[2], 0.0)
+        assertEquals(1000.0 / Math.pow(2.0, 1.0 / 3), tones[1], 0.01)
+        assertEquals(1000.0 * Math.pow(2.0, 1.0 / 3), tones[3], 0.01)
+    }
+
+    @Test
+    fun nearbyNotesStayInsideTheRange() {
+        assertEquals(Eq.MIN_FREQ, Sweep.nearbyTones(Eq.MIN_FREQ)[1], 0.0)
+        assertEquals(Eq.MAX_FREQ, Sweep.nearbyTones(Eq.MAX_FREQ)[3], 0.0)
+    }
+
+    @Test
     fun marksAtDifferentSpotsStaySeparateAndInOrder() {
         val marks = Sweep.addMark(Sweep.addMark(emptyList(), 6000.0, -3.0), 200.0, 2.0)
         assertEquals(listOf(200.0, 6000.0), marks.map { it.hz })
@@ -219,6 +235,24 @@ class NewFeaturesTest {
         val end = tone(oscillator, 1000.0, -30.0, sounding = false)
         assertTrue(oscillator.isSilent)
         assertTrue(abs(end[end.size - 2]) < 0.0001)
+    }
+
+    /** Counts upward zero crossings, which gives the pitch of a tone. */
+    private fun measuredHz(samples: FloatArray, sampleRate: Int): Double {
+        var crossings = 0
+        for (i in 2 until samples.size step 2) if (samples[i - 2] < 0f && samples[i] >= 0f) crossings++
+        return crossings * sampleRate.toDouble() / (samples.size / 2)
+    }
+
+    @Test
+    fun aNewNoteStartsOnItsPitchAfterAGap() {
+        val oscillator = SweepOscillator(48000)
+        tone(oscillator, 500.0, -30.0)
+        tone(oscillator, 500.0, -30.0, sounding = false)
+        assertTrue(oscillator.isSilent)
+        // Only the first tenth of a second, which is when a slide would be heard.
+        val note = tone(oscillator, 4000.0, -30.0, frames = 4800)
+        assertEquals(4000.0, measuredHz(note, 48000), 40.0)
     }
 
     @Test

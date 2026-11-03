@@ -30,9 +30,21 @@ object Sweep {
     /** Marks closer together than this are the same spot, and go further rather than stacking filters. */
     private const val SAME_SPOT_OCTAVES = 1.0 / 6.0
     private const val MAX_MARK_DB = 9.0
+    private const val NEARBY_OCTAVES = 1.0 / 3.0
 
     /** Position along the sweep from 0 to 1, spaced the way ears hear pitch. */
     fun hzAt(position: Double): Double = Eq.logFreq(position.coerceIn(0.0, 1.0))
+
+    /**
+     * Tones to alternate between when checking a spot: the spot itself, then just below it, then just
+     * above it. Comparing separate notes is far easier than judging one that keeps moving, and the
+     * spot comes round twice as often, so it's the one to listen to.
+     */
+    fun nearbyTones(hz: Double): List<Double> {
+        val below = (hz / 2.0.pow(NEARBY_OCTAVES)).coerceAtLeast(Eq.MIN_FREQ)
+        val above = (hz * 2.0.pow(NEARBY_OCTAVES)).coerceAtMost(Eq.MAX_FREQ)
+        return listOf(hz, below, hz, above)
+    }
 
     /** Adds a mark, or moves an existing one at the same spot further in that direction. */
     fun addMark(marks: List<SweepMark>, hz: Double, gainDb: Double): List<SweepMark> {
@@ -80,7 +92,8 @@ class SweepOscillator(private val sampleRate: Int) {
         val hzStep = (targetHz / hz).pow(1.0 / (GLIDE_SECONDS * sampleRate))
         val amplitudeStep = 1.0 / (FADE_SECONDS * sampleRate)
         for (frame in 0 until buffer.size / 2) {
-            hz = if (abs(log2(hz / targetHz)) < PITCH_EPSILON) targetHz else hz * hzStep
+            // While silent it can go straight there, so a new note starts on its pitch without a slide.
+            hz = if (amplitude == 0.0 || abs(log2(hz / targetHz)) < PITCH_EPSILON) targetHz else hz * hzStep
             amplitude = when {
                 amplitude < goal -> minOf(goal, amplitude + amplitudeStep * MAX_LEVEL)
                 amplitude > goal -> maxOf(goal, amplitude - amplitudeStep * MAX_LEVEL)
