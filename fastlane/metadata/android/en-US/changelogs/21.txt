@@ -1,0 +1,1 @@
+The hearing check now always shows a curve for each ear, and you can choose to correct your ears even when they're close.

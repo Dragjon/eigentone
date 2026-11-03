@@ -237,7 +237,8 @@ private fun Result(result: HearingResult, onClose: () -> Unit) {
     val points = remember(result) { result.shapePoints() }
     // Kept from when the check finished, in case the headphones are disconnected on this screen.
     val output = remember(result) { Repo.output.value }
-    val ears = remember(result) { result.earCorrection()?.takeIf { Profiles.supportsModes(output.key) } }
+    val ears = remember(result) { result.earCorrection() }
+    val recommended = remember(result) { result.earCorrectionIsRecommended() }
     var earsApplied by remember { mutableStateOf(false) }
     val hasCurve = points.any { it.db != 0.0 }
     fun save(): CustomShape {
@@ -310,29 +311,70 @@ private fun Result(result: HearingResult, onClose: () -> Unit) {
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
         ) { Text("Only save it to Your shapes") }
     }
-    if (ears != null) {
+    if (Profiles.supportsModes(output.key)) {
+        HearingGraph(result)
         Text(
-            "Your ears differed by up to ${result.largestEarDifferenceDb().toInt()} dB at some frequencies, which can also come from fit. Eigentone can close half of that gap, frequency by frequency, with a separate EQ for each ear. It's saved for ${output.label}, and you can also do this later from the Sound tab, under Space.",
+            if (recommended) {
+                "Your ears differed by up to ${result.largestEarDifferenceDb().toInt()} dB at some frequencies, which can also come from fit. Eigentone can close half of that gap, frequency by frequency, with a separate EQ for each ear. It's saved for ${output.label}, and you can also do this later from the Sound tab, under Space."
+            } else {
+                earsCloseNote(result)
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = Palette.Text,
         )
-        EarCurvesGraph(
-            ears,
-            Modifier
-                .clip(RoundedCornerShape(16.dp))
-                .background(Palette.Surface),
-        )
-        FilledTonalButton(
-            enabled = !earsApplied,
-            onClick = {
-                Repo.update { it.copy(earCorrections = it.earCorrections + (output.key to ears)) }
-                earsApplied = true
-            },
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-        ) { Text(if (earsApplied) "Each ear is now corrected" else "Correct each ear") }
+        if (ears.hasChanges) {
+            FilledTonalButton(
+                enabled = !earsApplied,
+                onClick = {
+                    Repo.update { it.copy(earCorrections = it.earCorrections + (output.key to ears)) }
+                    earsApplied = true
+                },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            ) {
+                Text(
+                    when {
+                        earsApplied -> "Each ear is now corrected"
+                        recommended -> "Correct each ear"
+                        else -> "Correct each ear anyway"
+                    },
+                )
+            }
+        }
     }
     TextButton(onClick = onClose, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (hasCurve) "Discard" else "Done") }
 }
 
+/** What each ear measured, side by side, so they can be compared whether or not they need correcting. */
+@Composable
+fun HearingGraph(result: HearingResult, modifier: Modifier = Modifier) {
+    val levels = remember(result) { result.earLevels() }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("How each ear heard", style = MaterialTheme.typography.titleSmall, color = Palette.Text)
+        EarCurvesGraph(
+            levels,
+            Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(Palette.Surface),
+            rangeDb = HEARING_GRAPH_RANGE_DB,
+        )
+        Text(
+            "Higher means that ear needed a louder tone. This compares your ears with each other, and isn't a measure of how well you hear.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Palette.TextDim,
+        )
+    }
+}
+
+/** Explains why a correction isn't suggested, while leaving the choice to the listener. */
+fun earsCloseNote(result: HearingResult): String {
+    val gap = result.largestEarDifferenceDb().toInt()
+    return if (gap == 0) {
+        "Your ears matched at every frequency, so there's nothing to correct."
+    } else {
+        "Your ears are within $gap dB, which is close to what this check can tell apart, so no correction is needed. You can still try one."
+    }
+}
+
+private const val HEARING_GRAPH_RANGE_DB = 20.0
 private const val NAME = "My hearing"
 private const val TONE_GAP_MS = 400L

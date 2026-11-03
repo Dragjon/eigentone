@@ -267,7 +267,7 @@ fun EqGraph(
 
 /** What ear correction changes, on its own. Zoomed in, because these changes are small next to a whole sound. */
 @Composable
-fun EarCurvesGraph(ears: EarCorrection, modifier: Modifier = Modifier) {
+fun EarCurvesGraph(ears: EarCorrection, modifier: Modifier = Modifier, rangeDb: Double = EAR_GRAPH_RANGE_DB) {
     val (left, right) = remember(ears) { Processing.earCurves(emptyList(), ears) }
     EqGraph(
         filters = emptyList(),
@@ -281,7 +281,7 @@ fun EarCurvesGraph(ears: EarCorrection, modifier: Modifier = Modifier) {
         onDragEnd = {},
         modifier = modifier,
         heightDp = 130,
-        rangeDb = EAR_GRAPH_RANGE_DB,
+        rangeDb = rangeDb,
     )
 }
 

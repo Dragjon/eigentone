@@ -134,12 +134,22 @@ data class HearingResult(val thresholds: Map<Ear, Map<Double, Double>>) {
         return left.keys.maxOfOrNull { hz -> abs(left.getValue(hz) - (right[hz] ?: left.getValue(hz))) } ?: 0.0
     }
 
+    /** Below this, one 5 dB step could just be a missed beep, so a correction isn't suggested. */
+    fun earCorrectionIsRecommended(): Boolean = largestEarDifferenceDb() >= MIN_EAR_DIFFERENCE_DB
+
     /**
-     * Moves each ear towards the middle of the two, frequency by frequency, closing half of the gap.
-     * Null when the ears are too close for it to matter: one 5 dB step could just be a missed beep.
+     * Each ear's results compared with the listener's typical level, for showing side by side. Higher
+     * means that ear needed a louder tone. Uses the same form as a correction, so it draws the same way.
      */
-    fun earCorrection(): EarCorrection? {
-        if (largestEarDifferenceDb() < MIN_EAR_DIFFERENCE_DB) return null
+    fun earLevels(): EarCorrection {
+        val all = thresholds.values.flatMap { it.values }.sorted()
+        val typical = if (all.isEmpty()) 0.0 else (all[(all.size - 1) / 2] + all[all.size / 2]) / 2
+        fun points(ear: Ear) = thresholds[ear].orEmpty().toSortedMap().map { (hz, level) -> ShapePoint(hz, level - typical) }
+        return EarCorrection(left = points(Ear.LEFT), right = points(Ear.RIGHT))
+    }
+
+    /** Moves each ear towards the middle of the two, frequency by frequency, closing half of the gap. */
+    fun earCorrection(): EarCorrection {
         val left = thresholds.getValue(Ear.LEFT)
         val right = thresholds.getValue(Ear.RIGHT)
         fun offsets(mine: Map<Double, Double>, other: Map<Double, Double>) = mine.keys.sorted().map { hz ->

@@ -383,9 +383,11 @@ class NewFeaturesTest {
     }
 
     @Test
-    fun evenEarsOfferNoCorrectionFromASavedCheck() {
+    fun evenEarsHaveNothingToCorrect() {
         val even = HearingResult(Ear.entries.associateWith { mapOf(1000.0 to -60.0) })
-        assertNull(HearingRecord.of(even, "Buds", 1L).result()!!.earCorrection())
+        val result = HearingRecord.of(even, "Buds", 1L).result()!!
+        assertFalse(result.earCorrectionIsRecommended())
+        assertFalse(result.earCorrection().hasChanges)
     }
 
     @Test
@@ -679,10 +681,37 @@ class NewFeaturesTest {
         HearingResult(mapOf(Ear.LEFT to mapOf(1000.0 to left), Ear.RIGHT to mapOf(1000.0 to right)))
 
     @Test
-    fun earCorrectionOnlyAppearsForARealDifference() {
+    fun earCorrectionIsOnlyRecommendedForARealDifference() {
         // One 5 dB step could just be a missed beep.
-        assertNull(earResult(-60.0, -55.0).earCorrection())
-        assertNotNull(earResult(-60.0, -50.0).earCorrection())
+        assertFalse(earResult(-60.0, -55.0).earCorrectionIsRecommended())
+        assertTrue(earResult(-60.0, -50.0).earCorrectionIsRecommended())
+    }
+
+    @Test
+    fun aCloseResultCanStillBeCorrected() {
+        val ears = earResult(-60.0, -55.0).earCorrection()
+        assertTrue(ears.hasChanges)
+        assertTrue(ears.right.single().db > 0.0)
+        assertTrue(ears.left.single().db < 0.0)
+    }
+
+    @Test
+    fun earLevelsShowHowEachEarComparedAtEveryFrequency() {
+        val levels = HearingResult(
+            mapOf(
+                Ear.LEFT to mapOf(4000.0 to -60.0, 1000.0 to -50.0),
+                Ear.RIGHT to mapOf(1000.0 to -50.0, 4000.0 to -40.0),
+            ),
+        ).earLevels()
+        // The typical level is -50 dB, and points come out in frequency order.
+        assertEquals(listOf(ShapePoint(1000.0, 0.0), ShapePoint(4000.0, -10.0)), levels.left)
+        assertEquals(listOf(ShapePoint(1000.0, 0.0), ShapePoint(4000.0, 10.0)), levels.right)
+    }
+
+    @Test
+    fun theNoteAboutCloseEarsSaysHowClose() {
+        assertTrue(com.phonons.app.ui.earsCloseNote(earResult(-60.0, -55.0)).contains("within 5 dB"))
+        assertTrue(com.phonons.app.ui.earsCloseNote(earResult(-60.0, -60.0)).contains("matched"))
     }
 
     @Test

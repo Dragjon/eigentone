@@ -81,7 +81,10 @@ data class EarCorrection(
     val enabled: Boolean = true,
     val left: List<ShapePoint> = emptyList(),
     val right: List<ShapePoint> = emptyList(),
-)
+) {
+    /** Whether this would change anything. Small gaps can round down to no change at all. */
+    val hasChanges: Boolean get() = (left + right).any { it.db != 0.0 }
+}
 
 /** Applies night mode automatically during part of the day. Times are minutes after midnight. */
 @Serializable

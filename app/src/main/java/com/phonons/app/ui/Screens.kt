@@ -730,7 +730,7 @@ private fun EarCorrectionRows(state: AppState) {
     val key = output.key
     val ears = state.earsFor(key)
     val record = state.hearings[key]
-    val available = remember(record) { record?.result()?.earCorrection() }
+    val measured = remember(record) { record?.result() }
     fun setEars(new: com.phonons.app.data.EarCorrection?) = Repo.update {
         it.copy(earCorrections = if (new == null) it.earCorrections - key else it.earCorrections + (key to new))
     }
@@ -744,16 +744,32 @@ private fun EarCorrectionRows(state: AppState) {
             EarCurvesGraph(ears, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             RowDivider()
             ActionRow("Remove ear correction", Help.earCorrection) { setEars(null) }
-        } else if (available != null && record != null) {
+        } else if (measured != null && record != null) {
             // Offered until it's used, so leaving the hearing check without choosing doesn't lose it.
+            val correction = remember(measured) { measured.earCorrection() }
+            val recommended = measured.earCorrectionIsRecommended()
+            val date = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(record.measuredAt))
             RowDivider()
-            ActionRow(
-                "Correct each ear",
-                Help.earCorrection,
-                detail = "For ${output.label}, from your hearing check on " +
-                    java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(record.measuredAt)) + ".",
-            ) { setEars(available) }
-            EarCurvesGraph(available, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            HearingGraph(measured, Modifier.padding(16.dp))
+            RowDivider()
+            if (correction.hasChanges) {
+                ActionRow(
+                    if (recommended) "Correct each ear" else "Correct each ear anyway",
+                    Help.earCorrection,
+                    detail = if (recommended) {
+                        "For ${output.label}, from your hearing check on $date."
+                    } else {
+                        "For ${output.label}, from your check on $date. ${earsCloseNote(measured)}"
+                    },
+                ) { setEars(correction) }
+            } else {
+                Text(
+                    earsCloseNote(measured),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Palette.TextDim,
+                    modifier = Modifier.padding(16.dp),
+                )
+            }
         }
     }
     val others = (state.earCorrections.keys - key).map { state.hearings[it]?.headphones ?: it.substringAfter(':') }
