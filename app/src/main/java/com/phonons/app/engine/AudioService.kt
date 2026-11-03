@@ -27,6 +27,7 @@ import com.phonons.app.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -50,6 +51,7 @@ class AudioService : Service() {
     private lateinit var audioManager: AudioManager
     private val mediaWatcher by lazy { MediaWatcher(this, Repo::onPlayingAppChanged) }
     private var lastNotified: Pair<Boolean, String>? = null
+    private var settleJob: Job? = null
     @Volatile private var outputDeviceType = AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
 
     private val sessionReceiver = object : BroadcastReceiver() {
@@ -133,9 +135,21 @@ class AudioService : Service() {
                     engine.scheduledNight = night
                     engine.suspended = suspended
                     engine.apply(state)
+                    keepSettling()
                     updateNotification(state)
                     delay(APPLY_INTERVAL_MS)
                 }
+        }
+    }
+
+    /** Finishes a move to a new sound. Only runs during one, so an idle service has no timer to wake for. */
+    private fun keepSettling() {
+        if (!engine.settling || settleJob?.isActive == true) return
+        settleJob = scope.launch {
+            while (engine.settling) {
+                delay(APPLY_INTERVAL_MS)
+                engine.apply(Repo.state.value)
+            }
         }
     }
 

@@ -35,7 +35,7 @@ Crash reports stay on the phone. You choose whether to share one from the System
 Copy the latest `Phonons-<version>.apk` to the phone and open it, or use USB debugging:
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Phonons-0.12.0.apk
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Phonons-0.13.0.apk
 ```
 
 ## Build
@@ -63,6 +63,8 @@ The Liberty 4 NC presets and headphone corrections use [AutoEq](https://github.c
 ## How the sound is built
 
 A preset holds a whole sound: parametric filters, graphic EQ, tone, surround, strength, correction amount and preamp. Balance, ear correction, night mode, the leveller, the compressor, loudness compensation and limiter settings stay global.
+
+Preset changes morph rather than jump (`data/GainRamp.kt`). Bands and the input level move together in steps of at most 4 dB, so if the old and new sounds are each safe from clipping, so is every step between them. Bypass and the hearing check still switch at once.
 
 The phone has one compressor, so night mode, manual settings and the leveller share it, in that order of priority (`data/Dynamics.kt`).
 

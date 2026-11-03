@@ -80,6 +80,7 @@ fun CompressorSection(state: AppState) {
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = Palette.Amber,
                         selectedLabelColor = Palette.OnAmber,
+                        labelColor = Palette.Text,
                     ),
                 )
             }
@@ -95,7 +96,9 @@ fun CompressorSection(state: AppState) {
                     selected = selected == index,
                     onClick = { selected = index },
                     shape = SegmentedButtonDefaults.itemShape(index, BAND_NAMES.size),
-                ) { Text(name) }
+                    colors = segmentColors(),
+                    icon = {},
+                ) { Text(name, maxLines = 1) }
             }
         }
         val band = compressor.bands[selected]

@@ -8,6 +8,7 @@ import com.phonons.app.data.AppState
 import com.phonons.app.data.Compressor
 import com.phonons.app.data.EngineMode
 import com.phonons.app.data.EngineStatus
+import com.phonons.app.data.GainRamp
 import com.phonons.app.data.Processing
 import com.phonons.app.data.ProcessingTarget
 import com.phonons.app.dsp.CurveMapper
@@ -35,6 +36,9 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         var lastInput = Float.NaN
         var lastBalance = Double.NaN
         var lastDynamics: Compressor? = null
+        var lastOff: Boolean? = null
+        var moving = false
+        var movingSince = 0L
         var lastLimiter: Boolean? = null
         var lastEnabled: Boolean? = null
         var verified = false
@@ -61,6 +65,9 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
 
     /** Set by the service before [apply]. Takes the sound out of the path during the hearing check. */
     var suspended = false
+
+    /** Whether the sound is still moving to its target, so [apply] needs calling again shortly. */
+    val settling: Boolean get() = chains.values.any { it.moving }
 
     fun apply(state: AppState) {
         latest = state
@@ -96,6 +103,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
             chain.lastInput = Float.NaN
             chain.lastBalance = Double.NaN
             chain.lastDynamics = null
+            chain.moving = false
             chain.lastLimiter = null
             chain.lastEnabled = null
             chain.lastLimiterThreshold = Double.NaN
@@ -209,21 +217,28 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         )
         try {
             val gains = map.gains(target.filters)
-            pushBands(dp, map, /* channel = */ 0, gains, chain.lastGains)
             val rightGains = if (target.rightFilters === target.filters) gains else map.gains(target.rightFilters)
-            pushBands(dp, map, /* channel = */ 1, rightGains, chain.lastRightGains)
+            // Comparing with Bypass needs a clean switch, and the hearing check needs the EQ gone at once.
+            val off = suspended || state.bypass
+            val step = GainRamp.next(
+                chain.lastGains, chain.lastRightGains, chain.lastInput,
+                gains, rightGains, target.inputDb.toFloat(),
+                instant = suspended || chain.lastOff != off,
+            )
+            chain.lastOff = off
+
+            // Each band is a separate call, so a boost could be heard before the level comes down for it.
+            // Lowering first and raising last keeps every moment during the update free of clipping.
+            val goingDown = chain.lastInput.isNaN() || step.inputDb < chain.lastInput
+            if (goingDown) pushInput(chain, step.inputDb, state.balance)
+            pushBands(dp, map, /* channel = */ 0, step.left, chain.lastGains)
+            pushBands(dp, map, /* channel = */ 1, step.right, chain.lastRightGains)
+            if (!goingDown) pushInput(chain, step.inputDb, state.balance)
+            logMove(chain, step.done)
 
             if (!chain.verified) {
                 chain.verified = true
                 verifyBands(chain, map, gains, rightGains)
-            }
-
-            val input = target.inputDb.toFloat()
-            if (input != chain.lastInput || state.balance != chain.lastBalance) {
-                dp.setInputGainbyChannel(0, input + channelTrimDb(-state.balance))
-                dp.setInputGainbyChannel(1, input + channelTrimDb(state.balance))
-                chain.lastInput = input
-                chain.lastBalance = state.balance
             }
 
             if (target.limiter != chain.lastLimiter || target.limiterThresholdDb != chain.lastLimiterThreshold) {
@@ -252,6 +267,23 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
             error = "Lost connection to ${chain.label}: ${e.message}"
         }
         pushSurround(chain, target)
+    }
+
+    private fun pushInput(chain: Chain, input: Float, balance: Double) {
+        if (input == chain.lastInput && balance == chain.lastBalance) return
+        chain.dp.setInputGainbyChannel(0, input + channelTrimDb(-balance))
+        chain.dp.setInputGainbyChannel(1, input + channelTrimDb(balance))
+        chain.lastInput = input
+        chain.lastBalance = balance
+    }
+
+    /** Timed in the log, because how long a move takes depends on how fast the phone accepts bands. */
+    private fun logMove(chain: Chain, done: Boolean) {
+        if (!done && !chain.moving) chain.movingSince = System.nanoTime()
+        if (done && chain.moving) {
+            Log.i(TAG, "Sound moved on ${chain.label} in ${(System.nanoTime() - chain.movingSince) / 1_000_000} ms")
+        }
+        chain.moving = !done
     }
 
     private fun pushBands(dp: DynamicsProcessing, map: CurveMapper, channel: Int, gains: FloatArray, sent: FloatArray) {

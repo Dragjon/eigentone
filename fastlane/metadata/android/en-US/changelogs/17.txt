@@ -1,0 +1,1 @@
+Presets now change with a quick, smooth morph, and a louder preset can no longer briefly overshoot while it loads.

@@ -359,6 +359,98 @@ class NewFeaturesTest {
         assertFalse(AppState(compressor = Dynamics.styles.first().compressor).resetSound().compressor.enabled)
     }
 
+    private fun floats(vararg values: Float) = values
+
+    /** Runs a move to the end, the way the engine does, and returns every step it took. */
+    private fun rampSteps(fromBands: FloatArray, fromInput: Float, toBands: FloatArray, toInput: Float): List<GainRamp.Step> {
+        val steps = mutableListOf<GainRamp.Step>()
+        var bands = fromBands
+        var input = fromInput
+        do {
+            val step = GainRamp.next(bands, bands, input, toBands, toBands, toInput)
+            steps += step
+            bands = step.left
+            input = step.inputDb
+            assertTrue("A move must finish", steps.size < 100)
+        } while (!step.done)
+        return steps
+    }
+
+    @Test
+    fun smallChangesGoStraightThrough() {
+        val step = GainRamp.next(floats(1f, 2f), floats(1f, 2f), -3f, floats(3f, 2f), floats(3f, 2f), -3.5f)
+        assertTrue(step.done)
+        assertEquals(3f, step.left[0], 0f)
+    }
+
+    @Test
+    fun largeChangesMoveInStepsAndEndExactly() {
+        val steps = rampSteps(floats(0f, 0f), 0f, floats(12f, -6f), -12f)
+        assertEquals(3, steps.size)
+        assertEquals(4f, steps[0].left[0], 0.001f)
+        assertEquals(-2f, steps[0].left[1], 0.001f)
+        assertEquals(-4f, steps[0].inputDb, 0.001f)
+        assertEquals(12f, steps.last().left[0], 0f)
+        assertEquals(-6f, steps.last().left[1], 0f)
+        assertEquals(-12f, steps.last().inputDb, 0f)
+    }
+
+    @Test
+    fun noStepChangesMoreThanTheLimit() {
+        var bands = floats(-20f, 15f)
+        var input = 0f
+        for (step in rampSteps(bands, input, floats(20f, -15f), -20f)) {
+            for (i in bands.indices) assertTrue(abs(step.left[i] - bands[i]) <= GainRamp.MAX_STEP_DB + 0.001f)
+            assertTrue(abs(step.inputDb - input) <= GainRamp.MAX_STEP_DB + 0.001f)
+            bands = step.left
+            input = step.inputDb
+        }
+    }
+
+    /** The reason for moving the level with the bands: nothing louder than either end along the way. */
+    @Test
+    fun aMoveBetweenTwoSafeSoundsStaysSafe() {
+        val quiet = floats(0f, 0f, 12f)
+        val boosted = floats(15f, -6f, 0f)
+        for ((from, to) in listOf(quiet to boosted, boosted to quiet)) {
+            val fromInput = -from.max()
+            val toInput = -to.max()
+            for (step in rampSteps(from, fromInput, to, toInput)) {
+                assertTrue(step.left.max() + step.inputDb <= 0.001f)
+            }
+        }
+    }
+
+    @Test
+    fun aNewTargetContinuesFromWhereTheSoundIs() {
+        val first = GainRamp.next(floats(0f), floats(0f), 0f, floats(12f), floats(12f), 0f)
+        assertEquals(4f, first.left[0], 0.001f)
+        val turned = GainRamp.next(first.left, first.right, first.inputDb, floats(-4f), floats(-4f), 0f)
+        assertEquals(0f, turned.left[0], 0.001f)
+        assertFalse(turned.done)
+    }
+
+    @Test
+    fun bothEarsFinishTogether() {
+        val step = GainRamp.next(floats(0f), floats(0f), 0f, floats(8f), floats(-2f), 0f)
+        assertEquals(4f, step.left[0], 0.001f)
+        assertEquals(-1f, step.right[0], 0.001f)
+    }
+
+    @Test
+    fun nothingToMoveFromGoesStraightThere() {
+        val fresh = GainRamp.next(floats(Float.NaN), floats(Float.NaN), Float.NaN, floats(12f), floats(12f), -12f)
+        assertTrue(fresh.done)
+        assertEquals(12f, fresh.left[0], 0f)
+    }
+
+    @Test
+    fun instantSkipsTheMove() {
+        val step = GainRamp.next(floats(0f), floats(0f), 0f, floats(12f), floats(12f), -12f, instant = true)
+        assertTrue(step.done)
+        assertEquals(12f, step.left[0], 0f)
+    }
+
     private val warmFaders = List(10) { if (it < 3) 3.0 else 0.0 }
 
     @Test
