@@ -14,10 +14,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -42,11 +44,9 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +55,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -65,7 +66,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -83,9 +83,9 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import com.phonons.app.data.NightSchedule
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.material3.FilledTonalIconButton
 import com.phonons.app.data.ClipRisk
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import com.phonons.app.data.PresetOrganiser
 import com.phonons.app.engine.PresetShortcuts
 import androidx.compose.ui.Modifier
@@ -135,6 +135,7 @@ private enum class Tab(val label: String, @DrawableRes val icon: Int) {
     EQ("EQ", R.drawable.ic_tab_eq),
     SOUND("Sound", R.drawable.ic_tab_sound),
     PRESETS("Presets", R.drawable.ic_tab_presets),
+    TUNE("Tune", R.drawable.ic_tab_tune),
     SYSTEM("System", R.drawable.ic_tab_system),
 }
 
@@ -150,8 +151,9 @@ private val LocalOpenFinder = compositionLocalOf<() -> Unit> { error("No finder"
 
 private val LocalOpenHearing = compositionLocalOf<() -> Unit> { error("No hearing check") }
 
-private const val SCROLL_FADE_DP = 28
 private const val SEARCH_FROM_PRESETS = 6
+
+private val LocalOpenPresets = compositionLocalOf<() -> Unit> { error("No presets tab") }
 
 private val LocalOpenPeaks = compositionLocalOf<() -> Unit> { error("No peak finder") }
 
@@ -221,13 +223,14 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
         LocalOpenCompare provides { comparing = true },
         LocalOpenSweep provides { sweeping = true },
         LocalOpenPeaks provides { findingPeaks = true },
+        LocalOpenPresets provides { tab = Tab.PRESETS },
     ) {
         Scaffold(
             containerColor = Palette.Background,
-            topBar = { TopBar(state, status, onSetEnabled) },
+            topBar = { TopBar(state, status, showCurve = tab != Tab.EQ, onSetEnabled) },
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = {
-                NavigationBar(containerColor = Palette.Background, tonalElevation = 0.dp) {
+                NavigationBar(containerColor = Palette.Bar, tonalElevation = 0.dp) {
                     Tab.entries.forEach { t ->
                         NavigationBarItem(
                             selected = tab == t,
@@ -236,9 +239,9 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
                             icon = { Icon(painterResource(t.icon), contentDescription = null) },
                             label = { Text(t.label) },
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Palette.OnAmber,
+                                selectedIconColor = Palette.OnLit,
                                 selectedTextColor = Palette.Text,
-                                indicatorColor = Palette.Amber,
+                                indicatorColor = Palette.Lit,
                                 unselectedIconColor = Palette.TextDim,
                                 unselectedTextColor = Palette.TextDim,
                             ),
@@ -258,64 +261,53 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
                         .widthIn(max = 640.dp)
                         .fillMaxSize()
                         .verticalScroll(scrolls.getValue(tab))
-                        .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
+                        .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
                     verticalArrangement = SectionSpacing,
                 ) {
                     when (tab) {
                         Tab.EQ -> EqTab(state)
                         Tab.SOUND -> SoundTab(state)
                         Tab.PRESETS -> PresetsTab(state)
+                        Tab.TUNE -> TuneTab(state)
                         Tab.SYSTEM -> SystemTab(state, status)
                     }
                 }
-                // The page fades out under each bar, but only where there's more of it to scroll to.
-                val scroll = scrolls.getValue(tab)
-                if (scroll.canScrollBackward) ScrollFade(Modifier.align(Alignment.TopCenter), fromTop = true)
-                if (scroll.canScrollForward) ScrollFade(Modifier.align(Alignment.BottomCenter), fromTop = false)
             }
         }
     }
 }
 
-/** Blends scrolling content into the background. It only draws, so touches pass straight through it. */
-@Composable
-private fun ScrollFade(modifier: Modifier, fromTop: Boolean) {
-    val colours = listOf(Palette.Background, Palette.Background.copy(alpha = 0f))
-    Box(
-        modifier
-            .fillMaxWidth()
-            .height(SCROLL_FADE_DP.dp)
-            .background(Brush.verticalGradient(if (fromTop) colours else colours.reversed())),
-    )
-}
-
 /** Stays on screen, so power and Bypass are always one tap away. */
 @Composable
-private fun TopBar(state: AppState, status: EngineStatus, onSetEnabled: (Boolean) -> Unit) {
+private fun TopBar(state: AppState, status: EngineStatus, showCurve: Boolean, onSetEnabled: (Boolean) -> Unit) {
     // Here because the strip below always shows the live spectrum. It still stops when the app is closed.
     AnalyserEffect(state.analyser)
     Column(
         Modifier
             .fillMaxWidth()
-            .background(Palette.Background)
+            .background(Palette.Bar)
             .windowInsetsPadding(WindowInsets.statusBars),
     ) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 4.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(stringResource(R.string.ui_eigentone), style = MaterialTheme.typography.titleLarge, color = Palette.Text)
-            val problem = state.enabled && (status.error != null || !status.hasControl)
-            Text(
-                statusLine(state, status),
-                style = MaterialTheme.typography.bodySmall,
-                color = if (problem) Palette.Danger else Palette.TextDim,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        val connectedNames = rememberConnectedOutputNames()
+        val quickPresets = remember(state.current.id, state.favorites, state.presets, connectedNames) {
+            PresetOrganiser.quickKeys(state, BuiltIns.availableFor(connectedNames) + state.presets)
+        }
+        PresetSwitcher(
+            label = statusLine(state, status),
+            problem = state.enabled && (status.error != null || !status.hasControl),
+            presets = quickPresets,
+            currentId = state.current.id,
+            onPick = Repo::loadPreset,
+            onAll = LocalOpenPresets.current,
+            modifier = Modifier.weight(1f),
+        ) {
+            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, color = Palette.Text)
         }
         if (state.enabled) BypassButton(state.bypass)
         InfoButton(Help.power)
@@ -325,18 +317,20 @@ private fun TopBar(state: AppState, status: EngineStatus, onSetEnabled: (Boolean
             modifier = Modifier.semantics { contentDescription = "Eigentone" },
         )
     }
-    LiveStrip(state)
+    LiveStrip(state, showCurve)
     }
 }
+
+private val BypassPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
 
 /** Distinct from the power switch: neutral until engaged, when it's clearly a held state. */
 @Composable
 private fun BypassButton(bypassed: Boolean) {
     val toggle = { Repo.update { it.copy(bypass = !it.bypass) } }
     if (bypassed) {
-        Button(onClick = { toggle() }) { Text(stringResource(R.string.ui_bypassed)) }
+        Button(onClick = { toggle() }, contentPadding = BypassPadding) { Text(stringResource(R.string.ui_bypassed)) }
     } else {
-        FilledTonalButton(onClick = { toggle() }) { Text(stringResource(R.string.ui_bypass)) }
+        FilledTonalButton(onClick = { toggle() }, contentPadding = BypassPadding) { Text(stringResource(R.string.ui_bypass)) }
     }
 }
 
@@ -349,46 +343,6 @@ private fun statusLine(state: AppState, status: EngineStatus): String {
         !status.running -> "Starting…"
         !status.hasControl -> "Another audio app has taken control"
         else -> name
-    }
-}
-
-/** Redo is the undo arrow mirrored. Without labels they fit beside other buttons. */
-@Composable
-private fun UndoRedoButtons(labels: Boolean) {
-    val canUndo by Repo.canUndo.collectAsStateWithLifecycle()
-    val canRedo by Repo.canRedo.collectAsStateWithLifecycle()
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (labels) {
-            FilledTonalButton(enabled = canUndo, onClick = Repo::undo) {
-                Icon(painterResource(R.drawable.ic_undo), contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.size(8.dp))
-                Text(stringResource(R.string.ui_undo))
-            }
-            FilledTonalButton(enabled = canRedo, onClick = Repo::redo) {
-                Icon(
-                    painterResource(R.drawable.ic_undo),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(18.dp)
-                        .graphicsLayer(scaleX = -1f),
-                )
-                Spacer(Modifier.size(8.dp))
-                Text(stringResource(R.string.ui_redo))
-            }
-        } else {
-            FilledTonalIconButton(enabled = canUndo, onClick = Repo::undo) {
-                Icon(painterResource(R.drawable.ic_undo), contentDescription = stringResource(R.string.ui_undo), modifier = Modifier.size(18.dp))
-            }
-            FilledTonalIconButton(enabled = canRedo, onClick = Repo::redo) {
-                Icon(
-                    painterResource(R.drawable.ic_undo),
-                    contentDescription = stringResource(R.string.ui_redo),
-                    modifier = Modifier
-                        .size(18.dp)
-                        .graphicsLayer(scaleX = -1f),
-                )
-            }
-        }
     }
 }
 
@@ -405,6 +359,18 @@ private fun EqTab(state: AppState) {
     val earCurves = remember(curveFilters, state.earCorrections, graphOutput.key, state.useSystemSurround, state.bypass) {
         if (state.bypass) null else Processing.channelFilters(state, graphOutput.key, curveFilters)
     }
+    // The measured points of the ear correction, sitting on each ear's own curve.
+    val earMarkers = remember(earCurves, state.earCorrections, graphOutput.key) {
+        val ears = state.earsFor(graphOutput.key)?.takeIf { it.enabled }
+        if (ears == null || earCurves == null) {
+            null
+        } else {
+            com.phonons.app.data.EarCorrection(
+                left = ears.left.map { com.phonons.app.data.ShapePoint(it.hz, Eq.curveDb(earCurves.first, it.hz)) },
+                right = ears.right.map { com.phonons.app.data.ShapePoint(it.hz, Eq.curveDb(earCurves.second, it.hz)) },
+            )
+        }
+    }
     val savedPreset = Repo.allPresets(state).firstOrNull { it.id == state.current.id }
     val savedCurve = remember(savedPreset, state.current, state.loudness, state.loudnessStrength, attenuation, state.bypass) {
         savedPreset?.takeIf { it != state.current && !state.bypass }
@@ -416,7 +382,7 @@ private fun EqTab(state: AppState) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
+                .clip(PanelShape)
                 .background(Palette.SurfaceHigh)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -439,7 +405,7 @@ private fun EqTab(state: AppState) {
     Box(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(PanelShape)
             .background(Palette.Surface),
     ) {
         EqGraph(
@@ -449,6 +415,7 @@ private fun EqTab(state: AppState) {
             curveFilters = earCurves?.first ?: curveFilters,
             rightCurveFilters = earCurves?.second,
             ghostFilters = savedCurve,
+            earMarkers = earMarkers,
             spectrum = { spectrumState.value },
             selectedId = selectedId,
             dimmed = !state.enabled || state.bypass,
@@ -465,14 +432,14 @@ private fun EqTab(state: AppState) {
             SegmentedButton(
                 selected = graphicMode,
                 onClick = { graphicMode = true },
-                shape = SegmentedButtonDefaults.itemShape(0, 2),
+                shape = SegmentedButtonDefaults.itemShape(0, 2, KeyShape),
                 colors = segmentColors(),
                 icon = {},
             ) { Text(stringResource(R.string.ui_graphic), maxLines = 1) }
             SegmentedButton(
                 selected = !graphicMode,
                 onClick = { graphicMode = false },
-                shape = SegmentedButtonDefaults.itemShape(1, 2),
+                shape = SegmentedButtonDefaults.itemShape(1, 2, KeyShape),
                 colors = segmentColors(),
                 icon = {},
             ) { Text(stringResource(R.string.ui_parametric), maxLines = 1) }
@@ -482,7 +449,6 @@ private fun EqTab(state: AppState) {
 
     if (graphicMode) {
         GraphicEqConsole(state.current.tone, onBrowseShapes = LocalOpenShapes.current)
-        UndoRedoButtons(labels = true)
         SettingsSection(stringResource(R.string.ui_display)) { AnalyserSetting(state) }
         return
     }
@@ -506,7 +472,7 @@ private fun EqTab(state: AppState) {
             Spacer(Modifier.size(8.dp))
             Text(stringResource(R.string.ui_add_filter))
         }
-        UndoRedoButtons(labels = false)
+        UndoRedoButtons()
     }
 
     if (selected == null) {
@@ -604,7 +570,7 @@ private fun FilterEditor(filter: Filter, filters: List<Filter>, onSelect: (Int) 
                 Icon(Icons.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.ui_next_filter))
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.ui_delete_filter), tint = Palette.Danger)
+                Icon(painterResource(R.drawable.ic_delete), contentDescription = stringResource(R.string.ui_delete_filter), tint = Palette.TextDim)
             }
         },
     ) {
@@ -681,8 +647,8 @@ private fun TypeChip(filter: Filter, type: FilterType, label: String, modifier: 
         },
         label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = Palette.Amber,
-            selectedLabelColor = Palette.OnAmber,
+            selectedContainerColor = Palette.Lit,
+            selectedLabelColor = Palette.OnLit,
             labelColor = Palette.Text,
         ),
     )
@@ -852,7 +818,7 @@ private fun EarCorrectionRows(state: AppState) {
             SwitchSetting(stringResource(R.string.ui_ear_correction), Help.earCorrection, ears.enabled, detail = "A separate EQ for each ear, for ${output.label}") { on ->
                 setEars(ears.copy(enabled = on))
             }
-            EarCurvesGraph(ears, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            EarCurvesGraph(ears, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), markers = true)
             RowDivider()
             ActionRow(stringResource(R.string.ui_remove_ear_correction), Help.earCorrection) { setEars(null) }
         } else if (measured != null && record != null) {
@@ -1072,11 +1038,49 @@ private fun CoroutineScope.notify(snackbar: SnackbarHostState, message: String) 
     launch { snackbar.showSnackbar(message, withDismissAction = true, duration = SnackbarDuration.Short) }
 }
 
+/** Everything used occasionally to tune the sound to these headphones and these ears. */
+@Composable
+private fun TuneTab(state: AppState) {
+    val scope = rememberCoroutineScope()
+    val snackbar = LocalSnackbar.current
+    var finding by remember { mutableStateOf(false) }
+    var tuning by remember { mutableStateOf(false) }
+
+    SettingsSection(stringResource(R.string.ui_headphones)) {
+        ActionRow(stringResource(R.string.ui_find_headphones), Help.find) { finding = true }
+        if (state.current.filters.any { it.gainDb != 0.0 } || state.current.tone.importedCurve.isNotEmpty()) {
+            RowDivider()
+            ActionRow(stringResource(R.string.ui_tune_correction), Help.tuner, detail = stringResource(R.string.ui_use_less_of_it_or_add_bass_or_treble_bac)) { tuning = true }
+        }
+    }
+    SettingsSection(stringResource(R.string.ui_listening_tools)) {
+        ActionRow(stringResource(R.string.ui_compare_two_sounds), Help.compare, detail = stringResource(R.string.ui_switch_instantly_with_an_optional_blind), onClick = LocalOpenCompare.current)
+        RowDivider()
+        ActionRow(stringResource(R.string.ui_find_my_sound), Help.finder, detail = stringResource(R.string.ui_a_short_guided_listening_test), onClick = LocalOpenFinder.current)
+        RowDivider()
+        ActionRow(stringResource(R.string.ui_hearing_check), Help.hearing, detail = stringResource(R.string.ui_builds_a_curve_for_how_you_hear), onClick = LocalOpenHearing.current)
+        RowDivider()
+        ActionRow(stringResource(R.string.ui_find_peaks_for_me), Help.peakFinder, detail = stringResource(R.string.ui_a_guided_test_that_finds_peaks_and_dips), onClick = LocalOpenPeaks.current)
+        RowDivider()
+        ActionRow(stringResource(R.string.ui_frequency_sweep), Help.sweep, detail = stringResource(R.string.ui_find_and_fix_peaks_in_your_headphones_by), onClick = LocalOpenSweep.current)
+    }
+
+    if (finding) {
+        AutoEqDialog(onDismiss = { finding = false }) { result ->
+            scope.notify(snackbar, result)
+            finding = false
+            // A correction is the moment people find it too neutral, so offer this straight away.
+            tuning = true
+        }
+    }
+    if (tuning) CorrectionTuner(onDismiss = { tuning = false })
+}
+
 @Composable
 private fun PresetsTab(state: AppState) {
     val output by Repo.output.collectAsStateWithLifecycle()
-    OutputSection(state, output.key, output.label)
     PresetListSection(state)
+    OutputSection(state, output.key, output.label)
     PerAppSection(state)
     ManageSection(state)
 }
@@ -1099,7 +1103,7 @@ private fun OutputSection(state: AppState, outputKey: String, outputLabel: Strin
             Text(
                 assigned?.name ?: "None",
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (assigned != null) Palette.Amber else Palette.TextDim,
+                color = if (assigned != null) Palette.Lit else Palette.TextDim,
                 modifier = Modifier.padding(bottom = 10.dp),
             )
             if (assigned == null && correction != null) {
@@ -1143,10 +1147,10 @@ private fun OutputSection(state: AppState, outputKey: String, outputLabel: Strin
                         SegmentedButton(
                             selected = state.listeningMode == mode,
                             onClick = { Repo.setListeningMode(mode) },
-                            shape = SegmentedButtonDefaults.itemShape(i, modes.size),
+                            shape = SegmentedButtonDefaults.itemShape(i, modes.size, KeyShape),
                             colors = segmentColors(),
                             icon = {},
-                        ) { Text(mode.label, maxLines = 1, style = MaterialTheme.typography.labelMedium) }
+                        ) { Text(mode.label, maxLines = 1) }
                     }
                 }
             }
@@ -1160,12 +1164,12 @@ private fun OutputSection(state: AppState, outputKey: String, outputLabel: Strin
 
 @Composable
 fun segmentColors() = SegmentedButtonDefaults.colors(
-    activeContainerColor = Palette.Amber,
-    activeContentColor = Palette.OnAmber,
-    activeBorderColor = Palette.Amber,
-    inactiveContainerColor = Palette.Surface,
+    activeContainerColor = Palette.Lit,
+    activeContentColor = Palette.OnLit,
+    activeBorderColor = Palette.Lit,
+    inactiveContainerColor = Palette.SurfaceHigh,
     inactiveContentColor = Palette.Text,
-    inactiveBorderColor = Palette.Outline,
+    inactiveBorderColor = Palette.Line,
 )
 
 @Composable
@@ -1186,6 +1190,8 @@ private fun PresetListSection(state: AppState) {
             onValueChange = { query = it },
             singleLine = true,
             label = { Text(stringResource(R.string.ui_search_presets)) },
+            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+            colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Palette.Track),
             trailingIcon = if (query.isEmpty()) null else ({
                 IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.ui_clear_search)) }
             }),
@@ -1256,14 +1262,14 @@ private fun PresetRow(preset: Preset, selected: Boolean, favorite: Boolean, fold
     ) {
         Box(Modifier.size(24.dp), contentAlignment = Alignment.CenterStart) {
             if (selected) {
-                Icon(Icons.Filled.Check, contentDescription = stringResource(R.string.ui_selected), tint = Palette.Amber, modifier = Modifier.size(20.dp))
+                Icon(Icons.Filled.Check, contentDescription = stringResource(R.string.ui_selected), tint = Palette.Lit, modifier = Modifier.size(20.dp))
             }
         }
         Text(
             preset.name,
             Modifier.weight(1f),
             style = MaterialTheme.typography.bodyLarge,
-            color = if (selected) Palette.Amber else Palette.Text,
+            color = if (selected) Palette.Lit else Palette.Text,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
@@ -1272,15 +1278,15 @@ private fun PresetRow(preset: Preset, selected: Boolean, favorite: Boolean, fold
                 // Filled against outlined, so the state doesn't rely on colour alone.
                 if (favorite) painterResource(R.drawable.ic_star) else painterResource(R.drawable.ic_star_border),
                 contentDescription = if (favorite) "Remove ${preset.name} from favourites" else "Add ${preset.name} to favourites",
-                tint = if (favorite) Palette.Amber else Palette.TextDim,
+                tint = if (favorite) Palette.Lit else Palette.TextDim,
             )
         }
         if (onDelete != null) {
             IconButton(onClick = { renaming = true }) {
-                Icon(Icons.Filled.Edit, contentDescription = "Edit ${preset.name}", tint = Palette.TextDim)
+                Icon(painterResource(R.drawable.ic_edit), contentDescription = "Edit ${preset.name}", tint = Palette.TextDim)
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete ${preset.name}", tint = Palette.Danger)
+                Icon(painterResource(R.drawable.ic_delete), contentDescription = "Delete ${preset.name}", tint = Palette.TextDim)
             }
         }
     }
@@ -1292,8 +1298,6 @@ private fun ManageSection(state: AppState) {
     val scope = rememberCoroutineScope()
     val snackbar = LocalSnackbar.current
     var saving by remember { mutableStateOf(false) }
-    var finding by remember { mutableStateOf(false) }
-    var tuning by remember { mutableStateOf(false) }
     val saved = state.presets.firstOrNull { it.id == state.current.id }
 
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -1386,17 +1390,7 @@ private fun ManageSection(state: AppState) {
         }
     }
 
-    SettingsSection(stringResource(R.string.ui_add_and_manage)) {
-        ActionRow(stringResource(R.string.ui_compare_two_sounds), Help.compare, detail = stringResource(R.string.ui_switch_instantly_with_an_optional_blind), onClick = LocalOpenCompare.current)
-        RowDivider()
-        ActionRow(stringResource(R.string.ui_find_my_sound), Help.finder, detail = stringResource(R.string.ui_a_short_guided_listening_test), onClick = LocalOpenFinder.current)
-        RowDivider()
-        ActionRow(stringResource(R.string.ui_hearing_check), Help.hearing, detail = stringResource(R.string.ui_builds_a_curve_for_how_you_hear), onClick = LocalOpenHearing.current)
-        RowDivider()
-        ActionRow(stringResource(R.string.ui_find_peaks_for_me), Help.peakFinder, detail = stringResource(R.string.ui_a_guided_test_that_finds_peaks_and_dips), onClick = LocalOpenPeaks.current)
-        RowDivider()
-        ActionRow(stringResource(R.string.ui_frequency_sweep), Help.sweep, detail = stringResource(R.string.ui_find_and_fix_peaks_in_your_headphones_by), onClick = LocalOpenSweep.current)
-        RowDivider()
+    SettingsSection(stringResource(R.string.ui_this_preset)) {
         ActionRow(stringResource(R.string.ui_save_as_new), Help.saveNew) { saving = true }
         if (saved != null && saved != state.current) {
             RowDivider()
@@ -1405,13 +1399,9 @@ private fun ManageSection(state: AppState) {
                 scope.notify(snackbar, "Updated ${saved.name}.")
             }
         }
-        RowDivider()
-        ActionRow(stringResource(R.string.ui_find_headphones), Help.find) { finding = true }
-        if (state.current.filters.any { it.gainDb != 0.0 } || state.current.tone.importedCurve.isNotEmpty()) {
-            RowDivider()
-            ActionRow(stringResource(R.string.ui_tune_correction), Help.tuner, detail = stringResource(R.string.ui_use_less_of_it_or_add_bass_or_treble_bac)) { tuning = true }
-        }
-        RowDivider()
+        ShareRows { message -> scope.notify(snackbar, message) }
+    }
+    SettingsSection(stringResource(R.string.ui_files_and_backup)) {
         ActionRow(stringResource(R.string.ui_import_eq_file), Help.importFile) {
             importer.launch(arrayOf("text/*", "application/octet-stream"))
         }
@@ -1431,7 +1421,6 @@ private fun ManageSection(state: AppState) {
         ActionRow(stringResource(R.string.ui_restore_presets), Help.restore) {
             restorer.launch(arrayOf("application/json", "text/*", "application/octet-stream"))
         }
-        ShareRows { message -> scope.notify(snackbar, message) }
     }
 
     if (saving) {
@@ -1440,15 +1429,6 @@ private fun ManageSection(state: AppState) {
             saving = false
         }
     }
-    if (finding) {
-        AutoEqDialog(onDismiss = { finding = false }) { result ->
-            scope.notify(snackbar, result)
-            finding = false
-            // A correction is the moment people find it too neutral, so offer this straight away.
-            tuning = true
-        }
-    }
-    if (tuning) CorrectionTuner(onDismiss = { tuning = false })
 }
 
 /** Finds and imports a headphone profile from AutoEq's published results. */
@@ -1586,7 +1566,7 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
                     SegmentedButton(
                         selected = state.engineMode == mode,
                         onClick = { Repo.update { it.copy(engineMode = mode) } },
-                        shape = SegmentedButtonDefaults.itemShape(i, modes.size),
+                        shape = SegmentedButtonDefaults.itemShape(i, modes.size, KeyShape),
                         colors = segmentColors(),
                         icon = {},
                     ) { Text(mode.label, maxLines = 1) }
@@ -1663,7 +1643,7 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
             Text(
                 "This phone only allowed ${status.bandCount} bands, so narrow filters will be less accurate.",
                 style = MaterialTheme.typography.bodySmall,
-                color = Palette.Amber,
+                color = Palette.Lit,
                 modifier = Modifier.padding(16.dp),
             )
         }

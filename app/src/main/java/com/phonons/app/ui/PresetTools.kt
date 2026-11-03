@@ -17,7 +17,6 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -59,8 +58,8 @@ fun PresetDetailsDialog(preset: Preset, folders: List<String>, onDismiss: () -> 
                                 onClick = { folder = if (folder.trim() == existing) "" else existing },
                                 label = { Text(existing, maxLines = 1) },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Palette.Amber,
-                                    selectedLabelColor = Palette.OnAmber,
+                                    selectedContainerColor = Palette.Lit,
+                                    selectedLabelColor = Palette.OnLit,
                                     labelColor = Palette.Text,
                                 ),
                             )

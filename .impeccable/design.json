@@ -1,0 +1,478 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-03T13:15:53Z",
+  "title": "Design System: Eigentone",
+  "extensions": {
+    "colorMeta": {
+      "graphite-page": {
+        "role": "neutral",
+        "displayName": "Page Graphite",
+        "tonalRamp": [
+          "#0A0B0C",
+          "#242526",
+          "#414243",
+          "#606163",
+          "#818284",
+          "#A4A5A6",
+          "#C8C9CB",
+          "#EDEFF0"
+        ]
+      },
+      "graphite-bar": {
+        "role": "neutral",
+        "displayName": "Bar Graphite",
+        "tonalRamp": [
+          "#0A0B0C",
+          "#242526",
+          "#414243",
+          "#606163",
+          "#818284",
+          "#A4A5A7",
+          "#C8C9CB",
+          "#EDEFF0"
+        ]
+      },
+      "enamel-panel": {
+        "role": "neutral",
+        "displayName": "Enamel",
+        "tonalRamp": [
+          "#0A0B0C",
+          "#242526",
+          "#414243",
+          "#606162",
+          "#818284",
+          "#A4A5A6",
+          "#C8C9CB",
+          "#EDEFF0"
+        ]
+      },
+      "raised-key": {
+        "role": "neutral",
+        "displayName": "Raised Key",
+        "tonalRamp": [
+          "#0A0B0C",
+          "#232526",
+          "#404243",
+          "#5F6263",
+          "#808384",
+          "#A3A5A7",
+          "#C7C9CB",
+          "#ECEFF0"
+        ]
+      },
+      "overlay": {
+        "role": "neutral",
+        "displayName": "Overlay",
+        "tonalRamp": [
+          "#0A0B0C",
+          "#232526",
+          "#404243",
+          "#5F6263",
+          "#808384",
+          "#A3A5A7",
+          "#C7C9CB",
+          "#ECEFF0"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "tonalRamp": [
+          "#0A0B0C",
+          "#232526",
+          "#404243",
+          "#5F6263",
+          "#808384",
+          "#A3A5A7",
+          "#C7C9CB",
+          "#ECEFF0"
+        ]
+      },
+      "control-outline": {
+        "role": "neutral",
+        "displayName": "Control Outline",
+        "tonalRamp": [
+          "#0A0B0D",
+          "#242527",
+          "#404244",
+          "#5F6163",
+          "#808284",
+          "#A3A5A7",
+          "#C7C9CB",
+          "#ECEFF1"
+        ]
+      },
+      "scale-track": {
+        "role": "neutral",
+        "displayName": "Scale Track",
+        "tonalRamp": [
+          "#090B0D",
+          "#232527",
+          "#404244",
+          "#5F6264",
+          "#808385",
+          "#A2A5A8",
+          "#C6CACC",
+          "#EBEFF1"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Text",
+        "tonalRamp": [
+          "#0B0B09",
+          "#252522",
+          "#42423F",
+          "#61615E",
+          "#82827F",
+          "#A5A5A1",
+          "#C9C9C5",
+          "#EFEFEB"
+        ]
+      },
+      "text-dim": {
+        "role": "neutral",
+        "displayName": "Dim Text",
+        "tonalRamp": [
+          "#0A0B0B",
+          "#242525",
+          "#414242",
+          "#606262",
+          "#818383",
+          "#A3A5A5",
+          "#C7C9C9",
+          "#EDEFEF"
+        ]
+      },
+      "lit-ivory": {
+        "role": "primary",
+        "displayName": "Lit Ivory",
+        "tonalRamp": [
+          "#110A00",
+          "#2C2410",
+          "#49412C",
+          "#69604B",
+          "#8B826B",
+          "#AEA48D",
+          "#D2C8B0",
+          "#F8EED5"
+        ]
+      },
+      "lit-pressed": {
+        "role": "primary",
+        "displayName": "Pressed Ivory",
+        "tonalRamp": [
+          "#110A00",
+          "#2C2411",
+          "#4A412D",
+          "#69604B",
+          "#8B826B",
+          "#AEA48D",
+          "#D2C8B0",
+          "#F8EED5"
+        ]
+      },
+      "on-lit": {
+        "role": "primary",
+        "displayName": "On Lit",
+        "tonalRamp": [
+          "#0E0B03",
+          "#29251A",
+          "#464236",
+          "#666155",
+          "#878276",
+          "#AAA598",
+          "#CEC9BB",
+          "#F4EEE0"
+        ]
+      },
+      "green-strip": {
+        "role": "tertiary",
+        "displayName": "Deep Green",
+        "tonalRamp": [
+          "#130900",
+          "#312205",
+          "#4F3F23",
+          "#705E42",
+          "#928062",
+          "#B5A283",
+          "#DAC6A6",
+          "#FFECCC"
+        ]
+      },
+      "green-dim": {
+        "role": "tertiary",
+        "displayName": "Green Dim",
+        "tonalRamp": [
+          "#110A00",
+          "#2D240A",
+          "#4B4127",
+          "#6B6045",
+          "#8D8165",
+          "#B0A487",
+          "#D4C8AA",
+          "#FAEECF"
+        ]
+      },
+      "danger-orange": {
+        "role": "tertiary",
+        "displayName": "Danger Orange",
+        "tonalRamp": [
+          "#1A0400",
+          "#3F1800",
+          "#6A2F00",
+          "#984702",
+          "#C46421",
+          "#EB8849",
+          "#FFB68C",
+          "#FFEADE"
+        ]
+      },
+      "left-ear": {
+        "role": "secondary",
+        "displayName": "Left Ear Blue",
+        "tonalRamp": [
+          "#000C1C",
+          "#002743",
+          "#014570",
+          "#0366A1",
+          "#3789C6",
+          "#5CACEC",
+          "#99D0FE",
+          "#E2F1FE"
+        ]
+      },
+      "right-ear": {
+        "role": "secondary",
+        "displayName": "Right Ear Red",
+        "tonalRamp": [
+          "#200000",
+          "#4D0000",
+          "#810002",
+          "#AC2B22",
+          "#D45144",
+          "#FC7666",
+          "#FEB3A8",
+          "#FEE9E6"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The large frequency on the sweep and peak finder."
+      },
+      "headline-large": {
+        "displayName": "Headline Large",
+        "purpose": "The labels on comparison cards."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Tool and test screen headings."
+      },
+      "title-large": {
+        "displayName": "Title Large",
+        "purpose": "The app name and full-screen tool titles."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Prompt titles."
+      },
+      "title-small": {
+        "displayName": "Title Small",
+        "purpose": "Tooltip titles and the current shape name."
+      },
+      "body-large": {
+        "displayName": "Body Large",
+        "purpose": "Setting names."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Explanations and dialog text."
+      },
+      "body-small": {
+        "displayName": "Body Small",
+        "purpose": "Setting details, the status line, the output name in the strip."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Key, segment and chip text."
+      },
+      "label-nav": {
+        "displayName": "Label Nav",
+        "purpose": "Bottom navigation labels."
+      },
+      "panel-legend": {
+        "displayName": "Panel Legend",
+        "purpose": "The heading of a group of settings, uppercase."
+      },
+      "strip-tag": {
+        "displayName": "Strip Tag",
+        "purpose": "Effect names in the strip."
+      },
+      "readout": {
+        "displayName": "Readout",
+        "purpose": "Values that change."
+      },
+      "scale-label": {
+        "displayName": "Scale Label",
+        "purpose": "Axis labels and ear legends drawn on canvases."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "playing-pulse",
+        "value": "alpha 0.35 to 1, 900ms, linear, infinite reverse",
+        "purpose": "The status strip's dot while Android reports music playing. The only authored motion."
+      }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Lit Key",
+      "kind": "button",
+      "refersTo": "key-lit",
+      "description": "The screen's primary action, or a held state.",
+      "html": "<button class=\"ds-key-lit\">Bypassed</button>",
+      "css": ".ds-key-lit{background:#F2E8CF;color:#1E1A10;border:0;border-radius:4px;padding:8px 14px;font:600 14px/20px Barlow,sans-serif;transition:none;}.ds-key-lit:hover,.ds-key-lit:focus-visible{outline:1px solid #8A8C8E;outline-offset:1px}.ds-key-lit:active{background:#D6CCB4}"
+    },
+    {
+      "name": "Unlit Key",
+      "kind": "button",
+      "refersTo": "key-unlit",
+      "description": "Every action that is not the primary one.",
+      "html": "<button class=\"ds-key-unlit\">Bypass</button>",
+      "css": ".ds-key-unlit{background:#2B2D2E;color:#EEEEEA;border:1px solid #323435;border-radius:4px;padding:8px 14px;font:600 14px/20px Barlow,sans-serif;transition:none;}.ds-key-unlit:hover,.ds-key-unlit:focus-visible{box-shadow:inset 0 0 0 999px rgba(238,238,234,.08);}.ds-key-unlit:active{background:#1E1F20}"
+    },
+    {
+      "name": "Segments",
+      "kind": "button",
+      "refersTo": "segment-active",
+      "description": "A joined single choice, with no icon.",
+      "html": "<div class=\"ds-segs\"><button class=\"ds-seg ds-seg-on\">Graphic</button><button class=\"ds-seg\">Parametric</button></div>",
+      "css": ".ds-segs{display:flex;width:320px}.ds-seg{flex:1;background:#2B2D2E;color:#EEEEEA;border:1px solid #323435;padding:10px;font:600 14px/20px Barlow,sans-serif}.ds-seg:first-child{border-radius:4px 0 0 4px}.ds-seg:last-child{border-radius:0 4px 4px 0}.ds-seg-on{background:#F2E8CF;border-color:#F2E8CF;color:#1E1A10}.ds-seg:not(.ds-seg-on):hover,.ds-seg:not(.ds-seg-on):focus-visible{box-shadow:inset 0 0 0 999px rgba(238,238,234,.08);}"
+    },
+    {
+      "name": "Shape Chip",
+      "kind": "chip",
+      "refersTo": "chip-selected",
+      "description": "Short sets that wrap instead of scrolling.",
+      "html": "<div class=\"ds-chips\"><button class=\"ds-chip ds-chip-on\">Flat</button><button class=\"ds-chip\">Bass boost</button><button class=\"ds-chip\">Warm</button></div>",
+      "css": ".ds-chips{display:flex;flex-wrap:wrap;gap:8px}.ds-chip{background:transparent;color:#EEEEEA;border:1px solid #323435;border-radius:6px;padding:6px 16px;font:600 14px/20px Barlow,sans-serif}.ds-chip-on{background:#F2E8CF;border-color:#F2E8CF;color:#1E1A10}.ds-chip:not(.ds-chip-on):hover,.ds-chip:not(.ds-chip-on):focus-visible{box-shadow:inset 0 0 0 999px rgba(238,238,234,.08);}"
+    },
+    {
+      "name": "Status Strip",
+      "kind": "custom",
+      "refersTo": "status-strip",
+      "description": "The deep green band of output and effects, each with a drawn tick or cross.",
+      "html": "<div class=\"ds-strip\"><span class=\"ds-strip-name\">soundcore Liberty 4 NC</span><span class=\"ds-on\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z\"/></svg>Comp</span><span class=\"ds-on\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z\"/></svg>Ears</span><span class=\"ds-off\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z\"/></svg>Width</span><i class=\"ds-dot\"></i></div>",
+      "css": ".ds-strip{display:flex;align-items:center;gap:6px;width:360px;min-height:38px;padding:4px 16px;background:#174035;color:#EEEEEA;font:400 12px/16px Barlow,sans-serif}.ds-strip-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ds-on,.ds-off{display:inline-flex;align-items:center;font-size:11px;line-height:14px}.ds-on{color:#F2E8CF}.ds-off{color:#BFD3C9}.ds-dot{width:8px;height:8px;border-radius:50%;background:#F2E8CF;animation:ds-pulse .9s linear infinite alternate}@keyframes ds-pulse{from{opacity:.35}to{opacity:1}}"
+    },
+    {
+      "name": "Bottom Navigation",
+      "kind": "nav",
+      "refersTo": "nav-indicator",
+      "description": "Five tabs on the darker bar. The indicator keeps stock Material's shape.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-tab ds-tab-on\" href=\"#\"><b></b>EQ</a><a class=\"ds-tab\" href=\"#\"><b></b>Sound</a><a class=\"ds-tab\" href=\"#\"><b></b>Presets</a></nav>",
+      "css": ".ds-nav{display:flex;width:360px;background:#0B0C0D;padding:12px 0}.ds-tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:#B0B2B2;text-decoration:none;font:500 12px/16px 'Barlow Semi Condensed',sans-serif}.ds-tab b{display:block;width:64px;height:32px;border-radius:16px}.ds-tab-on{color:#EEEEEA}.ds-tab-on b{background:#F2E8CF}.ds-tab:hover,.ds-tab:focus-visible{color:#EEEEEA}"
+    },
+    {
+      "name": "Settings Panel with Value Track",
+      "kind": "card",
+      "refersTo": "settings-panel",
+      "description": "An engraved legend, an enamel panel, and a rectangular cap on a ticked rail.",
+      "html": "<section class=\"ds-sec\"><h3 class=\"ds-legend\">Space</h3><div class=\"ds-panel\"><div class=\"ds-row\"><span>Stereo width</span><output class=\"ds-read\">30%</output></div><div class=\"ds-track\"><i class=\"ds-fill\"></i><i class=\"ds-cap\" tabindex=\"0\"></i></div></div></section>",
+      "css": ".ds-sec{width:340px}.ds-legend{margin:0;padding:11px 4px;font:600 13px/18px 'Barlow Semi Condensed',sans-serif;letter-spacing:1.2px;text-transform:uppercase;color:#B0B2B2;}.ds-panel{background:#1E1F20;border-radius:4px;padding:8px 16px 16px}.ds-row{display:flex;justify-content:space-between;color:#EEEEEA;font:400 16px/22px Barlow,sans-serif}.ds-read{color:#F2E8CF;font:400 13px/18px 'JetBrains Mono',monospace}.ds-track{position:relative;height:48px;background:repeating-linear-gradient(90deg,#6C6F71 0 1px,transparent 1px 15px) 0 29px/100% 3px no-repeat}.ds-track:before{content:'';position:absolute;left:0;right:0;top:23px;height:2px;background:#6C6F71}.ds-fill{position:absolute;left:0;top:23px;width:30%;height:2px;background:#F2E8CF}.ds-cap{position:absolute;left:calc(30% - 6px);top:12px;width:12px;height:24px;border-radius:2px;background:linear-gradient(90deg,#F2E8CF 5px,#1E1A10 5px 7px,#F2E8CF 7px)}.ds-cap:focus-visible,.ds-cap:hover{outline:1px solid #8A8C8E;outline-offset:1px}"
+    },
+    {
+      "name": "Audiogram Legend",
+      "kind": "custom",
+      "refersTo": "left-ear",
+      "description": "Left X and right O in ear colours, with the left ear on the left and the right ear dashed.",
+      "html": "<div class=\"ds-graph\"><span class=\"ds-l\"><svg width=\"10\" height=\"10\" viewBox=\"0 0 10 10\" aria-hidden=\"true\"><path d=\"M1 1l8 8M1 9l8-8\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg> Left ear</span><span class=\"ds-r\">Right ear <svg width=\"10\" height=\"10\" viewBox=\"0 0 10 10\" aria-hidden=\"true\"><circle cx=\"5\" cy=\"5\" r=\"4\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg></span><svg class=\"ds-curves\" viewBox=\"0 0 320 60\" aria-hidden=\"true\"><path d=\"M0 30H320\" stroke=\"#8A8C8E\"/><path d=\"M0 34C60 34 80 20 160 28S260 40 320 30\" fill=\"none\" stroke=\"#62B2F2\" stroke-width=\"2\"/><path d=\"M0 34C60 34 80 42 160 34S260 22 320 30\" fill=\"none\" stroke=\"#F06B5C\" stroke-width=\"2\" stroke-dasharray=\"6 6\"/></svg></div>",
+      "css": ".ds-graph{position:relative;width:320px;padding-top:24px;background:#1E1F20;border-radius:4px;font:400 10px 'JetBrains Mono',monospace}.ds-l,.ds-r{position:absolute;top:6px}.ds-l{left:8px;color:#62B2F2}.ds-r{right:8px;color:#F06B5C}.ds-curves{display:block;width:100%}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Audiometer",
+    "overview": "Eigentone is a precision instrument the listener owns: a graphite enamel faceplate, ivory that lights up, engraved condensed legends, a fine graph grid and readouts that hold still. Screens are dense because their users know Q and dB, and because a visit is short and happens with music playing.\n\nColour always carries meaning. Blue and red belong to the left and right ear, as on an audiogram, and every per-ear graph marks the left with X and the right with O. The system refuses the category's glossy dark app with coloured pill sliders and rounded cards.\n\nSix decisions came directly from the user and override the original direction contract. They are binding: no horizontal scrolling; preset switching by dropdown under the app name; a deep green status strip; effects in the strip with a drawn tick or cross; bars darker than the page with no scroll fades; ivory filter points on graphs.\n\n**Known limits:** Dark theme only. No authored motion beyond the playing pulse; anything else that moves is stock Material behaviour. Left and right are only partly mirrored, in graph legends and curves. Tool and test screens (hearing check, sweep, peak finder, Find my sound, A/B compare, shape browser) inherit these tokens but were not redesigned. No tablet layout: content is simply capped at 640dp and centred.",
+    "keyCharacteristics": [
+      "Graphite surfaces separated by tone, with no shadows on panels or keys",
+      "Ivory for what is lit, active or grippable; ear colours only for the ears",
+      "Barlow Semi Condensed legends, Barlow body, JetBrains Mono digits",
+      "Rectangular fader caps with a centre line, on thin rails with engraved scales",
+      "Everything fits the width: wrap or drop down, never scroll sideways"
+    ],
+    "rules": [
+      {
+        "name": "The Ear Colour Rule",
+        "body": "Blue and red mean left and right ear, and nothing else. Any other second state uses ivory, dim text or a shape.",
+        "section": "colors"
+      },
+      {
+        "name": "The Ivory Rule",
+        "body": "Ivory means lit, active, or a handle you can grip. Plain text stays Text, including text buttons and the app name, so that ivory keeps its meaning. Filter points are ivory because they apply to both ears (user decision).",
+        "section": "colors"
+      },
+      {
+        "name": "The Green Strip Rule",
+        "body": "Green is the one exception to \"the ears are the only chroma\" besides Danger Orange, and it belongs to the status strip alone (user decision). Do not reuse it for accents, and keep the band's hue clear of the ear colours.",
+        "section": "colors"
+      },
+      {
+        "name": "The Still Digits Rule",
+        "body": "Any number that changes while you watch it is set in JetBrains Mono, so that it does not shift as its value changes.",
+        "section": "typography"
+      },
+      {
+        "name": "The Engraved Legend Rule",
+        "body": "Uppercase tracked type is only the heading of a group of rows. It never sits above another heading as a kicker.",
+        "section": "typography"
+      },
+      {
+        "name": "The No Sideways Rule",
+        "body": "Nothing scrolls horizontally, anywhere. Short sets wrap with `FlowRow` (8dp gaps), and long lists use dropdowns (user decision).",
+        "section": "layout"
+      },
+      {
+        "name": "The Tonal Ladder Rule",
+        "body": "Surface height is shown by tone. A pressed unlit key becomes Enamel, and a pressed lit key becomes Pressed Ivory.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Fixed Bars Rule",
+        "body": "Top and bottom bars are darker than the page, with no scroll fades or gradients (user decision). The step is deliberately quiet (1.07:1), so the strip (1.67:1 against the page) marks the top edge.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Drawn State Rule",
+        "body": "On and off are shown by a drawn mark as well as a colour, and each tag is announced with its state.",
+        "section": "components"
+      },
+      {
+        "name": "The True Reading Rule",
+        "body": "Nothing is drawn as a live measurement unless it is one. The compressor shows as on rather than with a meter, because Android does not report gain reduction.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "Do use `Palette`, `KeyShape`, `PanelShape` and the type styles in `Theme.kt` rather than new literals.",
+      "Do draw right-ear lines dashed and mark ears with X and O wherever a graph is per-ear.",
+      "Do set changing numbers in Readout, in ivory when they differ from the default and Dim Text when they do not.",
+      "Do give every graph or fader gesture a button or slider alternative for screen readers.",
+      "Do keep the deep green strip as the only green surface, with drawn ticks and crosses for effects.",
+      "Do wrap short sets and put long lists in dropdowns."
+    ],
+    "donts": [
+      "Don't scroll anything horizontally.",
+      "Don't use blue or red for anything except the ears, or use red for errors.",
+      "Don't use ear colours for filter points; they apply to both ears.",
+      "Don't add scroll fades or gradients to the bars.",
+      "Don't bring back the rejected purple strip, or a row of preset keys in the first viewport.",
+      "Don't add coloured pill sliders, rounded cards or shadows on panels and keys.",
+      "Don't draw an invented meter or present an estimate as a measurement."
+    ]
+  }
+}

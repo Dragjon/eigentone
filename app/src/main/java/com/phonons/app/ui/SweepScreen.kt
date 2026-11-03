@@ -18,12 +18,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -156,16 +153,21 @@ fun SweepScreen(onClose: () -> Unit) {
             Text(
                 GraphicEq.formatFrequency(if (hz >= 1000) kotlin.math.round(hz / 10) * 10 else kotlin.math.round(hz)),
                 style = MaterialTheme.typography.displaySmall,
-                color = if (playing) Palette.Amber else Palette.Text,
+                color = if (playing) Palette.Lit else Palette.Text,
             )
-            Slider(
+            ValueTrack(
+                label = stringResource(R.string.ui_frequency_sweep),
+                readout = GraphicEq.formatFrequency(kotlin.math.round(hz)),
                 value = position.toFloat(),
-                onValueChange = {
+                range = 0f..1f,
+                origin = 0f,
+                default = 0f,
+                onChange = {
                     climbing = false
                     heardTone = Sweep.hzAt(it.toDouble())
                     position = it.toDouble()
                 },
-                modifier = Modifier.fillMaxWidth(),
+                onFinished = {},
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
@@ -247,7 +249,7 @@ fun SweepScreen(onClose: () -> Unit) {
                                 color = Palette.Text,
                                 modifier = Modifier.weight(1f),
                             )
-                            Text(String.format(Locale.US, "%+.0f dB", mark.gainDb), style = Readout, color = Palette.Amber)
+                            Text(String.format(Locale.US, "%+.0f dB", mark.gainDb), style = Readout, color = Palette.Lit)
                             TextButton(onClick = { marks = marks - mark }) { Text(stringResource(R.string.ui_remove)) }
                         }
                     }

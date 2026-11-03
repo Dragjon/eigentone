@@ -322,6 +322,23 @@ class NewFeaturesTest {
     }
 
     @Test
+    fun quickKeysLeadWithWhatsInUseThenFavouritesThenYourOwn() {
+        val own = List(3) { Preset("user:$it", "P$it") }
+        val built = Preset("builtin:x", "Built")
+        val state = AppState(current = own[2], favorites = setOf("builtin:x"))
+        val keys = PresetOrganiser.quickKeys(state, listOf(built) + own)
+        assertEquals(listOf("user:2", "builtin:x", "user:0", "user:1"), keys.map { it.id })
+    }
+
+    @Test
+    fun aNewInstallStillHasQuickKeys() {
+        val built = List(20) { Preset("builtin:$it", "B$it") }
+        val keys = PresetOrganiser.quickKeys(AppState(current = built[0]), built)
+        assertEquals(PresetOrganiser.MAX_QUICK_KEYS, keys.size)
+        assertEquals("builtin:0", keys.first().id)
+    }
+
+    @Test
     fun presetSearchMatchesEveryWordInAnyOrder() {
         assertTrue(PresetOrganiser.matches(bassy, "bass lib"))
         assertTrue(PresetOrganiser.matches(bassy, "BASS"))
@@ -697,6 +714,36 @@ class NewFeaturesTest {
         assertEquals(c, Repo.state.value.current)
         Repo.undo()
         assertEquals(a, Repo.state.value.current)
+    }
+
+    @Test
+    fun theMainEffectsAlwaysShowWhetherTheyreOn() {
+        assertEquals(
+            listOf(EffectState("Comp", false), EffectState("Width", false), EffectState("Ears", false)),
+            Processing.effectStates(AppState(enabled = true), BUDS),
+        )
+        val comp = Dynamics.styles.first().compressor
+        val full = AppState(
+            enabled = true,
+            current = Preset("user:a", "A", tone = Tone(surround = 0.3, compressor = comp)),
+            earCorrections = mapOf(BUDS to ears),
+        )
+        assertEquals(
+            listOf(EffectState("Comp", true), EffectState("Width", true), EffectState("Ears", true)),
+            Processing.effectStates(full, BUDS),
+        )
+        // Night mode takes the compressor's place while it's the one running.
+        assertEquals(EffectState("Night", true), Processing.effectStates(full.copy(nightMode = 0.5), BUDS).first())
+        assertEquals(EffectState("Surround", false), Processing.effectStates(AppState(enabled = true, useSystemSurround = true), BUDS)[1])
+        // Nothing is on while bypassed, even though the settings are still there.
+        assertTrue(Processing.effectStates(full.copy(bypass = true), BUDS).none { it.on })
+    }
+
+    @Test
+    fun theTamersOnlyAppearWhenOn() {
+        val state = AppState(enabled = true, current = Preset("user:t", "T", tone = Tone(boomTamer = 0.3)))
+        assertTrue(EffectState("Tame", true) in Processing.effectStates(state, BUDS))
+        assertTrue(Processing.effectStates(AppState(enabled = true), BUDS).none { it.name == "Tame" })
     }
 
     @Test
@@ -1574,8 +1621,8 @@ class NewFeaturesTest {
             ),
         ).earLevels()
         // The typical level is -50 dB, and points come out in frequency order.
-        assertEquals(listOf(ShapePoint(1000.0, 0.0), ShapePoint(4000.0, -10.0)), levels.left)
-        assertEquals(listOf(ShapePoint(1000.0, 0.0), ShapePoint(4000.0, 10.0)), levels.right)
+        assertEquals(listOf(ShapePoint(1000.0, 0.0), ShapePoint(4000.0, 10.0)), levels.left)
+        assertEquals(listOf(ShapePoint(1000.0, 0.0), ShapePoint(4000.0, -10.0)), levels.right)
     }
 
     @Test

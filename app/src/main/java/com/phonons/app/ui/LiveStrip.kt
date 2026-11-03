@@ -11,9 +11,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,6 +34,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,12 +44,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.phonons.app.R
 import com.phonons.app.data.AppState
 import com.phonons.app.data.ClipRisk
+import com.phonons.app.data.EffectState
 import com.phonons.app.data.OutputInfo
 import com.phonons.app.data.Processing
 import com.phonons.app.data.Repo
 import com.phonons.app.dsp.Eq
 
 private const val MINI_POINTS = 48
+private const val STRIP_HEIGHT_DP = 38
 private const val MINI_BARS = 24
 private const val MINI_RANGE_DB = 18.0
 
@@ -59,10 +66,10 @@ private fun outputIcon(output: OutputInfo): Int = when {
  * compressor is compressing, for example, so it's shown as on rather than with an invented meter.
  */
 @Composable
-fun LiveStrip(state: AppState) {
+fun LiveStrip(state: AppState, showCurve: Boolean) {
     val output by Repo.output.collectAsStateWithLifecycle()
     val scheduledNight by Repo.scheduledNight.collectAsStateWithLifecycle()
-    val effects = remember(state, output.key, scheduledNight) { Processing.activeEffects(state, output.key, scheduledNight) }
+    val effects = remember(state, output.key, scheduledNight) { Processing.effectStates(state, output.key, scheduledNight) }
     val working = state.enabled && !state.bypass
     val attenuationNow by Repo.attenuationDb.collectAsStateWithLifecycle()
     val clipping = remember(state, attenuationNow, output.key, scheduledNight) {
@@ -72,64 +79,78 @@ fun LiveStrip(state: AppState) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, bottom = 6.dp),
+            .background(Palette.Strip)
+            .heightIn(min = STRIP_HEIGHT_DP.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Icon(
             painterResource(outputIcon(output)),
             contentDescription = null,
-            tint = if (working) Palette.Amber else Palette.TextDim,
+            tint = if (working) Palette.Lit else Palette.StripDim,
             modifier = Modifier.size(16.dp),
         )
         Text(
             output.label,
             style = MaterialTheme.typography.bodySmall,
-            color = Palette.TextDim,
+            color = Palette.Text,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        if (clipping) EffectPill("Clip", Palette.Danger)
-        effects.forEach { EffectPill(it) }
+        if (clipping) EffectPill(stringResource(R.string.ui_clip_risk), Palette.Danger)
+        effects.forEach { EffectTag(it) }
         PlayingDot()
-        MiniCurve(state, output.key, working)
+        if (showCurve) MiniCurve(state, output.key, working)
+    }
+}
+
+/** A tick or a cross as well as the colour, so the state doesn't rely on colour alone. */
+@Composable
+private fun EffectTag(effect: EffectState) {
+    val colour = if (effect.on) Palette.Lit else Palette.StripDim
+    val description = "${effect.name} ${if (effect.on) "on" else "off"}"
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = description },
+    ) {
+        Icon(
+            if (effect.on) Icons.Filled.Check else Icons.Filled.Close,
+            contentDescription = null,
+            tint = colour,
+            modifier = Modifier.size(12.dp),
+        )
+        Text(effect.name, fontSize = 11.sp, lineHeight = 14.sp, color = colour, maxLines = 1)
     }
 }
 
 @Composable
-private fun EffectPill(name: String, colour: androidx.compose.ui.graphics.Color = Palette.Text) {
+private fun EffectPill(name: String, colour: androidx.compose.ui.graphics.Color = Palette.Lit) {
     Text(
         name,
         fontSize = 11.sp,
         lineHeight = 14.sp,
         color = colour,
         maxLines = 1,
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(Palette.SurfaceHigh)
-            .padding(horizontal = 6.dp, vertical = 2.dp),
     )
 }
 
-/** Pulses while Android reports music playing, and stays still otherwise. */
+/** Pulses while Android reports music playing. Absent otherwise, so it can't be read as a marker. */
 @Composable
 private fun PlayingDot() {
     val playing = rememberMusicActive()
-    val description = if (playing) "Music is playing" else "Nothing is playing"
-    val modifier = Modifier
-        .size(8.dp)
-        .semantics { contentDescription = description }
     if (playing) {
+        val modifier = Modifier
+            .size(8.dp)
+            .semantics { contentDescription = "Music is playing" }
         val pulse by rememberInfiniteTransition(label = "playing").animateFloat(
             initialValue = 0.35f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(tween(PULSE_MS, easing = LinearEasing), RepeatMode.Reverse),
             label = "pulse",
         )
-        Canvas(modifier) { drawCircle(Palette.Amber.copy(alpha = pulse)) }
-    } else {
-        Canvas(modifier) { drawCircle(Palette.TextDim, style = Stroke(1.dp.toPx())) }
+        Canvas(modifier) { drawCircle(Palette.Lit.copy(alpha = pulse)) }
     }
 }
 
@@ -146,14 +167,18 @@ private fun MiniCurve(state: AppState, outputKey: String, working: Boolean) {
         DoubleArray(MINI_POINTS + 1) { i -> Eq.curveDb(list, Eq.logFreq(i.toDouble() / MINI_POINTS)) }
     val left = remember(filters, channels) { sample(channels?.first ?: filters) }
     val right = remember(channels) { channels?.second?.let(::sample) }
-    val leftColour = if (working) Palette.Amber else Palette.TextDim
+    val leftColour = when {
+        !working -> Palette.TextDim
+        right != null -> Palette.LeftEar
+        else -> Palette.Lit
+    }
     val rightColour = if (working) Palette.RightEar else Palette.TextDim
 
     Canvas(
         Modifier
-            .size(width = 72.dp, height = 26.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .background(Palette.Surface)
+            .size(width = 52.dp, height = 26.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(Palette.Bar)
             .semantics { contentDescription = "Current sound curve" },
     ) {
         spectrum.value?.let { bands -> drawBars(bands) }

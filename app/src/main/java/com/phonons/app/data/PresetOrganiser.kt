@@ -4,6 +4,8 @@ package com.phonons.app.data
 object PresetOrganiser {
     const val MAX_FOLDER_NAME = 40
     const val MAX_SHORTCUTS = 4
+    const val MAX_QUICK_KEYS = 12
+    private const val MIN_QUICK_KEYS = 4
 
     /** Every word must match, in any order, so "bass lib" finds "Liberty 4 NC + bass". Folders count too. */
     fun matches(preset: Preset, query: String): Boolean {
@@ -18,6 +20,19 @@ object PresetOrganiser {
     /** Folder names in alphabetical order. A folder exists while something is in it. */
     fun folders(presets: List<Preset>): List<String> =
         presets.mapNotNull { it.folder }.distinct().sortedBy { it.lowercase() }
+
+    /**
+     * The keys on the EQ tab. Falls back to the first available presets, so a new install still has
+     * something to switch between.
+     */
+    fun quickKeys(state: AppState, available: List<Preset>): List<Preset> {
+        val favourites = available.filter { it.id in state.favorites }
+        val own = available.filter { it.id.startsWith("user:") && it.id !in state.favorites }
+        val current = available.filter { it.id == state.current.id }
+        val chosen = (current + favourites + own).distinctBy { it.id }
+        val filled = if (chosen.size < MIN_QUICK_KEYS) (chosen + available).distinctBy { it.id } else chosen
+        return filled.take(MAX_QUICK_KEYS)
+    }
 
     /** Favourites first, since those are the ones chosen for quick access, then the user's own presets. */
     fun shortcuts(state: AppState, available: List<Preset>): List<Preset> {

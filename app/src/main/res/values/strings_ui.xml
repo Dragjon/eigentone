@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="ui_change_preset" formatted="false">Change preset</string>
+    <string name="ui_clip_risk" formatted="false">Clip risk</string>
+    <string name="ui_more" formatted="false">More</string>
+    <string name="ui_all_presets" formatted="false">All presets</string>
+    <string name="ui_this_preset" formatted="false">This preset</string>
+    <string name="ui_files_and_backup" formatted="false">Files and backup</string>
+    <string name="ui_headphones" formatted="false">Headphones</string>
+    <string name="ui_listening_tools" formatted="false">Listening tools</string>
     <string name="ui_off" formatted="false">Off</string>
     <string name="ui_compare_measurements" formatted="false">Compare measurements</string>
     <string name="ui_compare_measurements_intro" formatted="false">Reviewers measure the same headphones differently. Play some music and switch between them. They play at about the same loudness as your current sound.</string>
@@ -286,7 +294,7 @@
     <string name="ui_hearing_before" formatted="false">Hearing before</string>
     <string name="ui_hearing_check" formatted="false">Hearing check</string>
     <string name="ui_help_and_reset" formatted="false">Help and reset</string>
-    <string name="ui_higher_means_that_ear_needed_a_louder_to" formatted="false">Higher means that ear needed a louder tone. This compares your ears with each other, and isn\'t a measure of how well you hear.</string>
+    <string name="ui_higher_means_that_ear_needed_a_louder_to" formatted="false">Lower means that ear needed a louder tone, as on an audiogram. This compares your ears with each other, and isn\'t a measure of how well you hear.</string>
     <string name="ui_how_each_ear_heard" formatted="false">How each ear heard</string>
     <string name="ui_i_can_t_hear_a_difference" formatted="false">I can\'t hear a difference</string>
     <string name="ui_i_didn_t_hear_it" formatted="false">I didn\'t hear it</string>

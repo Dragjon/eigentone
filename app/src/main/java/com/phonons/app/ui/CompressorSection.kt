@@ -19,7 +19,6 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -114,8 +113,8 @@ fun CompressorSection(state: AppState) {
                     },
                     label = { Text(style.name) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Palette.Amber,
-                        selectedLabelColor = Palette.OnAmber,
+                        selectedContainerColor = Palette.Lit,
+                        selectedLabelColor = Palette.OnLit,
                         labelColor = Palette.Text,
                     ),
                 )
@@ -131,7 +130,7 @@ fun CompressorSection(state: AppState) {
                 SegmentedButton(
                     selected = selected == index,
                     onClick = { selected = index },
-                    shape = SegmentedButtonDefaults.itemShape(index, BAND_NAMES.size),
+                    shape = SegmentedButtonDefaults.itemShape(index, BAND_NAMES.size, KeyShape),
                     colors = segmentColors(),
                     icon = {},
                 ) { Text(name, maxLines = 1) }
@@ -287,7 +286,7 @@ private fun TransferCurve(band: CompressorBand) {
                 val output = y(band.outputDb(input))
                 if (step == 0) path.moveTo(x(input), output) else path.lineTo(x(input), output)
             }
-            drawPath(path, Palette.Amber, style = Stroke(width = 2.dp.toPx()))
+            drawPath(path, Palette.Lit, style = Stroke(width = 2.dp.toPx()))
         }
         Text(stringResource(R.string.ui_level_in_left_to_right_level_out_bottom), style = MaterialTheme.typography.bodySmall, color = Palette.TextDim)
     }

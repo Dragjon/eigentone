@@ -43,7 +43,7 @@ Crash reports stay on the phone. You choose whether to share one from the System
 Copy the latest `Eigentone-<version>.apk` to the phone and open it, or use USB debugging:
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.22.1.apk
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.23.0.apk
 ```
 
 ## Build
@@ -71,6 +71,8 @@ Most text is in `app/src/main/res/values/strings.xml` and `strings_ui.xml`. To a
 The app was first called Phonons. The package name (`com.phonons.app`) and class names still use it, because Android treats a new application ID as a different app. It should change once, just before the first public release.
 
 ## Credits
+
+Barlow and JetBrains Mono are used under the SIL Open Font License 1.1.
 
 The Liberty 4 NC presets and headphone corrections use [AutoEq](https://github.com/jaakkopasanen/AutoEq) results (MIT License). The Liberty presets only appear while those earbuds are connected.
 

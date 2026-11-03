@@ -41,10 +41,8 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -55,7 +53,6 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -515,7 +512,7 @@ private fun FirstPage(
 private fun BrowseCard(option: BrowseOption, modifier: Modifier) {
     Column(
         modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(PanelShape)
             .background(Palette.Surface)
             .clickable(role = Role.Button, onClick = option.onClick)
             .heightIn(min = 88.dp)
@@ -611,7 +608,7 @@ private fun ShapeRow(
             Text(
                 shape.name,
                 style = MaterialTheme.typography.bodyLarge,
-                color = if (selected) Palette.Amber else Palette.Text,
+                color = if (selected) Palette.Lit else Palette.Text,
             )
             Text(
                 if (showGroup) "${shape.group}. ${shape.description}" else shape.description,
@@ -623,7 +620,7 @@ private fun ShapeRow(
         }
         if (onEdit != null) {
             IconButton(onClick = onEdit) {
-                Icon(Icons.Filled.Edit, contentDescription = "Edit ${shape.name}", tint = Palette.TextDim)
+                Icon(painterResource(R.drawable.ic_edit), contentDescription = "Edit ${shape.name}", tint = Palette.TextDim)
             }
         }
         IconButton(onClick = onToggleFavourite) {
@@ -631,7 +628,7 @@ private fun ShapeRow(
                 // Filled against outlined, so the state doesn't rely on colour alone.
                 painterResource(if (favourite) R.drawable.ic_star else R.drawable.ic_star_border),
                 contentDescription = if (favourite) "Remove ${shape.name} from favourites" else "Add ${shape.name} to favourites",
-                tint = if (favourite) Palette.Amber else Palette.TextDim,
+                tint = if (favourite) Palette.Lit else Palette.TextDim,
             )
         }
     }
@@ -653,7 +650,7 @@ private fun CurveThumbnail(curve: List<Double>, selected: Boolean) {
             val y = middle - (db.toFloat() / THUMBNAIL_RANGE_DB).coerceIn(-1f, 1f) * (middle - 2f)
             if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
-        drawPath(path, if (selected) Palette.Amber else Palette.Text, style = Stroke(width = 1.5.dp.toPx()))
+        drawPath(path, if (selected) Palette.Lit else Palette.Text, style = Stroke(width = 1.5.dp.toPx()))
     }
 }
 
@@ -728,14 +725,14 @@ private fun PreviewPanel(
                 SegmentedButton(
                     selected = !layering,
                     onClick = { onLayering(false) },
-                    shape = SegmentedButtonDefaults.itemShape(0, 2),
+                    shape = SegmentedButtonDefaults.itemShape(0, 2, KeyShape),
                     colors = segmentColors(),
                     icon = {},
                 ) { Text(stringResource(R.string.ui_replace), maxLines = 1) }
                 SegmentedButton(
                     selected = layering,
                     onClick = { onLayering(true) },
-                    shape = SegmentedButtonDefaults.itemShape(1, 2),
+                    shape = SegmentedButtonDefaults.itemShape(1, 2, KeyShape),
                     colors = segmentColors(),
                     icon = {},
                 ) { Text(stringResource(R.string.ui_add), maxLines = 1) }

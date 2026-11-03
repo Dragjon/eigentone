@@ -34,7 +34,9 @@ import kotlin.math.hypot
 private const val RANGE_DB = 18.0
 private const val GHOST_MIN_DIFFERENCE_DB = 0.05
 private const val CURVE_POINTS = 300
-private val GRID_FREQS = listOf(20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000)
+/** Every step of each decade, as on a published response chart. */
+private val GRID_FREQS = listOf(20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 20000)
+private val MAJOR_FREQS = setOf(100, 1000, 10000)
 private val LABEL_FREQS = setOf(100, 1000, 10000)
 private val GRID_DB = listOf(-12, -6, 0, 6, 12)
 
@@ -61,6 +63,8 @@ fun EqGraph(
     rightCurveFilters: List<Filter>? = null,
     /** The preset as saved, drawn faintly behind the current sound while it's being edited. */
     ghostFilters: List<Filter>? = null,
+    /** Measured points to mark as on an audiogram: an X for the left ear and an O for the right. */
+    earMarkers: EarCorrection? = null,
     /** Read while drawing, so spectrum frames redraw the canvas without recomposing the screen. */
     spectrum: () -> FloatArray?,
     selectedId: Int?,
@@ -74,8 +78,12 @@ fun EqGraph(
 ) {
     val currentFilters by rememberUpdatedState(filters)
     val measurer = rememberTextMeasurer()
-    val labelStyle = TextStyle(color = Palette.TextDim, fontSize = 11.sp)
-    val accent = if (dimmed) Palette.TextDim else Palette.Amber
+    val labelStyle = TextStyle(color = Palette.TextDim, fontSize = 10.sp, fontFamily = ReadoutFamily)
+    val accent = when {
+        dimmed -> Palette.TextDim
+        rightCurveFilters != null -> Palette.LeftEar
+        else -> Palette.Lit
+    }
     // Curves only change when filters do, so spectrum redraws don't recalculate them.
     val curve = remember(curveFilters) {
         DoubleArray(CURVE_POINTS + 1) { i -> Eq.curveDb(curveFilters, Eq.logFreq(i.toDouble() / CURVE_POINTS)) }
@@ -86,6 +94,7 @@ fun EqGraph(
         }
     }
     val rightColour = if (dimmed) Palette.TextDim else Palette.RightEar
+    val nodeColour = if (dimmed) Palette.TextDim else Palette.Lit
     // Some edits don't change the curve, such as the compressor, and then there's nothing to show.
     val ghost = remember(ghostFilters, curve, rightCurve) {
         ghostFilters?.let { saved ->
@@ -170,7 +179,8 @@ fun EqGraph(
 
         GRID_FREQS.forEach { freq ->
             val x = xOf(freq.toDouble(), w)
-            drawLine(Palette.Line, Offset(x, 0f), Offset(x, h), strokeWidth = 1f)
+            val major = freq in MAJOR_FREQS
+            drawLine(if (major) Palette.Track else Palette.Line, Offset(x, 0f), Offset(x, h), strokeWidth = 1f)
         }
         val gridDb = GRID_DB.filter { kotlin.math.abs(it) < rangeDb }
         gridDb.forEach { db ->
@@ -193,18 +203,6 @@ fun EqGraph(
         fill.lineTo(w, zeroY)
         fill.close()
 
-        // Filling under one ear's curve would make it look more important than the other's.
-        if (rightCurve == null) {
-            drawPath(
-                fill,
-                Brush.verticalGradient(
-                    0f to accent.copy(alpha = 0.28f),
-                    0.5f to accent.copy(alpha = 0.06f),
-                    1f to accent.copy(alpha = 0.28f),
-                ),
-            )
-        }
-
         ghost?.let { points ->
             val saved = Path()
             points.forEachIndexed { i, db ->
@@ -225,7 +223,7 @@ fun EqGraph(
             drawPath(single, Palette.TextDim, style = Stroke(width = 1.5.dp.toPx()))
         }
 
-        drawPath(curvePath, accent, style = Stroke(width = 2.5.dp.toPx()))
+        drawPath(curvePath, accent, style = Stroke(width = 2.dp.toPx()))
 
         rightCurve?.let { points ->
             val right = Path()
@@ -238,8 +236,21 @@ fun EqGraph(
             drawPath(
                 right,
                 rightColour,
-                style = Stroke(width = 2.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash, dash))),
+                style = Stroke(width = 2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash, dash))),
             )
+        }
+
+        earMarkers?.let { ears ->
+            val mark = 5.dp.toPx()
+            val stroke = 2.dp.toPx()
+            ears.left.forEach { point ->
+                val c = Offset(xOf(point.hz, w), yOf(point.db, h, rangeDb))
+                drawLine(Palette.LeftEar, Offset(c.x - mark, c.y - mark), Offset(c.x + mark, c.y + mark), stroke)
+                drawLine(Palette.LeftEar, Offset(c.x - mark, c.y + mark), Offset(c.x + mark, c.y - mark), stroke)
+            }
+            ears.right.forEach { point ->
+                drawCircle(Palette.RightEar, mark, Offset(xOf(point.hz, w), yOf(point.db, h, rangeDb)), style = Stroke(stroke))
+            }
         }
 
         // Labels go over the curve on a backing, so the curve can never make them unreadable.
@@ -266,9 +277,15 @@ fun EqGraph(
         if (rightCurve != null) {
             val rightStyle = labelStyle.copy(color = rightColour)
             val rightLabel = measurer.measure("Right ear", rightStyle).size.width + 8.dp.toPx()
-            val leftLabel = measurer.measure("Left ear", labelStyle).size.width + 8.dp.toPx()
-            label("Right ear", w - rightLabel, 4f, rightStyle)
-            label("Left ear", w - rightLabel - leftLabel - 4.dp.toPx(), 4f, labelStyle.copy(color = accent))
+            val mark = 4.dp.toPx()
+            val stroke = 1.5.dp.toPx()
+            val markY = 12.dp.toPx()
+            val leftX = 10.dp.toPx()
+            drawLine(accent, Offset(leftX - mark, markY - mark), Offset(leftX + mark, markY + mark), stroke)
+            drawLine(accent, Offset(leftX - mark, markY + mark), Offset(leftX + mark, markY - mark), stroke)
+            label("Left ear", 18.dp.toPx(), 4f, labelStyle.copy(color = accent))
+            label("Right ear", w - rightLabel - 18.dp.toPx(), 4f, rightStyle)
+            drawCircle(rightColour, mark, Offset(w - 10.dp.toPx(), markY), style = Stroke(stroke))
         }
 
         filters.forEach { f ->
@@ -278,12 +295,12 @@ fun EqGraph(
             when {
                 !f.enabled -> drawCircle(Palette.TextDim, radius, center, style = Stroke(1.5.dp.toPx()))
                 selected -> {
-                    drawCircle(accent.copy(alpha = 0.25f), radius * 2f, center)
-                    drawCircle(accent, radius, center)
+                    drawCircle(nodeColour.copy(alpha = 0.25f), radius * 2f, center)
+                    drawCircle(nodeColour, radius, center)
                 }
                 else -> {
                     drawCircle(Palette.Background, radius, center)
-                    drawCircle(accent, radius, center, style = Stroke(2.dp.toPx()))
+                    drawCircle(nodeColour, radius, center, style = Stroke(2.dp.toPx()))
                 }
             }
         }
@@ -292,7 +309,7 @@ fun EqGraph(
 
 /** What ear correction changes, on its own. Zoomed in, because these changes are small next to a whole sound. */
 @Composable
-fun EarCurvesGraph(ears: EarCorrection, modifier: Modifier = Modifier, rangeDb: Double = EAR_GRAPH_RANGE_DB) {
+fun EarCurvesGraph(ears: EarCorrection, modifier: Modifier = Modifier, rangeDb: Double = EAR_GRAPH_RANGE_DB, markers: Boolean = false) {
     val (left, right) = remember(ears) { Processing.earCurves(emptyList(), ears) }
     EqGraph(
         filters = emptyList(),
@@ -307,6 +324,7 @@ fun EarCurvesGraph(ears: EarCorrection, modifier: Modifier = Modifier, rangeDb: 
         modifier = modifier,
         heightDp = 130,
         rangeDb = rangeDb,
+        earMarkers = if (markers) ears else null,
     )
 }
 

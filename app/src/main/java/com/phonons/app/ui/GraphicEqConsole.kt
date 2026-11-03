@@ -12,14 +12,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -29,7 +27,6 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -67,6 +64,7 @@ private const val STEP_DB = 0.5
  * Vertical faders you can set one at a time, or sweep a finger across to draw a whole curve. The
  * band readout and buttons below offer the same control for precise changes and screen readers.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
     val bands = tone.graphicBands
@@ -86,9 +84,25 @@ fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
         tone.faderLabel(yours + GraphicEq.shapes + ShapeLibrary.all.map { it.shape })
     }
 
-    SettingsSection(
-        stringResource(R.string.ui_graphic_eq),
-        trailing = {
+    SettingsSection(null) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .padding(start = 16.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                shapeLabel,
+                style = MaterialTheme.typography.titleSmall,
+                color = if (shapeLabel == Tone.FLAT_LABEL || shapeLabel == Tone.CUSTOM_LABEL) Palette.TextDim else Palette.Lit,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics { contentDescription = "Current shape: $shapeLabel" },
+            )
+            UndoRedoButtons()
             InfoButton(Help.graphic)
             if (!GraphicEq.isFlat(gains)) {
                 TextButton(onClick = {
@@ -96,18 +110,7 @@ fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
                     Repo.commit()
                 }) { Text(stringResource(R.string.ui_reset)) }
             }
-        },
-    ) {
-        Text(
-            shapeLabel,
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (shapeLabel == Tone.FLAT_LABEL || shapeLabel == Tone.CUSTOM_LABEL) Palette.TextDim else Palette.Amber,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 4.dp)
-                .semantics { contentDescription = "Current shape: $shapeLabel" },
-        )
+        }
         Faders(
             gains = gains,
             selected = band,
@@ -134,7 +137,7 @@ fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
                 Text(
                     String.format(Locale.US, "%+.1f dB", gains[band]),
                     style = Readout,
-                    color = if (gains[band] != 0.0) Palette.Amber else Palette.TextDim,
+                    color = if (gains[band] != 0.0) Palette.Lit else Palette.TextDim,
                 )
             }
             IconButton(enabled = band < bands - 1, onClick = { selected = band + 1 }) {
@@ -175,7 +178,7 @@ fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
                                 Repo.commit()
                             }
                         },
-                        shape = SegmentedButtonDefaults.itemShape(i, GraphicEq.BAND_OPTIONS.size),
+                        shape = SegmentedButtonDefaults.itemShape(i, GraphicEq.BAND_OPTIONS.size, KeyShape),
                         colors = segmentColors(),
                         icon = {},
                     ) { Text("$option", maxLines = 1) }
@@ -195,11 +198,11 @@ fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
                 }) { Text(stringResource(R.string.ui_smooth)) }
                 InfoButton(Help.graphicSmooth)
             }
-            LazyRow(
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+            FlowRow(
+                Modifier.padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(GraphicEq.shapes) { shape ->
+                GraphicEq.shapes.forEach { shape ->
                     val shapeGains = GraphicEq.apply(shape, bands)
                     FilterChip(
                         selected = shapeGains == gains,
@@ -209,8 +212,8 @@ fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
                         },
                         label = { Text(shape.name, maxLines = 1) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Palette.Amber,
-                            selectedLabelColor = Palette.OnAmber,
+                            selectedContainerColor = Palette.Lit,
+                            selectedLabelColor = Palette.OnLit,
                             labelColor = Palette.Text,
                         ),
                     )
@@ -239,7 +242,7 @@ private fun Faders(
     val select by rememberUpdatedState(onSelect)
     val finished by rememberUpdatedState(onFinished)
     val measurer = rememberTextMeasurer()
-    val labelStyle = TextStyle(color = Palette.TextDim, fontSize = 11.sp)
+    val labelStyle = TextStyle(color = Palette.TextDim, fontSize = 10.sp, fontFamily = ReadoutFamily)
     val bands = gains.size
     val freqs = GraphicEq.frequencies(bands)
     val labelledBands = freqs.indices.filter { freqs[it] in LABEL_FREQS }
@@ -247,8 +250,8 @@ private fun Faders(
     Canvas(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = 240.dp)
-            .height(240.dp)
+            .heightIn(min = 196.dp)
+            .height(196.dp)
             .padding(horizontal = 12.dp)
             .semantics {
                 contentDescription =
@@ -256,7 +259,8 @@ private fun Faders(
             }
             .pointerInput(bands) {
                 val bottomLabels = LABEL_SPACE_DP.dp.toPx()
-                fun bandAt(x: Float) = ((x / size.width) * bands).toInt().coerceIn(0, bands - 1)
+                val gutter = DB_GUTTER_DP.dp.toPx()
+                fun bandAt(x: Float) = (((x - gutter) / (size.width - gutter)) * bands).toInt().coerceIn(0, bands - 1)
                 fun dbAt(y: Float): Double {
                     val height = size.height - bottomLabels
                     return GraphicEq.snap(GraphicEq.MAX_DB * (1 - 2 * y.coerceIn(0f, height) / height))
@@ -288,51 +292,71 @@ private fun Faders(
     ) {
         val bottomLabels = LABEL_SPACE_DP.dp.toPx()
         val height = size.height - bottomLabels
-        val slot = size.width / bands
-        val barWidth = (slot * 0.5f).coerceIn(3.dp.toPx(), 12.dp.toPx())
-        // Knobs fill their slot on dense layouts, and the selected one stands out on top of its neighbours.
-        val knobRadius = (slot / 2).coerceAtMost(9.dp.toPx())
-        val selectedKnobRadius = knobRadius.coerceAtLeast(8.dp.toPx()) + 2.dp.toPx()
+        val gutter = DB_GUTTER_DP.dp.toPx()
+        val slot = (size.width - gutter) / bands
+        val rail = 2.dp.toPx()
+        // Caps are as wide as the layout allows, so they read as faders even with 31 bands.
+        val capWidth = (slot * 0.76f).coerceAtMost(22.dp.toPx())
+        val capHeight = 12.dp.toPx()
         val yOf = { db: Double -> ((1 - db / GraphicEq.MAX_DB) / 2 * height).toFloat() }
         val zero = yOf(0.0)
 
         listOf(-10.0, -5.0, 5.0, 10.0).forEach { db ->
-            drawLine(Palette.Line, Offset(0f, yOf(db)), Offset(size.width, yOf(db)), strokeWidth = 1f)
+            drawLine(Palette.Line, Offset(gutter, yOf(db)), Offset(size.width, yOf(db)), strokeWidth = 1f)
         }
-        drawLine(Palette.Outline, Offset(0f, zero), Offset(size.width, zero), strokeWidth = 1f)
+        drawLine(Palette.Outline, Offset(gutter, zero), Offset(size.width, zero), strokeWidth = 1f)
 
         gains.forEachIndexed { i, gain ->
-            val x = slot * i + (slot - barWidth) / 2
+            val centre = gutter + slot * i + slot / 2
             val isSelected = i == selected
-            val corner = CornerRadius(barWidth / 2)
-            drawRoundRect(
-                if (isSelected) Palette.Track else Palette.SurfaceHigh,
-                topLeft = Offset(x, 0f),
-                size = Size(barWidth, height),
-                cornerRadius = corner,
+            drawRect(
+                if (isSelected) Palette.Outline else Palette.Track,
+                topLeft = Offset(centre - rail / 2, 0f),
+                size = Size(rail, height),
             )
             val top = minOf(zero, yOf(gain))
             val bottom = maxOf(zero, yOf(gain))
             if (bottom - top > 0.5f) {
-                drawRoundRect(
-                    Palette.Amber,
-                    topLeft = Offset(x, top),
-                    size = Size(barWidth, bottom - top),
-                    cornerRadius = corner,
+                drawRect(
+                    Palette.Lit,
+                    topLeft = Offset(centre - rail / 2, top),
+                    size = Size(rail, bottom - top),
                 )
             }
-            if (!isSelected) drawCircle(Palette.Amber, knobRadius, Offset(x + barWidth / 2, yOf(gain)))
+            val width = if (isSelected) capWidth.coerceAtLeast(14.dp.toPx()) else capWidth
+            val tall = if (isSelected) capHeight + 6.dp.toPx() else capHeight
+            val y = yOf(gain)
+            if (isSelected) {
+                drawRoundRect(
+                    Palette.Surface,
+                    topLeft = Offset(centre - width / 2 - 2.dp.toPx(), y - tall / 2 - 2.dp.toPx()),
+                    size = Size(width + 4.dp.toPx(), tall + 4.dp.toPx()),
+                    cornerRadius = CornerRadius(3.dp.toPx()),
+                )
+            }
+            drawRoundRect(
+                if (isSelected) Palette.Text else Palette.Lit,
+                topLeft = Offset(centre - width / 2, y - tall / 2),
+                size = Size(width, tall),
+                cornerRadius = CornerRadius(2.dp.toPx()),
+            )
+            drawRect(
+                Palette.OnLit,
+                topLeft = Offset(centre - width / 2 + 1.dp.toPx(), y - 0.5.dp.toPx()),
+                size = Size(width - 2.dp.toPx(), 1.dp.toPx()),
+            )
         }
-        gains.getOrNull(selected)?.let { gain ->
-            val centre = Offset(slot * selected + slot / 2, yOf(gain))
-            drawCircle(Palette.Surface, selectedKnobRadius + 1.dp.toPx(), centre)
-            drawCircle(Palette.Text, selectedKnobRadius, centre)
+
+        listOf(10.0, 0.0, -10.0).forEach { db ->
+            val text = if (db > 0) "+${db.toInt()}" else "${db.toInt()}"
+            val measured = measurer.measure(text, labelStyle)
+            drawText(measured, topLeft = Offset(0f, yOf(db) - measured.size.height / 2))
         }
 
         labelledBands.forEach { i ->
             val text = GraphicEq.formatFrequency(freqs[i]).replace(" kHz", "k").replace(" Hz", "")
             val measured = measurer.measure(text, labelStyle)
-            val centre = slot * i + slot / 2
+            val centre = gutter + slot * i + slot / 2
             drawText(
                 measured,
                 topLeft = Offset(
@@ -345,4 +369,5 @@ private fun Faders(
 }
 
 private const val LABEL_SPACE_DP = 22
+private const val DB_GUTTER_DP = 24
 private val LABEL_FREQS = setOf(62.5, 63.0, 250.0, 1000.0, 4000.0, 16000.0)

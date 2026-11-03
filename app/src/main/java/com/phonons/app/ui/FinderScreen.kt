@@ -25,13 +25,10 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -188,7 +185,7 @@ private fun Intro(
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(PanelShape)
             .background(Palette.Surface)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -263,7 +260,7 @@ private fun Compare(
     LinearProgressIndicator(
         progress = { finder.roundNumber.toFloat() / finder.totalRounds },
         modifier = Modifier.fillMaxWidth(),
-        color = Palette.Amber,
+        color = Palette.Lit,
         trackColor = Palette.Track,
         drawStopIndicator = {},
     )
@@ -307,9 +304,9 @@ fun SideCard(label: String, selected: Boolean, musicActive: Boolean, modifier: M
     Box(
         modifier
             .height(140.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (selected) Palette.Amber else Palette.Surface)
-            .border(1.dp, if (selected) Palette.Amber else Palette.Outline, RoundedCornerShape(16.dp))
+            .clip(PanelShape)
+            .background(if (selected) Palette.Lit else Palette.Surface)
+            .border(1.dp, if (selected) Palette.Lit else Palette.Outline, PanelShape)
             .semantics { this.selected = selected }
             .clickable(role = Role.RadioButton, onClickLabel = "Play version $label", onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -318,7 +315,7 @@ fun SideCard(label: String, selected: Boolean, musicActive: Boolean, modifier: M
             Text(
                 label,
                 style = MaterialTheme.typography.headlineMedium,
-                color = if (selected) Palette.OnAmber else Palette.Text,
+                color = if (selected) Palette.OnLit else Palette.Text,
             )
             Spacer(Modifier.height(4.dp))
             Text(
@@ -328,7 +325,7 @@ fun SideCard(label: String, selected: Boolean, musicActive: Boolean, modifier: M
                     else -> "Selected"
                 },
                 style = MaterialTheme.typography.bodySmall,
-                color = if (selected) Palette.OnAmber else Palette.TextDim,
+                color = if (selected) Palette.OnLit else Palette.TextDim,
             )
         }
     }
@@ -414,7 +411,7 @@ private fun Result(
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(PanelShape)
             .background(Palette.Surface),
     ) {
         Trait.entries.forEachIndexed { i, trait ->
@@ -428,7 +425,7 @@ private fun Result(
             ) {
                 Text(trait.title, style = MaterialTheme.typography.bodyLarge, color = Palette.Text, modifier = Modifier.weight(1f))
                 val value = finder.answer(trait)
-                Text(describe(trait, value), style = Readout, color = if (value != 0.0) Palette.Amber else Palette.TextDim)
+                Text(describe(trait, value), style = Readout, color = if (value != 0.0) Palette.Lit else Palette.TextDim)
             }
         }
     }

@@ -21,12 +21,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -257,13 +254,13 @@ private fun Choose(
 private fun Slot(label: String, name: String, active: Boolean, modifier: Modifier, onClick: () -> Unit) {
     Column(
         modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(PanelShape)
             .background(if (active) Palette.SurfaceHigh else Palette.Surface)
             .clickable(role = Role.Button, onClick = onClick)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(label, style = MaterialTheme.typography.titleMedium, color = if (active) Palette.Amber else Palette.TextDim)
+        Text(label, style = MaterialTheme.typography.titleMedium, color = if (active) Palette.Lit else Palette.TextDim)
         Text(name, style = MaterialTheme.typography.bodyMedium, color = Palette.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }

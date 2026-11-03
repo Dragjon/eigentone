@@ -69,30 +69,33 @@ import kotlin.math.abs
 
 private const val DOUBLE_TAP_MS = 300L
 private const val MUSIC_CHECK_MS = 1000L
+private const val TRACK_TICKS = 20
 
 /** A heading above a group of settings on one surface. */
 @Composable
-fun SettingsSection(title: String, trailing: @Composable (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
+fun SettingsSection(title: String?, trailing: @Composable (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 40.dp)
-                .padding(start = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                title,
-                style = MaterialTheme.typography.titleSmall,
-                color = Palette.TextDim,
-                modifier = Modifier.weight(1f),
-            )
-            trailing?.invoke()
+        if (title != null) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 40.dp)
+                    .padding(start = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    title.uppercase(),
+                    style = PanelLegend,
+                    color = Palette.TextDim,
+                    modifier = Modifier.weight(1f),
+                )
+                trailing?.invoke()
+            }
         }
         Column(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
+                .clip(PanelShape)
                 .background(Palette.Surface),
             content = content,
         )
@@ -206,7 +209,7 @@ fun ActionRow(title: String, tip: Tip, detail: String? = null, enabled: Boolean 
     }
 }
 
-/** Reads a value out. Amber means it differs from the default, so changes are easy to spot. */
+/** Reads a value out. Lit means it differs from the default, so changes are easy to spot. */
 @Composable
 fun SliderSetting(
     title: String,
@@ -231,7 +234,7 @@ fun SliderSetting(
             Text(
                 readout,
                 style = Readout,
-                color = if (changed) Palette.Amber else Palette.TextDim,
+                color = if (changed) Palette.Lit else Palette.TextDim,
                 modifier = Modifier.padding(start = 8.dp),
             )
         }
@@ -263,7 +266,7 @@ fun SliderSetting(
  * It stays a real slider for screen readers through its progress semantics.
  */
 @Composable
-private fun ValueTrack(
+fun ValueTrack(
     label: String,
     readout: String,
     value: Float,
@@ -283,7 +286,7 @@ private fun ValueTrack(
     Canvas(
         Modifier
             .fillMaxWidth()
-            .height(40.dp)
+            .height(48.dp)
             .semantics {
                 contentDescription = label
                 stateDescription = readout
@@ -327,38 +330,63 @@ private fun ValueTrack(
                 }
             },
     ) {
-        val thumbRadius = 9.dp.toPx()
-        val usable = size.width - thumbRadius * 2
-        val xOf = { v: Float -> thumbRadius + (v - range.start) / span * usable }
+        // A thin rail with an engraved scale and a rectangular cap, like a fader on a piece of equipment.
+        val capWidth = 12.dp.toPx()
+        val capHeight = 24.dp.toPx()
+        val usable = size.width - capWidth
+        val xOf = { v: Float -> capWidth / 2 + (v - range.start) / span * usable }
         val centre = size.height / 2
-        val trackHeight = 4.dp.toPx()
-        val corner = CornerRadius(trackHeight / 2)
-        drawRoundRect(
+        val railHeight = 2.dp.toPx()
+        val tickHeight = 3.dp.toPx()
+        for (tick in 0..TRACK_TICKS) {
+            val x = capWidth / 2 + usable * tick / TRACK_TICKS
+            val major = tick == 0 || tick == TRACK_TICKS
+            val length = if (major) tickHeight * 2 else tickHeight
+            drawRect(
+                Palette.Track,
+                topLeft = Offset(x - 0.5.dp.toPx(), centre + railHeight + 3.dp.toPx()),
+                size = Size(1.dp.toPx(), length),
+            )
+        }
+        // The default gets its own long tick, wherever it falls on the scale.
+        drawRect(
+            Palette.TextDim,
+            topLeft = Offset(xOf(default.coerceIn(range)) - 0.5.dp.toPx(), centre + railHeight + 3.dp.toPx()),
+            size = Size(1.dp.toPx(), tickHeight * 2),
+        )
+        drawRect(
             Palette.Track,
-            topLeft = Offset(thumbRadius, centre - trackHeight / 2),
-            size = Size(usable, trackHeight),
-            cornerRadius = corner,
+            topLeft = Offset(capWidth / 2, centre - railHeight / 2),
+            size = Size(usable, railHeight),
         )
         val from = xOf(origin.coerceIn(range))
         val to = xOf(clamped)
         val left = minOf(from, to)
-        drawRoundRect(
-            Palette.Amber,
-            topLeft = Offset(left, centre - trackHeight / 2),
-            size = Size(maxOf(from, to) - left, trackHeight),
-            cornerRadius = corner,
+        drawRect(
+            Palette.Lit,
+            topLeft = Offset(left, centre - railHeight / 2),
+            size = Size(maxOf(from, to) - left, railHeight),
         )
         if (origin > range.start) {
             // A notch marks the zero point on centred controls.
             drawRect(
                 Palette.TextDim,
-                topLeft = Offset(from - 1.dp.toPx() / 2, centre - 6.dp.toPx()),
-                size = Size(1.dp.toPx(), 12.dp.toPx()),
+                topLeft = Offset(from - 1.dp.toPx() / 2, centre - 7.dp.toPx()),
+                size = Size(1.dp.toPx(), 7.dp.toPx()),
             )
         }
-        drawCircle(Palette.Surface, thumbRadius, Offset(to, centre))
-        drawCircle(Palette.Amber, thumbRadius - 1.dp.toPx(), Offset(to, centre))
-        drawCircle(Palette.OnAmber, 2.5.dp.toPx(), Offset(to, centre))
+        val corner = CornerRadius(2.dp.toPx())
+        drawRoundRect(
+            Palette.Lit,
+            topLeft = Offset(to - capWidth / 2, centre - capHeight / 2),
+            size = Size(capWidth, capHeight),
+            cornerRadius = corner,
+        )
+        drawRect(
+            Palette.OnLit,
+            topLeft = Offset(to - 1.dp.toPx(), centre - capHeight / 2 + 4.dp.toPx()),
+            size = Size(2.dp.toPx(), capHeight - 8.dp.toPx()),
+        )
     }
 }
 

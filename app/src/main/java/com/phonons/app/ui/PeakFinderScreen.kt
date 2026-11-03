@@ -19,12 +19,9 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -231,14 +228,14 @@ private fun Questions(
     LinearProgressIndicator(
         progress = { progress },
         modifier = Modifier.fillMaxWidth(),
-        color = Palette.Amber,
+        color = Palette.Lit,
         trackColor = Palette.Track,
         drawStopIndicator = {},
     )
     Text(
         GraphicEq.formatFrequency(kotlin.math.round(question.hz)),
         style = MaterialTheme.typography.displaySmall,
-        color = Palette.Amber,
+        color = Palette.Lit,
     )
     when (question) {
         is PeakFinder.Question.Spot -> {
@@ -251,7 +248,7 @@ private fun Questions(
             Text(
                 if (mainNote) "Playing: this note" else "Playing: the note beside it",
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (mainNote) Palette.Amber else Palette.TextDim,
+                color = if (mainNote) Palette.Lit else Palette.TextDim,
             )
             AnswerButton("Stands out", ready) { onSpot(SpotAnswer.STANDS_OUT) }
             AnswerButton("Same", ready) { onSpot(SpotAnswer.SAME) }
@@ -263,7 +260,7 @@ private fun Questions(
             Text(
                 if (note % 2 == 0) "Playing: first note" else "Playing: second note",
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (note % 2 == 0) Palette.Amber else Palette.RightEar,
+                color = if (note % 2 == 0) Palette.Lit else Palette.Text,
             )
             AnswerButton("First", ready) { onPick(SidePick.FIRST) }
             AnswerButton("Second", ready) { onPick(SidePick.SECOND) }
@@ -329,7 +326,7 @@ private fun Result(
         onDrag = { _, _, _ -> },
         onDragEnd = {},
         modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(PanelShape)
             .background(Palette.Surface),
         heightDp = 150,
         rangeDb = RESULT_GRAPH_RANGE_DB,
@@ -350,7 +347,7 @@ private fun Result(
                     color = Palette.Text,
                     modifier = Modifier.weight(1f),
                 )
-                Text(String.format(Locale.US, "%+.0f dB", mark.gainDb), style = Readout, color = Palette.Amber)
+                Text(String.format(Locale.US, "%+.0f dB", mark.gainDb), style = Readout, color = Palette.Lit)
             }
         }
     }

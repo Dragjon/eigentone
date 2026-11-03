@@ -19,12 +19,9 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -189,7 +186,7 @@ private fun Tones(
     LinearProgressIndicator(
         progress = { progress },
         modifier = Modifier.fillMaxWidth(),
-        color = Palette.Amber,
+        color = Palette.Lit,
         trackColor = Palette.Track,
         drawStopIndicator = {},
     )
@@ -207,7 +204,7 @@ private fun Tones(
         },
         style = MaterialTheme.typography.titleMedium,
         color = when (phase) {
-            TonePhase.PLAYING -> Palette.Amber
+            TonePhase.PLAYING -> Palette.Lit
             TonePhase.FAILED -> Palette.Danger
             else -> Palette.Text
         },
@@ -283,7 +280,7 @@ private fun Result(result: HearingResult, onClose: () -> Unit) {
                     Text(
                         String.format(Locale.US, "%+.1f dB", point.db),
                         style = Readout,
-                        color = if (point.db != 0.0) Palette.Amber else Palette.TextDim,
+                        color = if (point.db != 0.0) Palette.Lit else Palette.TextDim,
                     )
                 }
             }
@@ -355,9 +352,10 @@ fun HearingGraph(result: HearingResult, modifier: Modifier = Modifier) {
         EarCurvesGraph(
             levels,
             Modifier
-                .clip(RoundedCornerShape(16.dp))
+                .clip(PanelShape)
                 .background(Palette.Surface),
             rangeDb = HEARING_GRAPH_RANGE_DB,
+            markers = true,
         )
         Text(
             stringResource(R.string.ui_higher_means_that_ear_needed_a_louder_to),

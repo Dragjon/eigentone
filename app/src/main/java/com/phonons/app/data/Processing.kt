@@ -19,6 +19,8 @@ enum class ClipRisk {
     CLIPPING,
 }
 
+data class EffectState(val name: String, val on: Boolean)
+
 data class PeakEstimate(val peakDb: Double, val risk: ClipRisk)
 
 /** What the audio effect should do right now. */
@@ -136,6 +138,22 @@ object Processing {
         if (width == null) return left to right
         val (leanLeft, leanRight) = StereoWidth.curves(width)
         return (left + curveFilter(WIDTH_CURVE_ID, leanLeft)) to (right + curveFilter(WIDTH_CURVE_ID, leanRight))
+    }
+
+    /**
+     * The main effects and whether each is on, for the top of the screen. The compressor's place shows
+     * whichever of night mode, the compressor or the leveller is really running.
+     */
+    fun effectStates(state: AppState, outputKey: String, scheduledNight: Boolean = false): List<EffectState> {
+        val active = activeEffects(state, outputKey, scheduledNight)
+        val dynamics = active.firstOrNull { it == "Night" || it == "Comp" || it == "Level" }
+        val space = active.firstOrNull { it == "Width" || it == "Surround" }
+        return buildList {
+            add(EffectState(dynamics ?: "Comp", dynamics != null))
+            add(EffectState(space ?: if (state.useSystemSurround) "Surround" else "Width", space != null))
+            add(EffectState("Ears", "Ears" in active))
+            if ("Tame" in active) add(EffectState("Tame", true))
+        }
     }
 
     /**
