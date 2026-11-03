@@ -17,6 +17,7 @@ object AutoEqCatalog {
     private const val MAX_PROFILE_BYTES = 256 * 1024
     private const val CACHE_MAX_AGE_MS = 30L * 24 * 60 * 60 * 1000
     private const val TIMEOUT_MS = 20_000
+    private const val MAX_MEASUREMENTS = 5
 
     private val line = Regex("""^- \[(.+?)]\((\./.+)\) by (.+)$""")
 
@@ -57,6 +58,20 @@ object AutoEqCatalog {
                     SOURCE_PREFERENCE.indexOfFirst { it in entry.source.lowercase() }.let { if (it < 0) SOURCE_PREFERENCE.size else it }
                 }.thenBy { it.name.length },
             )
+    }
+
+    /**
+     * Every published measurement of the same headphones, best-regarded sources first. Limited, because
+     * each has to be downloaded and few people can tell more than a handful apart.
+     */
+    fun measurementsOf(entries: List<CatalogEntry>, entry: CatalogEntry, limit: Int = MAX_MEASUREMENTS): List<CatalogEntry> {
+        val name = words(entry.name.replace(Regex("""\(.*?\)"""), ""))
+        val same = entries.filter { other -> words(other.name.replace(Regex("""\(.*?\)"""), "")) == name }
+        val ranked = same.sortedBy { other ->
+            SOURCE_PREFERENCE.indexOfFirst { it in other.source.lowercase() }.let { if (it < 0) SOURCE_PREFERENCE.size else it }
+        }
+        // The one that was picked always stays in, even if there are many others.
+        return (listOf(entry) + ranked.filterNot { it == entry }).take(limit)
     }
 
     private fun words(text: String): List<String> =

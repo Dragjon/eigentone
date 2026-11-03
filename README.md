@@ -10,7 +10,7 @@ A free system-wide equaliser for Android 14 and newer. No ads, no account, and n
 - **Parametric EQ** with up to 20 filters.
 - **Shape library** of 595 curves, searchable by genre, instrument, situation or problem. Hear each on your music before keeping it, and layer them.
 - **Your own shapes**, typed in from any other app's EQ.
-- **Headphone correction** from AutoEq's published measurements, with a strength control. Eigentone offers one when headphones connect.
+- **Headphone correction** from AutoEq's published measurements, with a strength control, and a way to compare reviewers' measurements by ear. Eigentone offers one when headphones connect.
 - **Compare two sounds**, switching instantly at matched loudness, with an optional blind test.
 - **Find my sound**, a guided A/B listening test that has to beat your current sound before you keep it.
 - **Hearing check** that builds a gentle curve for how you hear, with a separate EQ for each ear if they differ, saved per pair of headphones and drawn as a curve for each ear. It isn't a medical test.
@@ -18,6 +18,7 @@ A free system-wide equaliser for Android 14 and newer. No ads, no account, and n
 - **Find peaks for me**, a guided listening test that finds peaks and dips in your headphones and suggests narrow filters.
 - **Frequency sweep**, a climbing tone that lets you mark peaks and dips by ear and turns them into narrow filters.
 - **Presets** that load automatically per output, per earbud noise mode and per app.
+- **Dynamic EQ**, with a harshness tamer and a boom tamer that only act while those ranges get loud.
 - **Multiband compressor**, free and fully adjustable and saved per preset, with three bands, adjustable crossovers, a live response curve and starting styles.
 - **Volume leveller**, night mode with a schedule, loudness compensation, limiter, balance, stereo width and virtual surround.
 - **Undo and redo**, a saved-curve overlay while editing and a warning when settings could clip.
@@ -42,7 +43,7 @@ Crash reports stay on the phone. You choose whether to share one from the System
 Copy the latest `Eigentone-<version>.apk` to the phone and open it, or use USB debugging:
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.21.0.apk
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.22.1.apk
 ```
 
 ## Build

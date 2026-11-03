@@ -29,6 +29,10 @@ data class Tone(
     /** What was last applied to the faders, for showing its name. */
     val shape: AppliedShape? = null,
     val compressor: Compressor = Compressor(),
+    /** Only turns down harsh treble when it gets loud, from 0 to 1. */
+    val harshTamer: Double = 0.0,
+    /** Only turns down deep bass when it gets loud, from 0 to 1. */
+    val boomTamer: Double = 0.0,
 ) {
     /**
      * Names what the faders hold. Moving a fader afterwards shows as edited, because the name no longer
@@ -353,6 +357,8 @@ data class EngineStatus(
     val rebuilds: Int = 0,
     /** Bands the phone accepted when read back, as "accepted/total", or null before the first check. */
     val readback: String? = null,
+    /** This phone refused the extra bands the harshness and boom tamers need. */
+    val tamersUnavailable: Boolean = false,
 )
 
 object BuiltIns {

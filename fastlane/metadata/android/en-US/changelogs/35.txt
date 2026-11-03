@@ -1,0 +1,1 @@
+Adds dynamic EQ with a harshness tamer and boom tamer, and lets you compare reviewers' measurements of your headphones by ear before choosing one.

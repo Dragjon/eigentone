@@ -129,6 +129,8 @@ object BackupCodec {
             correction = safe(tone.correction, 1.0).coerceIn(0.0, 1.0),
             importedCurve = ShapeText.cleanCurve(tone.importedCurve),
             compressor = tone.compressor.clamped(),
+            harshTamer = safe(tone.harshTamer, 0.0).coerceIn(0.0, 1.0),
+            boomTamer = safe(tone.boomTamer, 0.0).coerceIn(0.0, 1.0),
             shape = tone.shape?.takeIf { it.name.isNotBlank() }?.let { shape ->
                 AppliedShape(shape.name.take(Tone.MAX_SHAPE_LABEL), shape.faders.take(bands).map { GraphicEq.snap(safe(it, 0.0)) })
             },

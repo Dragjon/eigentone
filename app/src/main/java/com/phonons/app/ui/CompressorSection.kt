@@ -58,6 +58,34 @@ fun CompressorSection(state: AppState) {
     var details by remember { mutableStateOf(false) }
     fun change(transform: (Compressor) -> Compressor) = Repo.editTone { it.copy(compressor = transform(it.compressor)) }
 
+    val status by Repo.status.collectAsStateWithLifecycle()
+    SettingsSection(stringResource(R.string.ui_dynamic_eq), trailing = { InfoButton(Help.dynamicEq) }) {
+        val tone = state.current.tone
+        val off = stringResource(R.string.ui_off)
+        fun amount(value: Double) = if (value <= 0.0) off else "${round(value * 100).toInt()}%"
+        SliderSetting(
+            title = stringResource(R.string.ui_harshness_tamer),
+            tip = Help.harshTamer,
+            readout = amount(tone.harshTamer),
+            value = tone.harshTamer.toFloat(),
+            range = 0f..1f,
+            default = 0f,
+            detail = if (status.tamersUnavailable) stringResource(R.string.ui_tamers_unavailable) else null,
+            onChange = { v -> Repo.editTone { it.copy(harshTamer = if (v < 0.02f) 0.0 else v.toDouble()) } },
+            onFinished = Repo::commit,
+        )
+        RowDivider()
+        SliderSetting(
+            title = stringResource(R.string.ui_boom_tamer),
+            tip = Help.boomTamer,
+            readout = amount(tone.boomTamer),
+            value = tone.boomTamer.toFloat(),
+            range = 0f..1f,
+            default = 0f,
+            onChange = { v -> Repo.editTone { it.copy(boomTamer = if (v < 0.02f) 0.0 else v.toDouble()) } },
+            onFinished = Repo::commit,
+        )
+    }
     SettingsSection(stringResource(R.string.ui_compressor)) {
         SwitchSetting(
             stringResource(R.string.ui_multiband_compressor),

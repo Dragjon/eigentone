@@ -23,7 +23,7 @@ object PresetShortcuts {
             ShortcutInfo.Builder(context, "preset:${preset.id}")
                 .setShortLabel(preset.name.take(MAX_SHORT_LABEL))
                 .setLongLabel(preset.name)
-                .setIcon(Icon.createWithResource(context, R.drawable.ic_phonons))
+                .setIcon(Icon.createWithResource(context, R.mipmap.ic_launcher))
                 .setIntent(
                     Intent(context, MainActivity::class.java)
                         .setAction(ACTION_LOAD_PRESET)

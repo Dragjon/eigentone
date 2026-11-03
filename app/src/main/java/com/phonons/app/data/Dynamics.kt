@@ -1,6 +1,7 @@
 package com.phonons.app.data
 
 import kotlin.math.abs
+import kotlin.math.pow
 import kotlinx.serialization.Serializable
 
 /** One frequency range of the compressor. */
@@ -75,6 +76,12 @@ data class Compressor(
 
 data class CompressorStyle(val name: String, val compressor: Compressor)
 
+/** How strongly to hold back each range, from 0 for off to 1. */
+data class Tamers(val harsh: Double = 0.0, val boom: Double = 0.0)
+
+/** One band as the audio effect receives it. */
+data class PlannedBand(val cutoffHz: Double, val band: CompressorBand, val active: Boolean)
+
 object Dynamics {
     val THRESHOLD_DB = -60.0..0.0
     val RATIO = 1.0..20.0
@@ -88,6 +95,78 @@ object Dynamics {
     val HIGH_CROSSOVER_HZ = 1000.0..12000.0
 
     private const val ACTIVE = 0.001
+
+    /** The full set of bands, which leaves room for the tamers beside the compressor's three. */
+    const val FULL_BANDS = 6
+
+    /** For a phone that refuses more, which keeps the compressor but can't offer the tamers. */
+    const val BASIC_BANDS = 3
+
+    const val BOOM_TOP_HZ = 110.0
+    const val HARSH_LOW_HZ = 4000.0
+    const val HARSH_HIGH_HZ = 9000.0
+    private const val TOP_HZ = 24000.0
+    private const val SPARE_FROM_HZ = 20000.0
+
+    /** Low thresholds, because a single narrow range holds much less level than the whole of the music. */
+    fun harshBand(amount: Double) = CompressorBand(
+        thresholdDb = -22.0 - 14.0 * amount,
+        ratio = 1.5 + 3.5 * amount,
+        attackMs = 3.0,
+        releaseMs = 80.0,
+    )
+
+    fun boomBand(amount: Double) = CompressorBand(
+        thresholdDb = -14.0 - 12.0 * amount,
+        ratio = 1.5 + 2.5 * amount,
+        attackMs = 15.0,
+        releaseMs = 150.0,
+    )
+
+    /**
+     * Combines the compressor and the tamers into the bands the effect has. Where both apply, the band
+     * does the stronger of the two, and keeps the compressor's makeup. Always gives exactly [slots] bands
+     * in rising order, because the effect's band count is fixed when it's created and can't have gaps.
+     */
+    fun plan(compressor: Compressor, tamers: Tamers, slots: Int = FULL_BANDS): List<PlannedBand> {
+        val harsh = if (slots >= FULL_BANDS) tamers.harsh else 0.0
+        val boom = if (slots >= FULL_BANDS) tamers.boom else 0.0
+        val edges = sortedSetOf(compressor.lowCrossoverHz, compressor.highCrossoverHz)
+        if (boom > ACTIVE) edges += BOOM_TOP_HZ
+        if (harsh > ACTIVE) {
+            edges += HARSH_LOW_HZ
+            edges += HARSH_HIGH_HZ
+        }
+        // Spare slots go above hearing. Splitting an audible band would change how it compresses, because
+        // a narrower band carries less level and so crosses the threshold less often.
+        val spare = slots - edges.size - 1
+        val cutoffs = edges.toList() +
+            List(spare) { SPARE_FROM_HZ * (TOP_HZ / SPARE_FROM_HZ).pow(it.toDouble() / spare) } +
+            TOP_HZ
+        return cutoffs.mapIndexed { i, top ->
+            val bottom = if (i == 0) LOWEST_HZ else cutoffs[i - 1]
+            val own = bandAt(compressor, kotlin.math.sqrt(bottom * top))
+            val ownActive = compressor.enabled && own.enabled
+            val tamer = when {
+                boom > ACTIVE && top <= BOOM_TOP_HZ -> boomBand(boom)
+                harsh > ACTIVE && bottom >= HARSH_LOW_HZ && top <= HARSH_HIGH_HZ -> harshBand(harsh)
+                else -> null
+            }
+            val band = when {
+                tamer == null -> own
+                !ownActive -> tamer
+                else -> own.copy(
+                    thresholdDb = minOf(own.thresholdDb, tamer.thresholdDb),
+                    ratio = maxOf(own.ratio, tamer.ratio),
+                    attackMs = minOf(own.attackMs, tamer.attackMs),
+                    releaseMs = minOf(own.releaseMs, tamer.releaseMs),
+                )
+            }
+            PlannedBand(top, band, ownActive || tamer != null)
+        }
+    }
+
+    private const val LOWEST_HZ = 20.0
 
     /** A typical level for music in a band, used to estimate what compression does to loudness. */
     private const val TYPICAL_LEVEL_DB = -18.0

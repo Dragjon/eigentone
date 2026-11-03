@@ -1460,6 +1460,19 @@ fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
     var problem by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    var measurements by remember { mutableStateOf<List<CatalogEntry>?>(null) }
+
+    measurements?.let { options ->
+        MeasurementCompare(
+            options,
+            onDismiss = { measurements = null },
+            onChosen = { message ->
+                measurements = null
+                onImported(message)
+            },
+        )
+        return
+    }
 
     LaunchedEffect(Unit) {
         val loaded = withContext(Dispatchers.IO) { runCatching { AutoEqCatalog.loadIndex(context.cacheDir) } }
@@ -1495,6 +1508,12 @@ fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
                                 .fillMaxWidth()
                                 .heightIn(min = 48.dp)
                                 .clickable(enabled = !busy, role = Role.Button) {
+                                    // Several measurements are worth hearing before choosing one.
+                                    val same = AutoEqCatalog.measurementsOf(entries.orEmpty(), entry)
+                                    if (same.size > 1) {
+                                        measurements = same
+                                        return@clickable
+                                    }
                                     busy = true
                                     scope.launch {
                                         val text = withContext(Dispatchers.IO) {

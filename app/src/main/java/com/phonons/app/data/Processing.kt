@@ -35,6 +35,7 @@ data class ProcessingTarget(
     val rightFilters: List<Filter> = filters,
     /** What the compressor does, once night mode, the leveller and manual settings are resolved. */
     val dynamics: Compressor = Compressor(),
+    val tamers: Tamers = Tamers(),
 )
 
 /** Turns the user's settings into the final processing. Pure, so it can be unit tested. */
@@ -150,6 +151,7 @@ object Processing {
                 tone.compressor.enabled -> add("Comp")
                 state.leveller > 0.001 -> add("Level")
             }
+            if (tone.harshTamer > 0.0 || tone.boomTamer > 0.0) add("Tame")
             if (tone.surround > 0.0) add(if (state.useSystemSurround) "Surround" else "Width")
             if (state.earsFor(outputKey)?.enabled == true) add("Ears")
         }
@@ -217,6 +219,7 @@ object Processing {
                 leveller = state.leveller,
                 rightFilters = right,
                 dynamics = dynamics,
+                tamers = Tamers(state.current.tone.harshTamer, state.current.tone.boomTamer),
             )
         }
         if (!state.matchBypass) {

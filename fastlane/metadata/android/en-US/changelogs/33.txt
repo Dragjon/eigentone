@@ -1,0 +1,1 @@
+App icon shortcuts now use the app's coloured icon.

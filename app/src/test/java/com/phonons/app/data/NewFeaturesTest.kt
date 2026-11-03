@@ -174,6 +174,153 @@ class NewFeaturesTest {
 
     private val bassy = Preset("user:1", "Liberty 4 NC + bass", folder = "Commute")
 
+    private fun assertOrdered(plan: List<PlannedBand>) {
+        for (i in 1 until plan.size) assertTrue(plan[i].cutoffHz > plan[i - 1].cutoffHz)
+    }
+
+    @Test
+    fun theBandPlanAlwaysFillsEverySlotInOrder() {
+        val cases = listOf(
+            Compressor(),
+            loudCompressor,
+            loudCompressor.copy(lowCrossoverHz = 110.0, highCrossoverHz = 4000.0),
+            loudCompressor.copy(lowCrossoverHz = 800.0, highCrossoverHz = 9000.0),
+        )
+        for (compressor in cases) for (tamers in listOf(Tamers(), Tamers(harsh = 0.5), Tamers(boom = 0.5), Tamers(0.5, 0.5))) {
+            val plan = Dynamics.plan(compressor, tamers)
+            assertEquals(Dynamics.FULL_BANDS, plan.size)
+            assertOrdered(plan)
+            assertEquals(24000.0, plan.last().cutoffHz, 0.0)
+        }
+    }
+
+    @Test
+    fun nothingIsActiveWithEverythingOff() {
+        assertTrue(Dynamics.plan(Compressor(), Tamers()).none { it.active })
+    }
+
+    @Test
+    fun theHarshnessTamerOnlyTouchesItsRange() {
+        val plan = Dynamics.plan(Compressor(), Tamers(harsh = 0.5))
+        val active = plan.filter { it.active }
+        assertEquals(1, active.size)
+        assertEquals(Dynamics.HARSH_HIGH_HZ, active.single().cutoffHz, 0.0)
+        assertEquals(Dynamics.HARSH_LOW_HZ, plan[plan.indexOf(active.single()) - 1].cutoffHz, 0.0)
+    }
+
+    @Test
+    fun theBoomTamerOnlyTouchesDeepBass() {
+        val plan = Dynamics.plan(Compressor(), Tamers(boom = 0.5))
+        assertTrue(plan.first().active)
+        assertTrue(plan.filter { it.active }.all { it.cutoffHz <= Dynamics.BOOM_TOP_HZ })
+    }
+
+    @Test
+    fun strongerAmountsTameMore() {
+        for (band in listOf(Dynamics::harshBand, Dynamics::boomBand)) {
+            assertTrue(band(1.0).thresholdDb < band(0.2).thresholdDb)
+            assertTrue(band(1.0).ratio > band(0.2).ratio)
+            assertEquals(0.0, band(1.0).makeupDb, 0.0)
+        }
+    }
+
+    @Test
+    fun tamersOnlyEverTurnThingsDown() {
+        val band = Dynamics.harshBand(1.0)
+        for (level in listOf(-60.0, -40.0, -20.0, 0.0)) assertTrue(band.outputDb(level) <= level)
+        assertEquals(-60.0, band.outputDb(-60.0), 0.01)
+    }
+
+    @Test
+    fun aTamerAndTheCompressorCombineWithoutLosingEither() {
+        val plan = Dynamics.plan(loudCompressor, Tamers(harsh = 1.0))
+        val tamed = plan.single { it.cutoffHz == Dynamics.HARSH_HIGH_HZ }
+        val tamer = Dynamics.harshBand(1.0)
+        assertEquals(minOf(punchyBand.thresholdDb, tamer.thresholdDb), tamed.band.thresholdDb, 0.0)
+        assertEquals(maxOf(punchyBand.ratio, tamer.ratio), tamed.band.ratio, 0.0)
+        assertEquals(punchyBand.makeupDb, tamed.band.makeupDb, 0.0)
+        assertTrue(plan.all { it.active })
+    }
+
+    /** Splitting an audible band would change how hard it compresses, so the compressor's bands stay whole. */
+    @Test
+    fun spareBandsDontSplitAnythingAudible() {
+        val plan = Dynamics.plan(loudCompressor, Tamers())
+        assertEquals(Dynamics.FULL_BANDS, plan.size)
+        assertEquals(200.0, plan[0].cutoffHz, 0.0)
+        assertEquals(2500.0, plan[1].cutoffHz, 0.0)
+        assertTrue(plan.drop(2).all { it.cutoffHz >= 20000.0 })
+        assertTrue(plan.all { it.band == punchyBand && it.active })
+    }
+
+    @Test
+    fun onlyTheTamersOwnEdgesAreAddedWhenOn() {
+        val audible = Dynamics.plan(loudCompressor, Tamers(harsh = 0.5, boom = 0.5)).map { it.cutoffHz }.filter { it < 20000.0 }
+        assertEquals(listOf(Dynamics.BOOM_TOP_HZ, 200.0, 2500.0, Dynamics.HARSH_LOW_HZ, Dynamics.HARSH_HIGH_HZ), audible)
+    }
+
+    @Test
+    fun aPhoneWithFewerBandsKeepsTheCompressorWithoutTheTamers() {
+        val plan = Dynamics.plan(loudCompressor, Tamers(harsh = 1.0, boom = 1.0), Dynamics.BASIC_BANDS)
+        assertEquals(listOf(200.0, 2500.0, 24000.0), plan.map { it.cutoffHz })
+        assertTrue(plan.all { it.band == punchyBand })
+        assertTrue(Dynamics.plan(Compressor(), Tamers(harsh = 1.0), Dynamics.BASIC_BANDS).none { it.active })
+    }
+
+    @Test
+    fun tamersAreSavedWithThePresetAndStepAsideInBypass() {
+        val preset = Preset("user:t", "T", tone = Tone(harshTamer = 0.4, boomTamer = 0.7))
+        val shared = ShareCode.decode(ShareCode.encode(preset))!!.tone
+        assertEquals(0.4, shared.harshTamer, 0.0)
+        assertEquals(0.7, shared.boomTamer, 0.0)
+        assertEquals(Tamers(0.4, 0.7), Processing.target(AppState(current = preset), 0.0).tamers)
+        assertEquals(Tamers(), Processing.target(AppState(current = preset, bypass = true), 0.0).tamers)
+        val wild = Preset("user:t", "T", tone = Tone(harshTamer = 90.0, boomTamer = -3.0))
+        assertEquals(1.0, ShareCode.decode(ShareCode.encode(wild))!!.tone.harshTamer, 0.0)
+        assertEquals(0.0, ShareCode.decode(ShareCode.encode(wild))!!.tone.boomTamer, 0.0)
+    }
+
+    @Test
+    fun theTopStripShowsTheTamers() {
+        val state = AppState(enabled = true, current = Preset("user:t", "T", tone = Tone(harshTamer = 0.4)))
+        assertTrue("Tame" in Processing.activeEffects(state, BUDS))
+    }
+
+    private fun entry(name: String, source: String) = CatalogEntry(name, source, "x/$source/$name")
+
+    @Test
+    fun measurementsOfTheSameHeadphonesAreFoundBestFirst() {
+        val a = entry("Sony WH-1000XM5", "Other Reviewer")
+        val b = entry("Sony WH-1000XM5", "oratory1990")
+        val c = entry("Sony WH-1000XM5", "Rtings")
+        val different = entry("Sony WH-1000XM4", "oratory1990")
+        val found = AutoEqCatalog.measurementsOf(listOf(a, b, c, different), a)
+        assertEquals(setOf(a, b, c), found.toSet())
+        assertEquals(a, found.first())
+        assertEquals(listOf(b, c), found.drop(1).take(2))
+    }
+
+    @Test
+    fun aSampleLabelCountsAsTheSameHeadphones() {
+        val a = entry("Sony WH-1000XM5", "Rtings")
+        val b = entry("Sony WH-1000XM5 (sample 2)", "oratory1990")
+        assertEquals(2, AutoEqCatalog.measurementsOf(listOf(a, b), a).size)
+    }
+
+    @Test
+    fun aHeadphoneWithOneMeasurementHasNothingToCompare() {
+        val a = entry("Rare Model", "Rtings")
+        assertEquals(listOf(a), AutoEqCatalog.measurementsOf(listOf(a, entry("Other", "Rtings")), a))
+    }
+
+    @Test
+    fun tooManyMeasurementsAreCutDownButKeepTheChosenOne() {
+        val many = List(9) { entry("Popular", "Reviewer $it") }
+        val found = AutoEqCatalog.measurementsOf(many, many[8])
+        assertEquals(5, found.size)
+        assertEquals(many[8], found.first())
+    }
+
     @Test
     fun presetSearchMatchesEveryWordInAnyOrder() {
         assertTrue(PresetOrganiser.matches(bassy, "bass lib"))

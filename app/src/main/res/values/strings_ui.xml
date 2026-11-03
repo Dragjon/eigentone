@@ -1,5 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="ui_off" formatted="false">Off</string>
+    <string name="ui_compare_measurements" formatted="false">Compare measurements</string>
+    <string name="ui_compare_measurements_intro" formatted="false">Reviewers measure the same headphones differently. Play some music and switch between them. They play at about the same loudness as your current sound.</string>
+    <string name="ui_could_not_download_measurements" formatted="false">Could not download these measurements. Check your connection and try again.</string>
+    <string name="ui_what_i_had" formatted="false">What I had</string>
+    <string name="ui_dynamic_eq" formatted="false">Dynamic EQ</string>
+    <string name="ui_harshness_tamer" formatted="false">Harshness tamer</string>
+    <string name="ui_boom_tamer" formatted="false">Boom tamer</string>
+    <string name="ui_tamers_unavailable" formatted="false">This phone doesn\'t allow the extra bands these need, so they have no effect here.</string>
+    <string name="help_dynamic_eq_title" formatted="false">Dynamic EQ</string>
+    <string name="help_dynamic_eq_body" formatted="false">Turns a range of frequencies down only while it\'s too loud, so the rest of the time your sound is untouched. A normal EQ cut would dull it all the time. Saved with each preset.</string>
+    <string name="help_harsh_tamer_title" formatted="false">Harshness tamer</string>
+    <string name="help_harsh_tamer_body" formatted="false">Holds back sharp treble, such as sibilance and cymbals, around 4 to 9 kHz, when it gets loud. Too much can make music sound dull, so use as little as helps.</string>
+    <string name="help_boom_tamer_title" formatted="false">Boom tamer</string>
+    <string name="help_boom_tamer_body" formatted="false">Holds back deep bass below about 110 Hz when it surges, so heavy tracks stay under control without thinning out the rest.</string>
     <string name="help_add_shared_body" formatted="false">Paste a code someone shared with you. It\'s added as a new preset, and your others are kept.</string>
     <string name="help_add_shared_title" formatted="false">Add a shared sound</string>
     <string name="help_analyser_body" formatted="false">Shows the level of each frequency behind the curve, only while this screen is open. Android requires microphone permission for this, but only levels of playing audio are read. The lowest bands look coarse.</string>

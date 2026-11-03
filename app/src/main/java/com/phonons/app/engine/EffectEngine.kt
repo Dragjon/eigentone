@@ -12,6 +12,7 @@ import com.phonons.app.data.EngineStatus
 import com.phonons.app.data.GainRamp
 import com.phonons.app.data.Processing
 import com.phonons.app.data.ProcessingTarget
+import com.phonons.app.data.Tamers
 import com.phonons.app.dsp.CurveMapper
 import kotlin.math.abs
 import kotlin.math.log10
@@ -37,6 +38,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         var lastInput = Float.NaN
         var lastBalance = Double.NaN
         var lastDynamics: Compressor? = null
+        var lastTamers: Tamers? = null
         var lastOff: Boolean? = null
         var moving = false
         var movingSince = 0L
@@ -49,6 +51,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
     private val chains = LinkedHashMap<Int, Chain>()
     private val pendingSessions = LinkedHashMap<Int, String>()
     private var mapper: CurveMapper? = null
+    private var mbcBands: Int? = null
     private var activeMode: EngineMode? = null
     private var builtLowLatency: Boolean? = null
     private var builtMode: EngineMode? = null
@@ -114,6 +117,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
             chain.lastInput = Float.NaN
             chain.lastBalance = Double.NaN
             chain.lastDynamics = null
+            chain.lastTamers = null
             chain.moving = false
             chain.lastLimiter = null
             chain.lastEnabled = null
@@ -186,14 +190,16 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
     private fun attach(session: Int, label: String): Boolean {
         val lowLatency = builtLowLatency == true
         val counts = mapper?.let { listOf(it.bandCount) } ?: BAND_COUNTS
+        // Fewer compressor bands costs the tamers, which is far better than losing the whole EQ.
+        val mbcOptions = mbcBands?.let { listOf(it) } ?: listOf(Dynamics.FULL_BANDS, Dynamics.BASIC_BANDS)
         var failure: Exception? = null
-        for (count in counts) {
+        for (count in counts) for (mbc in mbcOptions) {
             try {
                 val config = DynamicsProcessing.Config.Builder(
                     DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION,
                     CHANNELS,
                     /* preEqInUse = */ true, count,
-                    /* mbcInUse = */ true, MBC_BANDS,
+                    /* mbcInUse = */ true, mbc,
                     /* postEqInUse = */ false, 0,
                     /* limiterInUse = */ true,
                 )
@@ -202,11 +208,12 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
                 val dp = DynamicsProcessing(Int.MAX_VALUE, session, config)
                 dp.setControlStatusListener { _, _ -> refreshRequested?.invoke() }
                 if (mapper?.bandCount != count) mapper = CurveMapper(count)
+                mbcBands = mbc
                 chains[session] = Chain(dp, session, label, count)
-                Log.i(TAG, "Attached to session $session with $count bands")
+                Log.i(TAG, "Attached to session $session with $count bands and $mbc compressor bands")
                 return true
             } catch (e: Exception) {
-                Log.w(TAG, "Session $session refused $count bands: ${e.message}")
+                Log.w(TAG, "Session $session refused $count bands and $mbc compressor bands: ${e.message}")
                 failure = e
             }
         }
@@ -275,9 +282,10 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
                 chain.lastLimiterThreshold = target.limiterThresholdDb
             }
 
-            if (dynamicsStep.compressor != chain.lastDynamics) {
-                pushDynamics(chain, dynamicsStep.compressor, dynamicsStep.done)
+            if (dynamicsStep.compressor != chain.lastDynamics || target.tamers != chain.lastTamers) {
+                pushDynamics(chain, dynamicsStep.compressor, target.tamers, dynamicsStep.done)
                 chain.lastDynamics = dynamicsStep.compressor
+                chain.lastTamers = target.tamers
             }
 
             val wanted = target.effectEnabled
@@ -377,26 +385,29 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         if (rejected > 0) error = "${chain.label} did not accept $rejected of $total EQ bands"
     }
 
-    private fun pushDynamics(chain: Chain, dynamics: Compressor, finished: Boolean) {
-        val cutoffs = floatArrayOf(dynamics.lowCrossoverHz.toFloat(), dynamics.highCrossoverHz.toFloat(), MBC_TOP_HZ)
-        val mbc = DynamicsProcessing.Mbc(true, dynamics.enabled, MBC_BANDS)
-        dynamics.bands.forEachIndexed { i, band ->
+    private fun pushDynamics(chain: Chain, dynamics: Compressor, tamers: Tamers, finished: Boolean) {
+        val slots = mbcBands ?: return
+        val plan = Dynamics.plan(dynamics, tamers, slots)
+        val on = plan.any { it.active }
+        val mbc = DynamicsProcessing.Mbc(true, on, slots)
+        plan.forEachIndexed { i, planned ->
+            val band = planned.band
             mbc.setBand(
                 i,
                 DynamicsProcessing.MbcBand(
-                    dynamics.enabled && band.enabled, cutoffs[i], band.attackMs.toFloat(), band.releaseMs.toFloat(),
+                    planned.active, planned.cutoffHz.toFloat(), band.attackMs.toFloat(), band.releaseMs.toFloat(),
                     band.ratio.toFloat(), band.thresholdDb.toFloat(), band.kneeDb.toFloat(),
                     /* gate */ -90f, /* expander */ 1f, /* pre */ 0f, band.makeupDb.toFloat(),
                 ),
             )
         }
         chain.dp.setMbcAllChannelsTo(mbc)
-        if (dynamics.enabled && finished) logDynamics(chain)
+        if (on && finished) logDynamics(chain, slots)
     }
 
     /** Reads back what the phone kept, so a device that changes these values shows up in the log. */
-    private fun logDynamics(chain: Chain) {
-        val bands = (0 until MBC_BANDS).map { chain.dp.getMbcBandByChannelIndex(1, it) }
+    private fun logDynamics(chain: Chain, slots: Int) {
+        val bands = (0 until slots).map { chain.dp.getMbcBandByChannelIndex(1, it) }
         val summary = bands.joinToString { b ->
             "${b.cutoffFrequency.toInt()}Hz on=${b.isEnabled} ${b.threshold}dB ${b.ratio}:1 +${b.postGain}dB"
         }
@@ -425,6 +436,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
                 spatialError = spatialError,
                 rebuilds = rebuilds,
                 readback = readback,
+                tamersUnavailable = mbcBands == Dynamics.BASIC_BANDS,
             ),
         )
     }
@@ -433,7 +445,6 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         private const val TAG = "PhononsEngine"
         private const val GLOBAL_SESSION = 0
         private const val CHANNELS = 2
-        private const val MBC_BANDS = 3
         private const val GAIN_EPSILON = 0.02f
         private const val FRAME_MS_PRECISE = 20f
         private const val FRAME_MS_LOW_LATENCY = 10f
@@ -442,7 +453,6 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         private const val LIMITER_RATIO = 10f
         private const val MAX_EFFECT_STRENGTH = 1000
         private val BAND_COUNTS = listOf(128, 64, 32, 16)
-        private const val MBC_TOP_HZ = 24000f
         private const val LOG_SWITCH_MS = 5L
     }
 }
