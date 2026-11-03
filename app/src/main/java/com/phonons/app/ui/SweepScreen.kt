@@ -127,153 +127,135 @@ fun SweepScreen(onClose: () -> Unit) {
     }
     BackHandler { leave() }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(Palette.Background)
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .windowInsetsPadding(WindowInsets.navigationBars),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Column(
-            Modifier
-                .widthIn(max = 560.dp)
-                .fillMaxWidth()
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(stringResource(R.string.ui_frequency_sweep), style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
-            Text(
-                stringResource(R.string.ui_a_tone_climbs_from_deep_bass_to_high_tre),
-                style = MaterialTheme.typography.bodyMedium,
-                color = Palette.TextDim,
-            )
-            Text(
-                GraphicEq.formatFrequency(if (hz >= 1000) kotlin.math.round(hz / 10) * 10 else kotlin.math.round(hz)),
-                style = MaterialTheme.typography.displaySmall,
-                color = if (playing) Palette.Lit else Palette.Text,
-            )
-            ValueTrack(
-                label = stringResource(R.string.ui_frequency_sweep),
-                readout = GraphicEq.formatFrequency(kotlin.math.round(hz)),
-                value = position.toFloat(),
-                range = 0f..1f,
-                origin = 0f,
-                default = 0f,
-                onChange = {
-                    climbing = false
-                    heardTone = Sweep.hzAt(it.toDouble())
-                    position = it.toDouble()
-                },
-                onFinished = {},
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = {
-                        failed = false
-                        if (playing) {
-                            player.stop()
-                            climbing = false
-                            comparing = false
-                        }
-                        playing = !playing
-                    },
-                    modifier = Modifier.weight(1f).heightIn(min = 52.dp),
-                ) { Text(if (playing) "Stop tone" else "Start tone") }
-                FilledTonalButton(
-                    enabled = playing && position < 1.0,
-                    onClick = {
+    ToolScreen(title = stringResource(R.string.ui_frequency_sweep), onBack = ::leave, spacing = 12.dp) {
+        Text(
+            stringResource(R.string.ui_a_tone_climbs_from_deep_bass_to_high_tre),
+            style = MaterialTheme.typography.bodyMedium,
+            color = Palette.TextDim,
+        )
+        Text(
+            GraphicEq.formatFrequency(if (hz >= 1000) kotlin.math.round(hz / 10) * 10 else kotlin.math.round(hz)),
+            style = BigReadout,
+            color = if (playing) Palette.Lit else Palette.Text,
+        )
+        ValueTrack(
+            label = stringResource(R.string.ui_frequency_sweep),
+            readout = GraphicEq.formatFrequency(kotlin.math.round(hz)),
+            value = position.toFloat(),
+            range = 0f..1f,
+            origin = 0f,
+            default = 0f,
+            onChange = {
+                climbing = false
+                heardTone = Sweep.hzAt(it.toDouble())
+                position = it.toDouble()
+            },
+            onFinished = {},
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = {
+                    failed = false
+                    if (playing) {
+                        player.stop()
+                        climbing = false
                         comparing = false
-                        climbing = !climbing
-                    },
-                    modifier = Modifier.weight(1f).heightIn(min = 52.dp),
-                ) { Text(if (climbing) "Pause climb" else "Climb") }
-            }
+                    }
+                    playing = !playing
+                },
+                modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+            ) { Text(if (playing) stringResource(R.string.ui_stop_tone) else stringResource(R.string.ui_start_tone)) }
+            FilledTonalButton(
+                enabled = playing && position < 1.0,
+                onClick = {
+                    comparing = false
+                    climbing = !climbing
+                },
+                modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+            ) { Text(if (climbing) stringResource(R.string.ui_pause_climb) else stringResource(R.string.ui_climb)) }
+        }
+        FilledTonalButton(
+            enabled = playing,
+            onClick = {
+                climbing = false
+                comparing = !comparing
+            },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+        ) { Text(if (comparing) stringResource(R.string.ui_stop_comparing) else stringResource(R.string.ui_compare_with_nearby_notes)) }
+        if (comparing && playing) {
+            Text(
+                stringResource(if (heardTone == hz) R.string.ui_sweep_now_your_spot else R.string.ui_sweep_now, GraphicEq.formatFrequency(kotlin.math.round(heardTone))),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Palette.Text,
+            )
+        }
+        if (failed) {
+            Text(stringResource(R.string.ui_this_phone_wouldn_t_play_the_tone), style = MaterialTheme.typography.bodyMedium, color = Palette.Danger)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilledTonalButton(
                 enabled = playing,
-                onClick = {
-                    climbing = false
-                    comparing = !comparing
-                },
-                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-            ) { Text(if (comparing) "Stop comparing" else "Compare with nearby notes") }
-            if (comparing && playing) {
-                Text(
-                    "Now: ${GraphicEq.formatFrequency(kotlin.math.round(heardTone))}${if (heardTone == hz) ", your spot" else ""}. Your spot plays every other note. If it stands out from the notes beside it, mark it too loud. If it sinks below them, mark it too quiet.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Palette.Text,
-                )
-            }
-            if (failed) {
-                Text(stringResource(R.string.ui_this_phone_wouldn_t_play_the_tone), style = MaterialTheme.typography.bodyMedium, color = Palette.Danger)
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(
-                    enabled = playing,
-                    onClick = { marks = Sweep.addMark(marks, hz, Sweep.TOO_LOUD_DB) },
-                    modifier = Modifier.weight(1f).heightIn(min = 64.dp),
-                ) { Text(stringResource(R.string.ui_too_loud_here)) }
-                FilledTonalButton(
-                    enabled = playing,
-                    onClick = { marks = Sweep.addMark(marks, hz, Sweep.TOO_QUIET_DB) },
-                    modifier = Modifier.weight(1f).heightIn(min = 64.dp),
-                ) { Text(stringResource(R.string.ui_too_quiet_here)) }
-            }
-            SliderSetting(
-                title = stringResource(R.string.ui_tone_level),
-                tip = Help.sweepLevel,
-                readout = String.format(Locale.US, "%.0f dB", levelDb),
-                value = levelDb.toFloat(),
-                range = Sweep.MIN_LEVEL_DB.toFloat()..Sweep.MAX_LEVEL_DB.toFloat(),
-                default = Sweep.DEFAULT_LEVEL_DB.toFloat(),
-                onChange = { levelDb = it.toDouble() },
-            )
-            SwitchSetting(stringResource(R.string.ui_hear_through_my_eq), Help.sweepHearEq, hearEq) { hearEq = it }
+                onClick = { marks = Sweep.addMark(marks, hz, Sweep.TOO_LOUD_DB) },
+                modifier = Modifier.weight(1f).heightIn(min = 64.dp),
+            ) { Text(stringResource(R.string.ui_too_loud_here)) }
+            FilledTonalButton(
+                enabled = playing,
+                onClick = { marks = Sweep.addMark(marks, hz, Sweep.TOO_QUIET_DB) },
+                modifier = Modifier.weight(1f).heightIn(min = 64.dp),
+            ) { Text(stringResource(R.string.ui_too_quiet_here)) }
+        }
+        SliderSetting(
+            title = stringResource(R.string.ui_tone_level),
+            tip = Help.sweepLevel,
+            readout = String.format(Locale.US, "%.0f dB", levelDb),
+            value = levelDb.toFloat(),
+            range = Sweep.MIN_LEVEL_DB.toFloat()..Sweep.MAX_LEVEL_DB.toFloat(),
+            default = Sweep.DEFAULT_LEVEL_DB.toFloat(),
+            onChange = { levelDb = it.toDouble() },
+        )
+        SwitchSetting(stringResource(R.string.ui_hear_through_my_eq), Help.sweepHearEq, hearEq) { hearEq = it }
 
-            if (marks.isNotEmpty()) {
-                SettingsSection(stringResource(R.string.ui_your_marks)) {
-                    marks.forEachIndexed { index, mark ->
-                        if (index > 0) RowDivider()
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 48.dp)
-                                .padding(start = 16.dp, end = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                GraphicEq.formatFrequency(kotlin.math.round(mark.hz)),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Palette.Text,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Text(String.format(Locale.US, "%+.0f dB", mark.gainDb), style = Readout, color = Palette.Lit)
-                            TextButton(onClick = { marks = marks - mark }) { Text(stringResource(R.string.ui_remove)) }
-                        }
+        if (marks.isNotEmpty()) {
+            SettingsSection(stringResource(R.string.ui_your_marks)) {
+                marks.forEachIndexed { index, mark ->
+                    if (index > 0) RowDivider()
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                            .padding(start = 16.dp, end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            GraphicEq.formatFrequency(kotlin.math.round(mark.hz)),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Palette.Text,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(String.format(Locale.US, "%+.0f dB", mark.gainDb), style = Readout, color = Palette.Lit)
+                        TextButton(onClick = { marks = marks - mark }) { Text(stringResource(R.string.ui_remove)) }
                     }
                 }
-                if (marks.size > room) {
-                    Text(
-                        "This preset only has room for $room more ${if (room == 1) "filter" else "filters"}, so the rest won't be added.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Palette.Danger,
-                    )
-                }
-                Button(
-                    enabled = room > 0,
-                    onClick = {
-                        Repo.edit { it.copy(filters = Sweep.addTo(it.filters, marks)) }
-                        Repo.commit()
-                        leave()
-                    },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                ) { Text("Add ${minOf(marks.size, room)} to my sound") }
             }
-            TextButton(onClick = { leave() }, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text(if (marks.isEmpty()) "Close" else "Discard marks")
+            if (marks.size > room) {
+                Text(
+                    appPlural(R.plurals.ui_room_for_filters, room, room),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Palette.Danger,
+                )
             }
+            Button(
+                enabled = room > 0,
+                onClick = {
+                    Repo.edit { it.copy(filters = Sweep.addTo(it.filters, marks)) }
+                    Repo.commit()
+                    leave()
+                },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+            ) { Text(stringResource(R.string.ui_add_to_my_sound_2, minOf(marks.size, room))) }
+        }
+        TextButton(onClick = { leave() }, modifier = Modifier.heightIn(min = 48.dp)) {
+            Text(if (marks.isEmpty()) stringResource(R.string.ui_close) else stringResource(R.string.ui_discard_marks))
         }
     }
 }

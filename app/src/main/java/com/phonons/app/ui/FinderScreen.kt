@@ -90,71 +90,53 @@ fun FinderScreen(onSetEnabled: (Boolean) -> Unit, onClose: () -> Unit) {
 
     BackHandler { cancel() }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(Palette.Background)
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .windowInsetsPadding(WindowInsets.navigationBars)
-            .imePadding(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Column(
-            Modifier
-                .widthIn(max = 560.dp)
-                .fillMaxWidth()
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            when (step) {
-                FinderStep.INTRO -> Intro(
-                    outputLabel = output.label,
-                    // Read directly, because the service's output isn't known while Phonons is off.
-                    correction = rememberConnectedOutputNames().firstNotNullOfOrNull(BuiltIns::correctionFor),
-                    current = before.current,
-                    onStart = ::begin,
-                    onFind = { finding = true },
+    ToolScreen(title = stringResource(R.string.ui_find_my_sound), onBack = ::cancel, spacing = 16.dp) {
+        when (step) {
+            FinderStep.INTRO -> Intro(
+                outputLabel = output.label,
+                // Read directly, because the service's output isn't known while Phonons is off.
+                correction = rememberConnectedOutputNames().firstNotNullOfOrNull(BuiltIns::correctionFor),
+                current = before.current,
+                onStart = ::begin,
+                onFind = { finding = true },
+                onCancel = ::cancel,
+            )
+            FinderStep.COMPARE -> finder?.let { active ->
+                Compare(
+                    finder = active,
+                    progress = progress,
+                    start = start,
+                    onAnswered = {
+                        progress++
+                        if (active.isDone) step = FinderStep.FINAL
+                    },
                     onCancel = ::cancel,
                 )
-                FinderStep.COMPARE -> finder?.let { active ->
-                    Compare(
-                        finder = active,
-                        progress = progress,
-                        start = start,
-                        onAnswered = {
-                            progress++
-                            if (active.isDone) step = FinderStep.FINAL
-                        },
-                        onCancel = ::cancel,
-                    )
-                }
-                FinderStep.FINAL -> finder?.let { active ->
-                    FinalChoice(
-                        previous = before.current,
-                        result = start.copy(tone = active.result()),
-                        autoHeadroom = state.autoHeadroom,
-                        onKeepPrevious = ::cancel,
-                        onUseNew = {
-                            Repo.edit { start.copy(tone = active.result()) }
-                            step = FinderStep.RESULT
-                        },
-                    )
-                }
-                FinderStep.RESULT -> finder?.let { active ->
-                    Result(
-                        finder = active,
-                        state = state,
-                        start = start,
-                        outputKey = output.key,
-                        onDone = {
-                            Repo.commit()
-                            onClose()
-                        },
-                        onDiscard = ::cancel,
-                    )
-                }
+            }
+            FinderStep.FINAL -> finder?.let { active ->
+                FinalChoice(
+                    previous = before.current,
+                    result = start.copy(tone = active.result()),
+                    autoHeadroom = state.autoHeadroom,
+                    onKeepPrevious = ::cancel,
+                    onUseNew = {
+                        Repo.edit { start.copy(tone = active.result()) }
+                        step = FinderStep.RESULT
+                    },
+                )
+            }
+            FinderStep.RESULT -> finder?.let { active ->
+                Result(
+                    finder = active,
+                    state = state,
+                    start = start,
+                    outputKey = output.key,
+                    onDone = {
+                        Repo.commit()
+                        onClose()
+                    },
+                    onDiscard = ::cancel,
+                )
             }
         }
     }
@@ -176,7 +158,6 @@ private fun Intro(
     onFind: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    Text(stringResource(R.string.ui_find_my_sound), style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
     Text(
         stringResource(R.string.ui_you_ll_compare_two_versions_of_your_musi),
         style = MaterialTheme.typography.bodyLarge,
@@ -193,25 +174,25 @@ private fun Intro(
         Text(stringResource(R.string.ui_before_you_start), style = MaterialTheme.typography.titleSmall, color = Palette.Text)
         Text(stringResource(R.string.ui_play_a_song_you_know_well_and_keep_it_pl), style = MaterialTheme.typography.bodyMedium, color = Palette.Text)
         Text(stringResource(R.string.ui_set_a_comfortable_volume_and_leave_it_th), style = MaterialTheme.typography.bodyMedium, color = Palette.Text)
-        Text("• Listening on: $outputLabel", style = MaterialTheme.typography.bodyMedium, color = Palette.Text)
+        Text(stringResource(R.string.ui_listening_on, outputLabel), style = MaterialTheme.typography.bodyMedium, color = Palette.Text)
     }
     Text(stringResource(R.string.ui_start_from), style = MaterialTheme.typography.titleSmall, color = Palette.TextDim)
     // A sound the listener has already shaped is a better base than a fresh correction it may replace.
     val hasOwnSound = current.filters.any { it.gainDb != 0.0 } || current.tone != com.phonons.app.data.Tone()
     if (hasOwnSound) {
         Button(onClick = { onStart(current) }, modifier = Modifier.fillMaxWidth()) {
-            Text("My current sound: ${current.name} (recommended)")
+            Text(stringResource(R.string.ui_my_current_sound_recommended, current.name))
         }
     }
     if (correction != null) {
         val recommended = if (hasOwnSound) "" else " (recommended)"
         if (hasOwnSound) {
             FilledTonalButton(onClick = { onStart(correction) }, modifier = Modifier.fillMaxWidth()) {
-                Text("${correction.name} correction")
+                Text(stringResource(R.string.ui_correction, correction.name))
             }
         } else {
             Button(onClick = { onStart(correction) }, modifier = Modifier.fillMaxWidth()) {
-                Text("${correction.name} correction$recommended")
+                Text(stringResource(R.string.ui_correction_2, correction.name, recommended))
             }
         }
     } else if (hasOwnSound) {
@@ -221,7 +202,7 @@ private fun Intro(
     }
     if (!hasOwnSound) {
         FilledTonalButton(onClick = { onStart(current) }, modifier = Modifier.fillMaxWidth()) {
-            Text("My current sound: ${current.name}")
+            Text(stringResource(R.string.ui_my_current_sound_2, current.name))
         }
     }
     Text(
@@ -255,7 +236,7 @@ private fun Compare(
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(round.trait.title, style = MaterialTheme.typography.titleLarge, color = Palette.Text, modifier = Modifier.weight(1f))
-        Text("Question ${finder.roundNumber} of ${finder.totalRounds}", style = MaterialTheme.typography.bodySmall, color = Palette.TextDim)
+        Text(stringResource(R.string.ui_question_of, finder.roundNumber, finder.totalRounds), style = MaterialTheme.typography.bodySmall, color = Palette.TextDim)
     }
     LinearProgressIndicator(
         progress = { finder.roundNumber.toFloat() / finder.totalRounds },
@@ -286,7 +267,7 @@ private fun Compare(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 52.dp),
-    ) { Text("I prefer ${if (pick == Choice.B) "B" else "A"}") }
+    ) { Text(stringResource(if (pick == Choice.B) R.string.ui_i_prefer_b else R.string.ui_i_prefer_a)) }
     FilledTonalButton(
         onClick = {
             finder.choose(Choice.NO_PREFERENCE)
@@ -308,7 +289,7 @@ fun SideCard(label: String, selected: Boolean, musicActive: Boolean, modifier: M
             .background(if (selected) Palette.Lit else Palette.Surface)
             .border(1.dp, if (selected) Palette.Lit else Palette.Outline, PanelShape)
             .semantics { this.selected = selected }
-            .clickable(role = Role.RadioButton, onClickLabel = "Play version $label", onClick = onClick),
+            .clickable(role = Role.RadioButton, onClickLabel = stringResource(R.string.ui_play_version, label), onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -320,9 +301,9 @@ fun SideCard(label: String, selected: Boolean, musicActive: Boolean, modifier: M
             Spacer(Modifier.height(4.dp))
             Text(
                 when {
-                    !selected -> "Tap to hear"
-                    musicActive -> "Playing"
-                    else -> "Selected"
+                    !selected -> stringResource(R.string.ui_tap_to_hear)
+                    musicActive -> stringResource(R.string.ui_playing)
+                    else -> stringResource(R.string.ui_selected)
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = if (selected) Palette.OnLit else Palette.TextDim,
@@ -359,8 +340,8 @@ private fun FinalChoice(
     NothingPlayingHint()
     val musicActive = rememberMusicActive()
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        SideCard("What I had", !hearingNew, musicActive, Modifier.weight(1f)) { hear(false) }
-        SideCard("New", hearingNew, musicActive, Modifier.weight(1f)) { hear(true) }
+        SideCard(stringResource(R.string.ui_what_i_had), !hearingNew, musicActive, Modifier.weight(1f)) { hear(false) }
+        SideCard(stringResource(R.string.ui_new), hearingNew, musicActive, Modifier.weight(1f)) { hear(true) }
     }
     FilledTonalButton(
         onClick = onKeepPrevious,
@@ -377,8 +358,8 @@ private fun FinalChoice(
 }
 
 private fun describe(trait: Trait, value: Double): String {
-    if (trait == Trait.SPACE) return if (value <= 0.0) "Off" else "${(value * 100).toInt()}%"
-    return if (value == 0.0) "Unchanged" else String.format(Locale.US, "%+.1f dB", value)
+    if (trait == Trait.SPACE) return if (value <= 0.0) appText(R.string.ui_mode_off) else "${(value * 100).toInt()}%"
+    return if (value == 0.0) appText(R.string.ui_unchanged) else String.format(Locale.US, "%+.1f dB", value)
 }
 
 @Composable
@@ -390,7 +371,7 @@ private fun Result(
     onDone: () -> Unit,
     onDiscard: () -> Unit,
 ) {
-    var name by remember { mutableStateOf("My sound") }
+    var name by remember { mutableStateOf(appText(R.string.ui_my_sound)) }
     var comparingOriginal by remember { mutableStateOf(false) }
     val finished = start.copy(tone = finder.result())
 
@@ -407,7 +388,7 @@ private fun Result(
         color = Palette.TextDim,
     )
     // Repeat tests build on each other, so these must not read as absolute levels.
-    Text("Changes from ${start.name}", style = MaterialTheme.typography.titleSmall, color = Palette.TextDim)
+    Text(stringResource(R.string.ui_changes_from, start.name), style = MaterialTheme.typography.titleSmall, color = Palette.TextDim)
     Column(
         Modifier
             .fillMaxWidth()
@@ -433,8 +414,8 @@ private fun Result(
     NothingPlayingHint()
     val musicActive = rememberMusicActive()
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        SideCard("Before", comparingOriginal, musicActive, Modifier.weight(1f)) { compare(true) }
-        SideCard("After", !comparingOriginal, musicActive, Modifier.weight(1f)) { compare(false) }
+        SideCard(stringResource(R.string.ui_before), comparingOriginal, musicActive, Modifier.weight(1f)) { compare(true) }
+        SideCard(stringResource(R.string.ui_after), !comparingOriginal, musicActive, Modifier.weight(1f)) { compare(false) }
     }
     OutlinedTextField(
         value = name,

@@ -12,6 +12,7 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -88,6 +89,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import com.phonons.app.data.PresetOrganiser
 import com.phonons.app.engine.PresetShortcuts
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.graphics.Brush
@@ -131,13 +134,31 @@ import java.util.Locale
 import kotlin.math.log10
 import kotlin.math.pow
 
-private enum class Tab(val label: String, @DrawableRes val icon: Int) {
-    EQ("EQ", R.drawable.ic_tab_eq),
-    SOUND("Sound", R.drawable.ic_tab_sound),
-    PRESETS("Presets", R.drawable.ic_tab_presets),
-    TUNE("Tune", R.drawable.ic_tab_tune),
-    SYSTEM("System", R.drawable.ic_tab_system),
+private enum class Tab(@StringRes val label: Int, @DrawableRes val icon: Int) {
+    EQ(R.string.ui_tab_eq, R.drawable.ic_tab_eq),
+    SOUND(R.string.ui_tab_sound, R.drawable.ic_tab_sound),
+    PRESETS(R.string.ui_tab_presets, R.drawable.ic_tab_presets),
+    TUNE(R.string.ui_tab_tune, R.drawable.ic_tab_tune),
+    SYSTEM(R.string.ui_tab_system, R.drawable.ic_tab_system),
 }
+
+@Composable
+private fun listeningModeLabel(mode: ListeningMode) = stringResource(
+    when (mode) {
+        ListeningMode.NOISE_CANCELLING -> R.string.ui_mode_cancelling
+        ListeningMode.TRANSPARENCY -> R.string.ui_mode_transparency
+        ListeningMode.NORMAL -> R.string.ui_mode_off
+    },
+)
+
+@Composable
+private fun engineModeLabel(mode: EngineMode) = stringResource(
+    when (mode) {
+        EngineMode.AUTO -> R.string.ui_route_auto
+        EngineMode.GLOBAL -> R.string.ui_route_global
+        EngineMode.SESSIONS -> R.string.ui_route_per_app
+    },
+)
 
 private const val MAX_FILTERS = 20
 private const val MAX_IMPORT_BYTES = 256 * 1024
@@ -152,6 +173,7 @@ private val LocalOpenFinder = compositionLocalOf<() -> Unit> { error("No finder"
 private val LocalOpenHearing = compositionLocalOf<() -> Unit> { error("No hearing check") }
 
 private const val SEARCH_FROM_PRESETS = 6
+private const val TAB_FADE_MS = 140
 
 private val LocalOpenPresets = compositionLocalOf<() -> Unit> { error("No presets tab") }
 
@@ -237,7 +259,7 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
                             onClick = { tab = t },
                             // The label below already names the tab for screen readers.
                             icon = { Icon(painterResource(t.icon), contentDescription = null) },
-                            label = { Text(t.label) },
+                            label = { Text(stringResource(t.label)) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = Palette.OnLit,
                                 selectedTextColor = Palette.Text,
@@ -256,20 +278,24 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
                     .padding(padding),
                 contentAlignment = Alignment.TopCenter,
             ) {
-                Column(
-                    Modifier
-                        .widthIn(max = 640.dp)
-                        .fillMaxSize()
-                        .verticalScroll(scrolls.getValue(tab))
-                        .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
-                    verticalArrangement = SectionSpacing,
-                ) {
-                    when (tab) {
-                        Tab.EQ -> EqTab(state)
-                        Tab.SOUND -> SoundTab(state)
-                        Tab.PRESETS -> PresetsTab(state)
-                        Tab.TUNE -> TuneTab(state)
-                        Tab.SYSTEM -> SystemTab(state, status)
+                Crossfade(targetState = tab, animationSpec = tween(TAB_FADE_MS), label = "tab") { shownTab ->
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                        Column(
+                            Modifier
+                                .widthIn(max = 640.dp)
+                                .fillMaxSize()
+                                .verticalScroll(scrolls.getValue(shownTab))
+                                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
+                            verticalArrangement = SectionSpacing,
+                        ) {
+                            when (shownTab) {
+                                Tab.EQ -> EqTab(state)
+                                Tab.SOUND -> SoundTab(state)
+                                Tab.PRESETS -> PresetsTab(state)
+                                Tab.TUNE -> TuneTab(state)
+                                Tab.SYSTEM -> SystemTab(state, status)
+                            }
+                        }
                     }
                 }
             }
@@ -336,12 +362,12 @@ private fun BypassButton(bypassed: Boolean) {
 
 private fun statusLine(state: AppState, status: EngineStatus): String {
     val saved = Repo.allPresets(state).firstOrNull { it.id == state.current.id }
-    val name = if (saved == state.current) state.current.name else "${state.current.name} (edited)"
+    val name = if (saved == state.current) state.current.name else appText(R.string.ui_edited, state.current.name)
     return when {
-        !state.enabled -> "Off"
-        status.error != null -> "Problem. See the System tab"
-        !status.running -> "Starting…"
-        !status.hasControl -> "Another audio app has taken control"
+        !state.enabled -> appText(R.string.ui_mode_off)
+        status.error != null -> appText(R.string.ui_problem_see_the_system_tab)
+        !status.running -> appText(R.string.ui_starting)
+        !status.hasControl -> appText(R.string.ui_another_audio_app_has_taken_control)
         else -> name
     }
 }
@@ -415,6 +441,7 @@ private fun EqTab(state: AppState) {
             curveFilters = earCurves?.first ?: curveFilters,
             rightCurveFilters = earCurves?.second,
             ghostFilters = savedCurve,
+            morphKey = state.current.id,
             earMarkers = earMarkers,
             spectrum = { spectrumState.value },
             selectedId = selectedId,
@@ -448,7 +475,7 @@ private fun EqTab(state: AppState) {
     }
 
     if (graphicMode) {
-        GraphicEqConsole(state.current.tone, onBrowseShapes = LocalOpenShapes.current)
+        GraphicEqConsole(state.current.tone, state.current.id, onBrowseShapes = LocalOpenShapes.current)
         SettingsSection(stringResource(R.string.ui_display)) { AnalyserSetting(state) }
         return
     }
@@ -477,8 +504,8 @@ private fun EqTab(state: AppState) {
 
     if (selected == null) {
         Text(
-            if (filters.isEmpty()) "No filters yet. Add one to start shaping the sound."
-            else "Tap a point on the curve to edit it.",
+            if (filters.isEmpty()) stringResource(R.string.ui_no_filters_yet_add_one_to)
+            else stringResource(R.string.ui_tap_a_point_on_the_curve),
             color = Palette.TextDim,
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -540,7 +567,7 @@ private fun AnalyserSetting(state: AppState) {
         stringResource(R.string.ui_spectrum_analyser),
         Help.analyser,
         state.analyser,
-        detail = if (analyserUnavailable.value) "This phone refused the analyser." else null,
+        detail = if (analyserUnavailable.value) stringResource(R.string.ui_this_phone_refused_the_analyser) else null,
     ) { on ->
         val granted = context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
@@ -560,7 +587,7 @@ private fun updateFilter(id: Int, transform: (Filter) -> Filter) {
 private fun FilterEditor(filter: Filter, filters: List<Filter>, onSelect: (Int) -> Unit, onDelete: () -> Unit) {
     val index = filters.indexOf(filter)
     SettingsSection(
-        "Filter ${index + 1} of ${filters.size}",
+        stringResource(R.string.ui_filter_of, index + 1, filters.size),
         trailing = {
             // Nodes can overlap on the graph, so every filter is also reachable from here.
             IconButton(enabled = index > 0, onClick = { onSelect(filters[index - 1].id) }) {
@@ -587,13 +614,13 @@ private fun FilterEditor(filter: Filter, filters: List<Filter>, onSelect: (Int) 
                 InfoButton(Help.filterType)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                TypeChip(filter, FilterType.BELL, "Bell", Modifier.weight(1f))
-                TypeChip(filter, FilterType.LOW_SHELF, "Low shelf", Modifier.weight(1.2f))
-                TypeChip(filter, FilterType.HIGH_SHELF, "High shelf", Modifier.weight(1.2f))
+                TypeChip(filter, FilterType.BELL, stringResource(R.string.ui_bell), Modifier.weight(1f))
+                TypeChip(filter, FilterType.LOW_SHELF, stringResource(R.string.ui_low_shelf), Modifier.weight(1.2f))
+                TypeChip(filter, FilterType.HIGH_SHELF, stringResource(R.string.ui_high_shelf), Modifier.weight(1.2f))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                TypeChip(filter, FilterType.HIGH_PASS, "High pass", Modifier.weight(1f))
-                TypeChip(filter, FilterType.LOW_PASS, "Low pass", Modifier.weight(1f))
+                TypeChip(filter, FilterType.HIGH_PASS, stringResource(R.string.ui_high_pass), Modifier.weight(1f))
+                TypeChip(filter, FilterType.LOW_PASS, stringResource(R.string.ui_low_pass), Modifier.weight(1f))
             }
         }
         RowDivider()
@@ -691,7 +718,7 @@ private fun SoundTab(state: AppState) {
             SliderSetting(
                 title = stringResource(R.string.ui_headphone_correction),
                 tip = Help.correction,
-                readout = if (state.current.tone.correction <= 0.0) "Off" else formatPercent(state.current.tone.correction),
+                readout = if (state.current.tone.correction <= 0.0) stringResource(R.string.ui_mode_off) else formatPercent(state.current.tone.correction),
                 value = state.current.tone.correction.toFloat(),
                 range = 0f..1f,
                 default = 1f,
@@ -722,13 +749,13 @@ private fun ToneSection(state: AppState) {
             }
         },
     ) {
-        ToneSlider("Bass", Help.bass, tone.bassDb) { v -> Repo.editTone { it.copy(bassDb = v) } }
+        ToneSlider(stringResource(R.string.ui_bass), Help.bass, tone.bassDb) { v -> Repo.editTone { it.copy(bassDb = v) } }
         RowDivider()
-        ToneSlider("Vocals", Help.vocals, tone.vocalsDb) { v -> Repo.editTone { it.copy(vocalsDb = v) } }
+        ToneSlider(stringResource(R.string.help_vocals_title), Help.vocals, tone.vocalsDb) { v -> Repo.editTone { it.copy(vocalsDb = v) } }
         RowDivider()
-        ToneSlider("Treble", Help.treble, tone.trebleDb) { v -> Repo.editTone { it.copy(trebleDb = v) } }
+        ToneSlider(stringResource(R.string.ui_treble), Help.treble, tone.trebleDb) { v -> Repo.editTone { it.copy(trebleDb = v) } }
         RowDivider()
-        ToneSlider("Bass tuner", Help.bassTunerAmount, tone.bassTunerDb) { v -> Repo.editTone { it.copy(bassTunerDb = v) } }
+        ToneSlider(stringResource(R.string.ui_bass_tuner), Help.bassTunerAmount, tone.bassTunerDb) { v -> Repo.editTone { it.copy(bassTunerDb = v) } }
         SliderSetting(
             title = stringResource(R.string.ui_bass_tuner_frequency),
             tip = Help.bassTunerFrequency,
@@ -763,16 +790,16 @@ private fun SpaceSection(state: AppState) {
     val systemSpatialAudio = rememberSystemSpatialAudio()
     SettingsSection(stringResource(R.string.ui_space)) {
         SliderSetting(
-            title = if (state.useSystemSurround) "Virtual surround" else "Stereo width",
+            title = if (state.useSystemSurround) stringResource(R.string.help_surround_title) else stringResource(R.string.help_stereo_width_title),
             tip = if (state.useSystemSurround) Help.surround else Help.stereoWidth,
-            readout = if (state.current.tone.surround <= 0.0) "Off" else formatPercent(state.current.tone.surround),
+            readout = if (state.current.tone.surround <= 0.0) stringResource(R.string.ui_mode_off) else formatPercent(state.current.tone.surround),
             value = state.current.tone.surround.toFloat(),
             range = 0f..1f,
             default = 0f,
             detail = when {
                 state.useSystemSurround && status.spatialError != null -> status.spatialError
                 state.current.tone.surround > 0.0 && systemSpatialAudio ->
-                    "Android's own spatial audio is on, and adds to this. Try one at a time."
+                    stringResource(R.string.ui_android_s_own_spatial_audio_is)
                 else -> null
             },
             onChange = { v -> Repo.editTone { it.copy(surround = if (v < 0.02f) 0.0 else v.toDouble()) } },
@@ -788,7 +815,7 @@ private fun SpaceSection(state: AppState) {
             readout = when {
                 state.balance < -0.005 -> "L ${formatPercent(-state.balance)}"
                 state.balance > 0.005 -> "R ${formatPercent(state.balance)}"
-                else -> "Centre"
+                else -> stringResource(R.string.ui_centre)
             },
             value = state.balance.toFloat(),
             range = -1f..1f,
@@ -815,7 +842,7 @@ private fun EarCorrectionRows(state: AppState) {
     if (Profiles.supportsModes(key)) {
         if (ears != null) {
             RowDivider()
-            SwitchSetting(stringResource(R.string.ui_ear_correction), Help.earCorrection, ears.enabled, detail = "A separate EQ for each ear, for ${output.label}") { on ->
+            SwitchSetting(stringResource(R.string.ui_ear_correction), Help.earCorrection, ears.enabled, detail = stringResource(R.string.ui_a_separate_eq_for_each_ear, output.label)) { on ->
                 setEars(ears.copy(enabled = on))
             }
             EarCurvesGraph(ears, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), markers = true)
@@ -831,12 +858,12 @@ private fun EarCorrectionRows(state: AppState) {
             RowDivider()
             if (correction.hasChanges) {
                 ActionRow(
-                    if (recommended) "Correct each ear" else "Correct each ear anyway",
+                    if (recommended) stringResource(R.string.ui_correct_each_ear) else stringResource(R.string.ui_correct_each_ear_anyway),
                     Help.earCorrection,
                     detail = if (recommended) {
-                        "For ${output.label}, from your hearing check on $date."
+                        stringResource(R.string.ui_for_from_your_hearing_check_on, output.label, date)
                     } else {
-                        "For ${output.label}, from your check on $date. ${earsCloseNote(measured)}"
+                        stringResource(R.string.ui_for_from_your_check_on, output.label, date, earsCloseNote(measured))
                     },
                 ) { setEars(correction) }
             } else {
@@ -853,7 +880,7 @@ private fun EarCorrectionRows(state: AppState) {
     if (others.isNotEmpty()) {
         RowDivider()
         Text(
-            "Ear correction is also saved for ${others.joinToString()}, and turns on when connected.",
+            stringResource(R.string.ui_ear_correction_is_also_saved_for, others.joinToString()),
             style = MaterialTheme.typography.bodySmall,
             color = Palette.TextDim,
             modifier = Modifier.padding(16.dp),
@@ -878,9 +905,9 @@ private fun DynamicsSection(state: AppState, attenuation: Double) {
                 range = 0f..1f,
                 default = 0.5f,
                 detail = if (added.isEmpty()) {
-                    "Nothing added at this volume."
+                    stringResource(R.string.ui_nothing_added_at_this_volume)
                 } else {
-                    "Now adding ${formatDb(added[0].gainDb)} bass and ${formatDb(added[1].gainDb)} treble."
+                    stringResource(R.string.ui_now_adding_bass_and_treble, formatDb(added[0].gainDb), formatDb(added[1].gainDb))
                 },
                 onChange = { v -> Repo.update { it.copy(loudnessStrength = v.toDouble()) } },
             )
@@ -889,7 +916,7 @@ private fun DynamicsSection(state: AppState, attenuation: Double) {
         SliderSetting(
             title = stringResource(R.string.ui_night_mode),
             tip = Help.nightMode,
-            readout = if (state.nightMode <= 0.001) "Off" else formatPercent(state.nightMode),
+            readout = if (state.nightMode <= 0.001) stringResource(R.string.ui_mode_off) else formatPercent(state.nightMode),
             value = state.nightMode.toFloat(),
             range = 0f..1f,
             default = 0f,
@@ -899,14 +926,14 @@ private fun DynamicsSection(state: AppState, attenuation: Double) {
         SliderSetting(
             title = stringResource(R.string.ui_volume_leveller),
             tip = Help.leveller,
-            readout = if (state.leveller <= 0.001) "Off" else formatPercent(state.leveller),
+            readout = if (state.leveller <= 0.001) stringResource(R.string.ui_mode_off) else formatPercent(state.leveller),
             value = state.leveller.toFloat(),
             range = 0f..1f,
             default = 0f,
             detail = when {
                 state.leveller <= 0.001 -> null
-                state.nightMode > 0.001 || scheduledNight -> "Night mode is on, so it's used instead."
-                state.current.tone.compressor.enabled -> "This preset's compressor is on, so it's used instead."
+                state.nightMode > 0.001 || scheduledNight -> stringResource(R.string.ui_night_mode_is_on_so_it)
+                state.current.tone.compressor.enabled -> stringResource(R.string.ui_this_preset_s_compressor_is_on)
                 else -> null
             },
             onChange = { v -> Repo.update { it.copy(leveller = if (v < 0.02f) 0.0 else v.toDouble()) } },
@@ -917,8 +944,8 @@ private fun DynamicsSection(state: AppState, attenuation: Double) {
             Repo.update { it.copy(nightSchedule = change(it.nightSchedule)) }
         SwitchSetting(stringResource(R.string.ui_night_mode_schedule), Help.nightSchedule, schedule.enabled) { on -> updateSchedule { it.copy(enabled = on) } }
         if (schedule.enabled) {
-            TimeSetting("Starts at", Help.nightScheduleStart, schedule.startMinute) { m -> updateSchedule { it.copy(startMinute = m) } }
-            TimeSetting("Ends at", Help.nightScheduleEnd, schedule.endMinute) { m -> updateSchedule { it.copy(endMinute = m) } }
+            TimeSetting(stringResource(R.string.help_night_schedule_start_title), Help.nightScheduleStart, schedule.startMinute) { m -> updateSchedule { it.copy(startMinute = m) } }
+            TimeSetting(stringResource(R.string.help_night_schedule_end_title), Help.nightScheduleEnd, schedule.endMinute) { m -> updateSchedule { it.copy(endMinute = m) } }
             if (schedule.startMinute == schedule.endMinute) {
                 Text(
                     stringResource(R.string.ui_the_start_and_end_are_the_same_so_night),
@@ -978,9 +1005,9 @@ private fun ClipWarning(state: AppState, attenuation: Double) {
     val peak = formatDb(estimate.peakDb)
     Text(
         if (estimate.risk == ClipRisk.CLIPPING) {
-            "Loud music could reach $peak, which can distort. Turn on the limiter, or lower the preamp or compressor makeup."
+            stringResource(R.string.ui_loud_music_could_reach_which_can, peak)
         } else {
-            "Loud music could reach $peak. The limiter is holding it back, which can flatten peaks. Lowering the preamp or compressor makeup avoids that."
+            stringResource(R.string.ui_loud_music_could_reach_the_limiter, peak)
         },
         style = MaterialTheme.typography.bodySmall,
         color = if (estimate.risk == ClipRisk.CLIPPING) Palette.Danger else Palette.TextDim,
@@ -1009,7 +1036,7 @@ private fun LevelSection(state: AppState, attenuation: Double) {
             stringResource(R.string.ui_automatic_headroom),
             Help.headroom,
             state.autoHeadroom,
-            detail = "Level going into the EQ: ${formatDb(input)}",
+            detail = stringResource(R.string.ui_level_going_into_the_eq, formatDb(input)),
         ) { on -> Repo.update { it.copy(autoHeadroom = on) } }
         RowDivider()
         ClipWarning(state, attenuation)
@@ -1101,7 +1128,7 @@ private fun OutputSection(state: AppState, outputKey: String, outputLabel: Strin
                 InfoButton(Help.outputPreset)
             }
             Text(
-                assigned?.name ?: "None",
+                assigned?.name ?: stringResource(R.string.ui_none),
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (assigned != null) Palette.Lit else Palette.TextDim,
                 modifier = Modifier.padding(bottom = 10.dp),
@@ -1113,7 +1140,7 @@ private fun OutputSection(state: AppState, outputKey: String, outputLabel: Strin
                         Repo.loadPreset(correction)
                     },
                     modifier = Modifier.padding(bottom = 8.dp),
-                ) { Text("Use ${correction.name} correction") }
+                ) { Text(stringResource(R.string.ui_use_correction, correction.name)) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 FilledTonalButton(
@@ -1122,7 +1149,7 @@ private fun OutputSection(state: AppState, outputKey: String, outputLabel: Strin
                     modifier = Modifier.weight(1f, fill = false),
                 ) {
                     Text(
-                        if (alreadyAssigned) "Current preset assigned" else "Assign ${state.current.name}",
+                        if (alreadyAssigned) stringResource(R.string.ui_current_preset_assigned) else stringResource(R.string.ui_assign, state.current.name),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -1142,17 +1169,11 @@ private fun OutputSection(state: AppState, outputKey: String, outputLabel: Strin
                     InfoButton(Help.noiseMode)
                 }
                 val modes = ListeningMode.entries
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    modes.forEachIndexed { i, mode ->
-                        SegmentedButton(
-                            selected = state.listeningMode == mode,
-                            onClick = { Repo.setListeningMode(mode) },
-                            shape = SegmentedButtonDefaults.itemShape(i, modes.size, KeyShape),
-                            colors = segmentColors(),
-                            icon = {},
-                        ) { Text(mode.label, maxLines = 1) }
-                    }
-                }
+                WordSegments(
+                    labels = modes.map { listeningModeLabel(it) },
+                    selected = modes.indexOf(state.listeningMode),
+                    onSelect = { Repo.setListeningMode(modes[it]) },
+                )
             }
         }
         RowDivider()
@@ -1216,8 +1237,8 @@ private fun PresetListSection(state: AppState) {
                             Repo.deletePreset(preset.id)
                             scope.launch {
                                 val result = snackbar.showSnackbar(
-                                    "Deleted ${preset.name}",
-                                    actionLabel = "Undo",
+                                    appText(R.string.ui_deleted, preset.name),
+                                    actionLabel = appText(R.string.ui_undo),
                                     duration = SnackbarDuration.Short,
                                 )
                                 if (result == SnackbarResult.ActionPerformed) {
@@ -1235,12 +1256,12 @@ private fun PresetListSection(state: AppState) {
         }
     }
 
-    Group("Your presets", own.filter { it.folder == null }, deletable = true, tip = Help.favorites)
+    Group(stringResource(R.string.ui_your_presets), own.filter { it.folder == null }, deletable = true, tip = Help.favorites)
     PresetOrganiser.folders(own).forEach { folder ->
         Group(folder, own.filter { it.folder == folder }, deletable = true)
     }
-    Group("Liberty 4 NC correction", headphones, deletable = false, tip = if (state.presets.isEmpty()) Help.favorites else null)
-    Group("General", general, deletable = false)
+    Group(stringResource(R.string.ui_liberty_4_nc_correction), headphones, deletable = false, tip = if (state.presets.isEmpty()) Help.favorites else null)
+    Group(stringResource(R.string.ui_general), general, deletable = false)
     if (query.isNotBlank() && own.isEmpty() && headphones.isEmpty() && general.isEmpty()) {
         Text(stringResource(R.string.ui_no_presets_match_that), style = MaterialTheme.typography.bodyMedium, color = Palette.TextDim)
     }
@@ -1277,16 +1298,16 @@ private fun PresetRow(preset: Preset, selected: Boolean, favorite: Boolean, fold
             Icon(
                 // Filled against outlined, so the state doesn't rely on colour alone.
                 if (favorite) painterResource(R.drawable.ic_star) else painterResource(R.drawable.ic_star_border),
-                contentDescription = if (favorite) "Remove ${preset.name} from favourites" else "Add ${preset.name} to favourites",
+                contentDescription = if (favorite) stringResource(R.string.ui_remove_from_favourites, preset.name) else stringResource(R.string.ui_add_to_favourites, preset.name),
                 tint = if (favorite) Palette.Lit else Palette.TextDim,
             )
         }
         if (onDelete != null) {
             IconButton(onClick = { renaming = true }) {
-                Icon(painterResource(R.drawable.ic_edit), contentDescription = "Edit ${preset.name}", tint = Palette.TextDim)
+                Icon(painterResource(R.drawable.ic_edit), contentDescription = stringResource(R.string.ui_edit, preset.name), tint = Palette.TextDim)
             }
             IconButton(onClick = onDelete) {
-                Icon(painterResource(R.drawable.ic_delete), contentDescription = "Delete ${preset.name}", tint = Palette.TextDim)
+                Icon(painterResource(R.drawable.ic_delete), contentDescription = stringResource(R.string.ui_delete, preset.name), tint = Palette.TextDim)
             }
         }
     }
@@ -1316,20 +1337,20 @@ private fun ManageSection(state: AppState) {
                 }
             }
             val (parsed, curve, name) = result.getOrElse {
-                notify(snackbar, "Could not read that file: ${it.message}")
+                notify(snackbar, appText(R.string.ui_could_not_read_that_file, it.message))
                 return@launch
             }
             val title = name?.substringBeforeLast('.')?.removeSuffix(" ParametricEQ")?.removeSuffix(" GraphicEQ")?.ifBlank { null }
             when {
                 parsed != null -> {
-                    Repo.importPreset(title ?: "Imported EQ", parsed)
-                    notify(snackbar, "Imported ${parsed.filters.size} filters.")
+                    Repo.importPreset(title ?: appText(R.string.ui_imported_eq), parsed)
+                    notify(snackbar, appText(R.string.ui_imported_filters, parsed.filters.size))
                 }
                 curve != null -> {
-                    Repo.importCurve(title ?: "Imported EQ", curve)
-                    notify(snackbar, "Imported a curve with ${curve.size} points.")
+                    Repo.importCurve(title ?: appText(R.string.ui_imported_eq), curve)
+                    notify(snackbar, appText(R.string.ui_imported_a_curve_with_points, curve.size))
                 }
-                else -> notify(snackbar, "No EQ found. Choose an AutoEq or Equalizer APO ParametricEQ or GraphicEQ file.")
+                else -> notify(snackbar, appText(R.string.ui_no_eq_found_choose_an_autoeq))
             }
         }
     }
@@ -1342,7 +1363,7 @@ private fun ManageSection(state: AppState) {
             val written = withContext(Dispatchers.IO) {
                 runCatching { context.contentResolver.openOutputStream(uri)!!.use { it.write(text.encodeToByteArray()) } }
             }
-            notify(snackbar, if (written.isSuccess) "Backup saved." else "Could not save backup: ${written.exceptionOrNull()?.message}")
+            notify(snackbar, if (written.isSuccess) appText(R.string.ui_backup_saved) else appText(R.string.ui_could_not_save_backup, written.exceptionOrNull()?.message))
         }
     }
     val eqExporter = rememberLauncherForActivityResult(
@@ -1354,7 +1375,7 @@ private fun ManageSection(state: AppState) {
             val written = withContext(Dispatchers.IO) {
                 runCatching { context.contentResolver.openOutputStream(uri)!!.use { it.write(text.encodeToByteArray()) } }
             }
-            notify(snackbar, if (written.isSuccess) "EQ file saved." else "Could not save the file: ${written.exceptionOrNull()?.message}")
+            notify(snackbar, if (written.isSuccess) appText(R.string.ui_eq_file_saved) else appText(R.string.ui_could_not_save_file, written.exceptionOrNull()?.message))
         }
     }
     val parametricExporter = rememberLauncherForActivityResult(
@@ -1368,7 +1389,7 @@ private fun ManageSection(state: AppState) {
             val written = withContext(Dispatchers.IO) {
                 runCatching { context.contentResolver.openOutputStream(uri)!!.use { it.write(text.encodeToByteArray()) } }
             }
-            notify(snackbar, if (written.isSuccess) "EQ file saved." else "Could not save the file: ${written.exceptionOrNull()?.message}")
+            notify(snackbar, if (written.isSuccess) appText(R.string.ui_eq_file_saved) else appText(R.string.ui_could_not_save_file, written.exceptionOrNull()?.message))
         }
     }
     val restorer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -1382,9 +1403,9 @@ private fun ManageSection(state: AppState) {
             notify(
                 snackbar,
                 when {
-                    text == null -> "Could not read that file."
-                    Repo.restoreBackup(text) -> "Backup restored."
-                    else -> "That isn't an Eigentone backup."
+                    text == null -> appText(R.string.ui_could_not_read_that_file_2)
+                    Repo.restoreBackup(text) -> appText(R.string.ui_backup_restored)
+                    else -> appText(R.string.ui_that_isn_t_an_eigentone_backup)
                 },
             )
         }
@@ -1394,9 +1415,9 @@ private fun ManageSection(state: AppState) {
         ActionRow(stringResource(R.string.ui_save_as_new), Help.saveNew) { saving = true }
         if (saved != null && saved != state.current) {
             RowDivider()
-            ActionRow("Update ${saved.name}", Help.update) {
+            ActionRow(stringResource(R.string.ui_update, saved.name), Help.update) {
                 Repo.overwriteCurrent()
-                scope.notify(snackbar, "Updated ${saved.name}.")
+                scope.notify(snackbar, appText(R.string.ui_updated, saved.name))
             }
         }
         ShareRows { message -> scope.notify(snackbar, message) }
@@ -1412,7 +1433,7 @@ private fun ManageSection(state: AppState) {
         ActionRow(
             stringResource(R.string.ui_export_filters_file),
             Help.exportParametric,
-            detail = if (canExportFilters) null else "This preset uses faders or a curve, so use Export EQ file instead.",
+            detail = if (canExportFilters) null else stringResource(R.string.ui_this_preset_uses_faders_or_a),
             enabled = canExportFilters,
         ) { parametricExporter.launch("${state.current.name} ParametricEQ.txt") }
         RowDivider()
@@ -1457,7 +1478,7 @@ fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
     LaunchedEffect(Unit) {
         val loaded = withContext(Dispatchers.IO) { runCatching { AutoEqCatalog.loadIndex(context.cacheDir) } }
         entries = loaded.getOrNull()
-        problem = loaded.exceptionOrNull()?.let { "Could not load the headphone list: ${it.message}" }
+        problem = loaded.exceptionOrNull()?.let { appText(R.string.ui_could_not_load_the_headphone_list, it.message) }
     }
 
     val results = remember(entries, query) { AutoEqCatalog.search(entries.orEmpty(), query) }
@@ -1502,10 +1523,10 @@ fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
                                         val parsed = text.getOrNull()?.let(AutoEqParser::parse)
                                         busy = false
                                         if (parsed == null) {
-                                            problem = "Could not download that profile. It may have no parametric version."
+                                            problem = appText(R.string.ui_could_not_download_that_profile_it)
                                         } else {
                                             Repo.importPreset(entry.title, parsed)
-                                            onImported("Added ${entry.title}.")
+                                            onImported(appText(R.string.ui_added, entry.title))
                                         }
                                     }
                                 }
@@ -1522,7 +1543,7 @@ fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
 
 @Composable
 private fun SaveDialog(
-    title: String = "Save preset",
+    title: String = stringResource(R.string.ui_save_preset),
     initial: String = "",
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,
@@ -1569,7 +1590,7 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
                         shape = SegmentedButtonDefaults.itemShape(i, modes.size, KeyShape),
                         colors = segmentColors(),
                         icon = {},
-                    ) { Text(mode.label, maxLines = 1) }
+                    ) { Text(engineModeLabel(mode), maxLines = 1) }
                 }
             }
         }
@@ -1621,27 +1642,27 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
     DiagnosticsSection(status, output)
 
     SettingsSection(stringResource(R.string.ui_status)) {
-        Fact("Running", Help.statusRunning, if (status.running) "Yes" else "No")
+        Fact(stringResource(R.string.help_status_running_title), Help.statusRunning, if (status.running) stringResource(R.string.ui_yes) else "No")
         RowDivider()
-        Fact("Mode", Help.statusMode, status.mode)
+        Fact(stringResource(R.string.help_status_mode_title), Help.statusMode, status.mode)
         RowDivider()
-        Fact("EQ bands", Help.statusBands, if (status.bandCount > 0) "${status.bandCount}" else "None")
+        Fact(stringResource(R.string.help_status_bands_title), Help.statusBands, if (status.bandCount > 0) "${status.bandCount}" else stringResource(R.string.ui_none))
         RowDivider()
-        Fact("In control", Help.statusControl, if (status.hasControl) "Yes" else "No")
+        Fact(stringResource(R.string.help_status_control_title), Help.statusControl, if (status.hasControl) stringResource(R.string.ui_yes) else "No")
         RowDivider()
-        Fact("Bands accepted", Help.statusReadback, status.readback ?: "Not checked yet")
+        Fact(stringResource(R.string.help_status_readback_title), Help.statusReadback, status.readback ?: stringResource(R.string.ui_not_checked_yet))
         RowDivider()
-        Fact("Repairs", Help.statusRepairs, "${status.rebuilds}")
+        Fact(stringResource(R.string.help_status_repairs_title), Help.statusRepairs, "${status.rebuilds}")
         RowDivider()
-        Fact("Output", Help.statusOutput, output.label)
+        Fact(stringResource(R.string.help_status_output_title), Help.statusOutput, output.label)
         if (status.sessions.isNotEmpty()) {
             RowDivider()
-            Fact("Attached apps", Help.statusApps, status.sessions.joinToString())
+            Fact(stringResource(R.string.help_status_apps_title), Help.statusApps, status.sessions.joinToString())
         }
         if (status.bandCount in 1 until 64) {
             RowDivider()
             Text(
-                "This phone only allowed ${status.bandCount} bands, so narrow filters will be less accurate.",
+                stringResource(R.string.ui_this_phone_only_allowed_bands_so, status.bandCount),
                 style = MaterialTheme.typography.bodySmall,
                 color = Palette.Lit,
                 modifier = Modifier.padding(16.dp),
@@ -1662,13 +1683,13 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
 @Composable
 private fun GuideDialog(onDismiss: () -> Unit) {
     val tips = listOf(
-        "Get a good seal" to "With earbuds, fit matters more than any setting. If bass sounds thin, try other ear tips before adding EQ.",
-        "Use one EQ at a time" to "EQ in a headphone app, such as soundcore, adds to this one. Set it to flat or default, or changes can apply twice.",
-        "Start with Find my sound" to "It picks a correction for your headphones if one is known, then tunes it to what you prefer. It always checks the result against what you had.",
-        "Change a little at a time" to "A change of 2 or 3 dB is clearly audible. Very large boosts usually add distortion and lower the overall level.",
-        "Prefer cuts to boosts" to "If something is too loud, cutting it often sounds cleaner than boosting everything else.",
-        "Compare with Bypass" to "Your ears adapt within minutes, so switch back and forth. If you can't hear a benefit, keep the simpler setting.",
-        "Try several songs" to "One track can mislead you. Test with a few you know well before settling on a sound.",
+        stringResource(R.string.ui_get_a_good_seal) to stringResource(R.string.ui_with_earbuds_fit_matters_more_than),
+        stringResource(R.string.ui_use_one_eq_at_a_time) to stringResource(R.string.ui_eq_in_a_headphone_app_such_2),
+        stringResource(R.string.ui_start_with_find_my_sound) to stringResource(R.string.ui_it_picks_a_correction_for_your),
+        stringResource(R.string.ui_change_a_little_at_a_time) to stringResource(R.string.ui_a_change_of_2_or_3),
+        stringResource(R.string.ui_prefer_cuts_to_boosts) to stringResource(R.string.ui_if_something_is_too_loud_cutting),
+        stringResource(R.string.ui_compare_with_bypass) to stringResource(R.string.ui_your_ears_adapt_within_minutes_so),
+        stringResource(R.string.ui_try_several_songs) to stringResource(R.string.ui_one_track_can_mislead_you_test),
     )
     AlertDialog(
         onDismissRequest = onDismiss,

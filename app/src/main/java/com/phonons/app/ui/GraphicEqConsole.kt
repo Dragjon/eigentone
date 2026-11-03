@@ -66,7 +66,7 @@ private const val STEP_DB = 0.5
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
+fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit) {
     val bands = tone.graphicBands
     val gains = GraphicEq.normalized(tone.graphicDb, bands)
     var selected by rememberSaveable(bands) { mutableIntStateOf(bands / 2) }
@@ -100,7 +100,7 @@ fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .weight(1f)
-                    .semantics { contentDescription = "Current shape: $shapeLabel" },
+                    .semantics { contentDescription = appText(R.string.ui_current_shape, shapeLabel) },
             )
             UndoRedoButtons()
             InfoButton(Help.graphic)
@@ -113,6 +113,7 @@ fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
         }
         Faders(
             gains = gains,
+            shown = rememberMorphed(gains.toDoubleArray(), presetId to tone.shape?.name),
             selected = band,
             onSelect = { selected = it },
             // Takes the band count from the faders themselves. A reference to setGains can be remembered
@@ -149,11 +150,11 @@ fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
                 Repo.commit()
             }
             FilledTonalIconButton(onClick = { nudge(-STEP_DB) }) {
-                Icon(painterResource(R.drawable.ic_minus), contentDescription = "Lower ${GraphicEq.formatFrequency(freqs[band])}")
+                Icon(painterResource(R.drawable.ic_minus), contentDescription = stringResource(R.string.ui_lower, GraphicEq.formatFrequency(freqs[band])))
             }
             Spacer(Modifier.height(0.dp).padding(start = 8.dp))
             FilledTonalIconButton(onClick = { nudge(STEP_DB) }) {
-                Icon(Icons.Filled.Add, contentDescription = "Raise ${GraphicEq.formatFrequency(freqs[band])}")
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.ui_raise, GraphicEq.formatFrequency(freqs[band])))
             }
         }
         RowDivider()
@@ -224,7 +225,7 @@ fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = 16.dp, end = 16.dp, top = 8.dp),
-            ) { Text("Browse all ${ShapeLibrary.all.size} shapes") }
+            ) { Text(stringResource(R.string.ui_browse_all_shapes, ShapeLibrary.all.size)) }
         }
     }
 }
@@ -232,6 +233,8 @@ fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
 @Composable
 private fun Faders(
     gains: List<Double>,
+    /** What to draw, which glides while the sound changes. Touches always work from [gains]. */
+    shown: DoubleArray,
     selected: Int,
     onSelect: (Int) -> Unit,
     onChange: (List<Double>) -> Unit,
@@ -255,7 +258,7 @@ private fun Faders(
             .padding(horizontal = 12.dp)
             .semantics {
                 contentDescription =
-                    "$bands band faders. Use the band controls below to change them one at a time."
+                    appText(R.string.ui_band_faders_use_the_band_controls, bands)
             }
             .pointerInput(bands) {
                 val bottomLabels = LABEL_SPACE_DP.dp.toPx()
@@ -306,7 +309,7 @@ private fun Faders(
         }
         drawLine(Palette.Outline, Offset(gutter, zero), Offset(size.width, zero), strokeWidth = 1f)
 
-        gains.forEachIndexed { i, gain ->
+        shown.forEachIndexed { i, gain ->
             val centre = gutter + slot * i + slot / 2
             val isSelected = i == selected
             drawRect(

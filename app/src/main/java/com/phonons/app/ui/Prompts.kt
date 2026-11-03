@@ -87,7 +87,7 @@ fun OutputPrompts(state: AppState) {
         output.key.startsWith("Bluetooth") && EARBUD_EQ_PROMPT !in state.dismissedPrompts -> {
             PromptCard(
                 stringResource(R.string.ui_your_headphones_may_have_their_own_eq),
-                "EQ in a headphone app, such as soundcore, Sony or Galaxy Wearable, adds to this one, so changes can apply twice. For the clearest results, set it to flat or default, and turn off any bass boost.",
+                stringResource(R.string.ui_eq_in_a_headphone_app_such),
             ) {
                 Button(onClick = { Repo.dismissPrompt(EARBUD_EQ_PROMPT) }) { Text(stringResource(R.string.ui_got_it)) }
             }
@@ -126,14 +126,14 @@ private fun CorrectionPrompt(output: OutputInfo) {
                         Repo.assignToOutput(output.key, Repo.state.value.current.id)
                     }
                 },
-                onFailure = { problem = "Couldn't get the headphone list. Check your connection and try again." },
+                onFailure = { problem = appText(R.string.ui_couldn_t_get_the_headphone_list) },
             )
         }
     }
 
     PromptCard(
-        "Correct ${output.label}?",
-        problem ?: "A correction evens out these headphones' sound, using published measurements. You can undo it or turn it down at any time.",
+        stringResource(R.string.ui_correct, output.label),
+        problem ?: stringResource(R.string.ui_a_correction_evens_out_these_headphones),
     ) {
         Button(
             enabled = !busy,
@@ -145,7 +145,7 @@ private fun CorrectionPrompt(output: OutputInfo) {
                     useCorrection()
                 }
             },
-        ) { Text(if (busy) "Looking…" else "Find a correction") }
+        ) { Text(if (busy) stringResource(R.string.ui_looking) else stringResource(R.string.ui_find_a_correction)) }
         TextButton(enabled = !busy, onClick = { Repo.dismissPrompt(correctionPrompt(output.key)) }) { Text(stringResource(R.string.ui_not_now)) }
     }
     if (searching) {
@@ -167,7 +167,7 @@ fun ShareRows(snack: (String) -> Unit) {
         val send = Intent(Intent.ACTION_SEND).setType("text/plain")
             .putExtra(Intent.EXTRA_SUBJECT, "${preset.name} for Eigentone")
             .putExtra(Intent.EXTRA_TEXT, ShareCode.encode(preset))
-        context.startActivity(Intent.createChooser(send, "Share ${preset.name}"))
+        context.startActivity(Intent.createChooser(send, appText(R.string.ui_share, preset.name)))
     }
     RowDivider()
     ActionRow(stringResource(R.string.ui_add_a_shared_sound), Help.addShared) { pasting = true }
@@ -195,7 +195,7 @@ fun ShareRows(snack: (String) -> Unit) {
                 TextButton(enabled = code.isNotBlank(), onClick = {
                     if (Repo.importShareCode(code)) {
                         pasting = false
-                        snack("Added ${Repo.state.value.current.name}.")
+                        snack(appText(R.string.ui_added, Repo.state.value.current.name))
                     } else {
                         failed = true
                     }
@@ -235,7 +235,7 @@ fun PerAppSection(state: AppState) {
         val canAssign = Repo.findPreset(state.current.id) != null
         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                if (app == null) "Play something to set up its preset." else "Last playing: ${appLabel(context, app)}",
+                if (app == null) stringResource(R.string.ui_play_something_to_set_up_its) else stringResource(R.string.ui_last_playing, appLabel(context, app)),
                 style = MaterialTheme.typography.bodyMedium,
                 color = Palette.Text,
             )
@@ -243,7 +243,7 @@ fun PerAppSection(state: AppState) {
                 FilledTonalButton(
                     enabled = canAssign && state.appProfiles[app] != state.current.id,
                     onClick = { Repo.assignToApp(app, state.current.id) },
-                ) { Text("Use ${state.current.name} for this app", maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                ) { Text(stringResource(R.string.ui_use_for_this_app, state.current.name), maxLines = 1, overflow = TextOverflow.Ellipsis) }
             }
         }
         state.appProfiles.forEach { (packageName, presetId) ->
@@ -258,7 +258,7 @@ fun PerAppSection(state: AppState) {
                 Column(Modifier.weight(1f)) {
                     Text(appLabel(context, packageName), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
                     Text(
-                        Repo.findPreset(presetId)?.name ?: "Preset was deleted",
+                        Repo.findPreset(presetId)?.name ?: stringResource(R.string.ui_preset_was_deleted),
                         style = MaterialTheme.typography.bodySmall,
                         color = Palette.TextDim,
                     )
@@ -280,7 +280,7 @@ fun DiagnosticsSection(status: EngineStatus, output: OutputInfo) {
     SettingsSection(stringResource(R.string.ui_troubleshooting)) {
         if (!status.hasControl && rivals.isNotEmpty()) {
             Text(
-                "Another audio app has control. Try closing or turning off: ${rivals.joinToString()}.",
+                stringResource(R.string.ui_another_audio_app_has_control_try, rivals.joinToString()),
                 style = MaterialTheme.typography.bodySmall,
                 color = Palette.Danger,
                 modifier = Modifier.padding(16.dp),
@@ -288,7 +288,7 @@ fun DiagnosticsSection(status: EngineStatus, output: OutputInfo) {
             RowDivider()
         }
         ActionRow(
-            if (copied) "Copied" else "Copy status details",
+            if (copied) stringResource(R.string.ui_copied) else stringResource(R.string.ui_copy_status_details),
             Help.diagnostics,
         ) {
             val text = buildList {
@@ -298,7 +298,7 @@ fun DiagnosticsSection(status: EngineStatus, output: OutputInfo) {
                 add("Output: ${output.key}")
                 status.error?.let { add("Error: $it") }
                 status.spatialError?.let { add("Surround: $it") }
-                if (rivals.isNotEmpty()) add("Other audio effect apps: ${rivals.joinToString()}")
+                if (rivals.isNotEmpty()) add(appText(R.string.ui_other_audio_effect_apps, rivals.joinToString()))
             }.joinToString("\n")
             context.getSystemService(ClipboardManager::class.java)
                 .setPrimaryClip(ClipData.newPlainText("Eigentone status", text))
@@ -310,7 +310,7 @@ fun DiagnosticsSection(status: EngineStatus, output: OutputInfo) {
                 val send = Intent(Intent.ACTION_SEND).setType("text/plain")
                     .putExtra(Intent.EXTRA_SUBJECT, "Eigentone crash report")
                     .putExtra(Intent.EXTRA_TEXT, report)
-                context.startActivity(Intent.createChooser(send, "Share crash report"))
+                context.startActivity(Intent.createChooser(send, appText(R.string.ui_share_crash_report)))
             }
             RowDivider()
             ActionRow(stringResource(R.string.ui_delete_crash_report), Help.crashReport) {

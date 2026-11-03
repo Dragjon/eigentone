@@ -1,0 +1,4 @@
+- The curve and faders glide when you switch preset, and tabs fade from one to the next
+- Hearing check, peak finder, sweep, Find my sound and Compare now share the instrument look, with a way back and a progress scale
+- "Transparency" no longer gets cut off
+- Nearly all text can now be translated

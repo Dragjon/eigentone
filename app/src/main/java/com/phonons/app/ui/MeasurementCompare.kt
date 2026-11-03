@@ -121,7 +121,7 @@ fun MeasurementCompare(options: List<CatalogEntry>, onDismiss: () -> Unit, onCho
                         Repo.edit { before.current }
                         kept = true
                         Repo.importPreset(choice.first.title, choice.second)
-                        onChosen("Added ${choice.first.title}.")
+                        onChosen(appText(R.string.ui_added, choice.first.title))
                     }
                 },
             ) { Text(stringResource(R.string.ui_keep)) }

@@ -166,7 +166,7 @@ fun CorrectionTuner(onDismiss: () -> Unit) {
                     TextButton(onClick = {
                         hearingBefore = !hearingBefore
                         play(!hearingBefore)
-                    }) { Text(if (hearingBefore) "Hear tuned" else "Hear before") }
+                    }) { Text(if (hearingBefore) stringResource(R.string.ui_hear_tuned) else stringResource(R.string.ui_hear_before)) }
                 }
             }
         },

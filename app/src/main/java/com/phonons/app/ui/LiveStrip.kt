@@ -110,7 +110,7 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
 @Composable
 private fun EffectTag(effect: EffectState) {
     val colour = if (effect.on) Palette.Lit else Palette.StripDim
-    val description = "${effect.name} ${if (effect.on) "on" else "off"}"
+    val description = stringResource(if (effect.on) R.string.ui_effect_on else R.string.ui_effect_off, effect.name)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = description },
@@ -143,7 +143,7 @@ private fun PlayingDot() {
     if (playing) {
         val modifier = Modifier
             .size(8.dp)
-            .semantics { contentDescription = "Music is playing" }
+            .semantics { contentDescription = appText(R.string.ui_music_is_playing) }
         val pulse by rememberInfiniteTransition(label = "playing").animateFloat(
             initialValue = 0.35f,
             targetValue = 1f,
@@ -179,7 +179,7 @@ private fun MiniCurve(state: AppState, outputKey: String, working: Boolean) {
             .size(width = 52.dp, height = 26.dp)
             .clip(RoundedCornerShape(4.dp))
             .background(Palette.Bar)
-            .semantics { contentDescription = "Current sound curve" },
+            .semantics { contentDescription = appText(R.string.ui_current_sound_curve) },
     ) {
         spectrum.value?.let { bands -> drawBars(bands) }
         val zero = size.height / 2

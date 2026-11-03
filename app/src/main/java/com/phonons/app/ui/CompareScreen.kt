@@ -107,75 +107,58 @@ fun CompareScreen(onClose: () -> Unit) {
         if (step == CompareStep.CHOOSE) cancel() else step = CompareStep.CHOOSE
     }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(Palette.Background)
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .windowInsetsPadding(WindowInsets.navigationBars),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Column(
-            Modifier
-                .widthIn(max = 560.dp)
-                .fillMaxWidth()
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            when (step) {
-                CompareStep.CHOOSE -> Choose(
-                    current = before.current,
-                    firstId = firstId,
-                    secondId = secondId,
-                    choosingFirst = choosingFirst,
-                    blind = blind,
-                    onChooseSlot = { choosingFirst = it },
-                    onPick = { id ->
-                        if (choosingFirst) {
-                            firstId = id
-                            choosingFirst = false
+    ToolScreen(title = stringResource(R.string.ui_compare_two_sounds), onBack = { if (step == CompareStep.CHOOSE) cancel() else step = CompareStep.CHOOSE }, spacing = 16.dp) {
+        when (step) {
+            CompareStep.CHOOSE -> Choose(
+                current = before.current,
+                firstId = firstId,
+                secondId = secondId,
+                choosingFirst = choosingFirst,
+                blind = blind,
+                onChooseSlot = { choosingFirst = it },
+                onPick = { id ->
+                    if (choosingFirst) {
+                        firstId = id
+                        choosingFirst = false
+                    } else {
+                        secondId = id
+                    }
+                },
+                onBlind = { blind = it },
+                canStart = comparison != null && first != second,
+                onStart = {
+                    flipped = Random.nextBoolean()
+                    playing = 0
+                    step = CompareStep.LISTEN
+                },
+                onCancel = ::cancel,
+            )
+            CompareStep.LISTEN -> comparison?.let { active ->
+                Listen(
+                    comparison = active,
+                    playing = playing,
+                    silent = !state.enabled,
+                    onPlay = { playing = it },
+                    onPrefer = { button ->
+                        if (active.blind) {
+                            preferred = button
+                            playing = button
+                            step = CompareStep.REVEAL
                         } else {
-                            secondId = id
+                            use(active.presetFor(button))
                         }
-                    },
-                    onBlind = { blind = it },
-                    canStart = comparison != null && first != second,
-                    onStart = {
-                        flipped = Random.nextBoolean()
-                        playing = 0
-                        step = CompareStep.LISTEN
                     },
                     onCancel = ::cancel,
                 )
-                CompareStep.LISTEN -> comparison?.let { active ->
-                    Listen(
-                        comparison = active,
-                        playing = playing,
-                        silent = !state.enabled,
-                        onPlay = { playing = it },
-                        onPrefer = { button ->
-                            if (active.blind) {
-                                preferred = button
-                                playing = button
-                                step = CompareStep.REVEAL
-                            } else {
-                                use(active.presetFor(button))
-                            }
-                        },
-                        onCancel = ::cancel,
-                    )
-                }
-                CompareStep.REVEAL -> comparison?.let { active ->
-                    Reveal(
-                        chosen = active.nameOf(active.presetFor(preferred)),
-                        other = active.nameOf(active.presetFor(1 - preferred)),
-                        wasCurrent = active.presetFor(preferred) == before.current,
-                        onUse = { use(active.presetFor(preferred)) },
-                        onCancel = ::cancel,
-                    )
-                }
+            }
+            CompareStep.REVEAL -> comparison?.let { active ->
+                Reveal(
+                    chosen = active.nameOf(active.presetFor(preferred)),
+                    other = active.nameOf(active.presetFor(1 - preferred)),
+                    wasCurrent = active.presetFor(preferred) == before.current,
+                    onUse = { use(active.presetFor(preferred)) },
+                    onCancel = ::cancel,
+                )
             }
         }
     }
@@ -199,16 +182,15 @@ private fun Choose(
     val connected = rememberConnectedOutputNames()
     val presets = remember(connected, state.presets) { BuiltIns.availableFor(connected) + state.presets }
     /** The saved version of a preset that's been edited sits beside the edited one, so it says which it is. */
-    fun label(preset: Preset) = if (preset.id == current.id) "${preset.name} (saved)" else preset.name
+    fun label(preset: Preset) = if (preset.id == current.id) appText(R.string.ui_saved, preset.name) else preset.name
     fun nameOf(id: String?) = when (id) {
-        null -> "Choose below"
-        CURRENT -> "My current sound"
-        else -> presets.firstOrNull { it.id == id }?.let(::label) ?: "Choose below"
+        null -> appText(R.string.ui_choose_below)
+        CURRENT -> appText(R.string.ui_my_current_sound)
+        else -> presets.firstOrNull { it.id == id }?.let(::label) ?: appText(R.string.ui_choose_below)
     }
     // Comparing something with itself wouldn't tell anyone anything, so neither slot offers the other's sound.
     val otherId = if (choosingFirst) secondId else firstId
 
-    Text(stringResource(R.string.ui_compare_two_sounds), style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
     Text(
         stringResource(R.string.ui_switch_between_them_while_your_music_pla),
         style = MaterialTheme.typography.bodyLarge,
@@ -218,7 +200,7 @@ private fun Choose(
         Slot("A", nameOf(firstId), choosingFirst, Modifier.weight(1f)) { onChooseSlot(true) }
         Slot("B", nameOf(secondId), !choosingFirst, Modifier.weight(1f)) { onChooseSlot(false) }
     }
-    SettingsSection("Choose ${if (choosingFirst) "A" else "B"}") {
+    SettingsSection(stringResource(if (choosingFirst) R.string.ui_choose_a else R.string.ui_choose_b)) {
         @Composable
         fun Option(id: String, name: String) {
             Row(
@@ -237,7 +219,7 @@ private fun Choose(
                 Text(name, style = MaterialTheme.typography.bodyLarge, color = Palette.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        if (otherId != CURRENT) Option(CURRENT, "My current sound: ${current.name}")
+        if (otherId != CURRENT) Option(CURRENT, stringResource(R.string.ui_my_current_sound_2, current.name))
         presets.filter { it.id != otherId && (otherId != CURRENT || it != current) }.forEachIndexed { index, preset ->
             if (index > 0 || otherId != CURRENT) RowDivider()
             Option(preset.id, label(preset))
@@ -275,15 +257,15 @@ private fun Listen(
     onCancel: () -> Unit,
 ) {
     Text(
-        if (comparison.blind) "Which do you prefer?" else "Compare",
+        if (comparison.blind) stringResource(R.string.ui_which_do_you_prefer) else stringResource(R.string.ui_compare),
         style = MaterialTheme.typography.headlineSmall,
         color = Palette.Text,
     )
     Text(
         if (comparison.blind) {
-            "The buttons are in a random order, and you'll find out which is which after you choose. Try more than one song."
+            stringResource(R.string.ui_the_buttons_are_in_a_random)
         } else {
-            "Switch back and forth, ideally on more than one song."
+            stringResource(R.string.ui_switch_back_and_forth_ideally_on)
         },
         style = MaterialTheme.typography.bodyLarge,
         color = Palette.TextDim,
@@ -306,7 +288,7 @@ private fun Listen(
             modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
         ) {
             Text(
-                if (name != null) "Use ${comparison.label(button)}: $name" else "I prefer ${comparison.label(button)}",
+                if (name != null) stringResource(R.string.ui_use, comparison.label(button), name) else stringResource(R.string.ui_i_prefer, comparison.label(button)),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -317,16 +299,16 @@ private fun Listen(
 
 @Composable
 private fun Reveal(chosen: String, other: String, wasCurrent: Boolean, onUse: () -> Unit, onCancel: () -> Unit) {
-    Text("You preferred $chosen", style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
+    Text(stringResource(R.string.ui_you_preferred, chosen), style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
     Text(
-        "The other one was $other. A single choice can be down to chance, so it's worth trying again if the two were close.",
+        stringResource(R.string.ui_the_other_one_was_a_single, other),
         style = MaterialTheme.typography.bodyLarge,
         color = Palette.TextDim,
     )
     if (wasCurrent) {
         Button(onClick = onCancel, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.ui_done)) }
     } else {
-        Button(onClick = onUse, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Use $chosen", maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        Button(onClick = onUse, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.ui_use_2, chosen), maxLines = 1, overflow = TextOverflow.Ellipsis) }
         TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_keep_what_i_had)) }
     }
 }

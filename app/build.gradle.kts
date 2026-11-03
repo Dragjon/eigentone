@@ -21,8 +21,8 @@ android {
         applicationId = "com.phonons.app"
         minSdk = 34
         targetSdk = 36
-        versionCode = 36
-        versionName = "0.23.0"
+        versionCode = 37
+        versionName = "0.24.0"
     }
 
     signingConfigs {

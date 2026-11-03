@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -74,6 +73,10 @@ fun PeakFinderScreen(onClose: () -> Unit) {
     var failed by remember { mutableStateOf(false) }
     var finished by remember { mutableStateOf(false) }
 
+    val questionProgress = remember(answers, stage) {
+        if (stage == FinderStage.QUESTIONS) answers.toFloat() / finder.total.coerceAtLeast(1) else null
+    }
+
     DisposableEffect(stage) {
         val asking = stage == FinderStage.QUESTIONS
         Repo.hearingCheckRunning.value = asking
@@ -125,77 +128,59 @@ fun PeakFinderScreen(onClose: () -> Unit) {
 
     BackHandler { onClose() }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(Palette.Background)
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .windowInsetsPadding(WindowInsets.navigationBars),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Column(
-            Modifier
-                .widthIn(max = 560.dp)
-                .fillMaxWidth()
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            when (stage) {
-                FinderStage.INTRO -> Intro(failed, onStart = { stage = FinderStage.QUESTIONS }, onCancel = onClose)
-                FinderStage.QUESTIONS -> finder.question?.let { question ->
-                    Questions(
-                        finder = finder,
-                        question = question,
-                        answers = answers,
-                        note = note,
-                        ready = ready,
-                        levelDb = levelDb,
-                        onLevel = { levelDb = it },
-                        onSpot = { answer ->
-                            finder.answer(answer)
-                            afterAnswer()
-                        },
-                        onPick = { side ->
-                            finder.pick(side)
-                            afterAnswer()
-                        },
-                        onStop = onClose,
-                    )
-                }
-                FinderStage.RESULT -> Result(
-                    marks = marks,
-                    onHear = { withFilters ->
-                        Repo.edit { if (withFilters) it.copy(filters = Sweep.addTo(before.filters, marks), tone = before.tone) else before }
+    ToolScreen(title = stringResource(R.string.ui_find_peaks_for_me), onBack = onClose, spacing = 14.dp, progress = questionProgress) {
+        when (stage) {
+            FinderStage.INTRO -> Intro(failed, onStart = { stage = FinderStage.QUESTIONS }, onCancel = onClose)
+            FinderStage.QUESTIONS -> finder.question?.let { question ->
+                Questions(
+                    finder = finder,
+                    question = question,
+                    answers = answers,
+                    note = note,
+                    ready = ready,
+                    levelDb = levelDb,
+                    onLevel = { levelDb = it },
+                    onSpot = { answer ->
+                        finder.answer(answer)
+                        afterAnswer()
                     },
-                    onAdd = {
-                        finished = true
-                        Repo.edit { before.copy(filters = Sweep.addTo(before.filters, marks)) }
-                        Repo.commit()
-                        onClose()
+                    onPick = { side ->
+                        finder.pick(side)
+                        afterAnswer()
                     },
-                    onClose = onClose,
+                    onStop = onClose,
                 )
             }
+            FinderStage.RESULT -> Result(
+                marks = marks,
+                onHear = { withFilters ->
+                    Repo.edit { if (withFilters) it.copy(filters = Sweep.addTo(before.filters, marks), tone = before.tone) else before }
+                },
+                onAdd = {
+                    finished = true
+                    Repo.edit { before.copy(filters = Sweep.addTo(before.filters, marks)) }
+                    Repo.commit()
+                    onClose()
+                },
+                onClose = onClose,
+            )
         }
     }
 }
 
 @Composable
 private fun Intro(failed: Boolean, onStart: () -> Unit, onCancel: () -> Unit) {
-    Text(stringResource(R.string.ui_find_peaks_for_me), style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
     Text(
-        "You'll hear a note alternating with the notes just beside it, and say whether it stands out. There are about ${PeakFinder.spots().size} short questions, then a few more about anything you flagged. It takes around 3 minutes.",
+        stringResource(R.string.ui_you_ll_hear_a_note_alternating, PeakFinder.spots().size),
         style = MaterialTheme.typography.bodyLarge,
         color = Palette.TextDim,
     )
     SettingsSection(stringResource(R.string.ui_before_you_start)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(
-                "Wear the headphones you want this for, and go somewhere quiet.",
-                "Keep your volume low, and stop if a tone is ever uncomfortable.",
-                "If you're unsure, answer Same. Only clear differences are worth fixing.",
+                stringResource(R.string.ui_wear_the_headphones_you_want_this),
+                stringResource(R.string.ui_keep_your_volume_low_and_stop),
+                stringResource(R.string.ui_if_you_re_unsure_answer_same),
             ).forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium, color = Palette.Text) }
         }
     }
@@ -222,49 +207,41 @@ private fun Questions(
     onPick: (SidePick) -> Unit,
     onStop: () -> Unit,
 ) {
-    // PeakFinder isn't observable, so everything shown is read here, where each answer redraws it.
-    val progress = answers.toFloat() / finder.total.coerceAtLeast(1)
-    Text("Step ${finder.answered + 1} of ${finder.total}", style = MaterialTheme.typography.titleLarge, color = Palette.Text)
-    LinearProgressIndicator(
-        progress = { progress },
-        modifier = Modifier.fillMaxWidth(),
-        color = Palette.Lit,
-        trackColor = Palette.Track,
-        drawStopIndicator = {},
-    )
+    Text(stringResource(R.string.ui_step_of, finder.answered + 1, finder.total), style = MaterialTheme.typography.titleLarge, color = Palette.Text)
     Text(
         GraphicEq.formatFrequency(kotlin.math.round(question.hz)),
-        style = MaterialTheme.typography.displaySmall,
+        style = BigReadout,
         color = Palette.Lit,
     )
+    Lamps(count = question.tones.size, lit = note)
     when (question) {
         is PeakFinder.Question.Spot -> {
             val mainNote = note % 2 == 0
             Text(
-                if (question.rechecking) "Checking again: does this note stand out from the ones beside it?" else "Does this note stand out from the ones beside it?",
+                if (question.rechecking) stringResource(R.string.ui_checking_again_does_this_note_stand) else stringResource(R.string.ui_does_this_note_stand_out_from),
                 style = MaterialTheme.typography.titleMedium,
                 color = Palette.Text,
             )
             Text(
-                if (mainNote) "Playing: this note" else "Playing: the note beside it",
+                if (mainNote) stringResource(R.string.ui_playing_this_note) else stringResource(R.string.ui_playing_the_note_beside_it),
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (mainNote) Palette.Lit else Palette.TextDim,
             )
-            AnswerButton("Stands out", ready) { onSpot(SpotAnswer.STANDS_OUT) }
-            AnswerButton("Same", ready) { onSpot(SpotAnswer.SAME) }
-            AnswerButton("Weaker", ready) { onSpot(SpotAnswer.WEAKER) }
+            AnswerButton(stringResource(R.string.ui_stands_out), ready) { onSpot(SpotAnswer.STANDS_OUT) }
+            AnswerButton(stringResource(R.string.ui_same), ready) { onSpot(SpotAnswer.SAME) }
+            AnswerButton(stringResource(R.string.ui_weaker), ready) { onSpot(SpotAnswer.WEAKER) }
         }
         is PeakFinder.Question.Narrow -> {
             val word = if (question.answer == SpotAnswer.STANDS_OUT) "stronger" else "weaker"
-            Text("Which of these two notes is $word?", style = MaterialTheme.typography.titleMedium, color = Palette.Text)
+            Text(stringResource(R.string.ui_which_of_these_two_notes_is, word), style = MaterialTheme.typography.titleMedium, color = Palette.Text)
             Text(
-                if (note % 2 == 0) "Playing: first note" else "Playing: second note",
+                if (note % 2 == 0) stringResource(R.string.ui_playing_first_note) else stringResource(R.string.ui_playing_second_note),
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (note % 2 == 0) Palette.Lit else Palette.Text,
             )
-            AnswerButton("First", ready) { onPick(SidePick.FIRST) }
-            AnswerButton("Second", ready) { onPick(SidePick.SECOND) }
-            AnswerButton("About the same", ready) { onPick(SidePick.SAME) }
+            AnswerButton(stringResource(R.string.ui_first), ready) { onPick(SidePick.FIRST) }
+            AnswerButton(stringResource(R.string.ui_second), ready) { onPick(SidePick.SECOND) }
+            AnswerButton(stringResource(R.string.ui_about_the_same), ready) { onPick(SidePick.SAME) }
         }
     }
     SliderSetting(
@@ -361,8 +338,8 @@ private fun Result(
     NothingPlayingHint()
     val musicActive = rememberMusicActive()
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        SideCard("Before", !hearingNew, musicActive, Modifier.weight(1f)) { hearingNew = false }
-        SideCard("With filters", hearingNew, musicActive, Modifier.weight(1f)) { hearingNew = true }
+        SideCard(stringResource(R.string.ui_before), !hearingNew, musicActive, Modifier.weight(1f)) { hearingNew = false }
+        SideCard(stringResource(R.string.ui_with_filters), hearingNew, musicActive, Modifier.weight(1f)) { hearingNew = true }
     }
     Button(onClick = onAdd, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.ui_add_to_my_sound)) }
     TextButton(onClick = onClose, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_discard)) }

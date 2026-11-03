@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -66,6 +65,8 @@ fun HearingScreen(onClose: () -> Unit) {
     var phase by remember { mutableStateOf(TonePhase.WAITING) }
     var result by remember { mutableStateOf<HearingResult?>(null) }
 
+    val testProgress = remember(answers, step) { if (step == HearingStep.TONES) test.progress else null }
+
     DisposableEffect(step) {
         val testing = step == HearingStep.TONES
         Repo.hearingCheckRunning.value = testing
@@ -78,73 +79,55 @@ fun HearingScreen(onClose: () -> Unit) {
 
     BackHandler { onClose() }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(Palette.Background)
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .windowInsetsPadding(WindowInsets.navigationBars),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Column(
-            Modifier
-                .widthIn(max = 560.dp)
-                .fillMaxWidth()
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            when (step) {
-                HearingStep.INTRO -> Intro(onStart = { step = HearingStep.TONES }, onCancel = onClose)
-                HearingStep.TONES -> {
-                    LaunchedEffect(answers, replays) {
-                        phase = TonePhase.WAITING
-                        // A short pause, so a tone can't be mistaken for the sound of the tap.
-                        kotlinx.coroutines.delay(TONE_GAP_MS)
-                        val hz = test.hz ?: return@LaunchedEffect
-                        if (!player.play(hz, test.levelDb, test.ear!!)) {
-                            phase = TonePhase.FAILED
-                            return@LaunchedEffect
-                        }
-                        phase = TonePhase.PLAYING
-                        kotlinx.coroutines.delay(TonePlayer.TONE_MS)
-                        phase = TonePhase.ASKING
+    ToolScreen(title = stringResource(R.string.ui_hearing_check), onBack = onClose, spacing = 16.dp, progress = testProgress) {
+        when (step) {
+            HearingStep.INTRO -> Intro(onStart = { step = HearingStep.TONES }, onCancel = onClose)
+            HearingStep.TONES -> {
+                LaunchedEffect(answers, replays) {
+                    phase = TonePhase.WAITING
+                    // A short pause, so a tone can't be mistaken for the sound of the tap.
+                    kotlinx.coroutines.delay(TONE_GAP_MS)
+                    val hz = test.hz ?: return@LaunchedEffect
+                    if (!player.play(hz, test.levelDb, test.ear!!)) {
+                        phase = TonePhase.FAILED
+                        return@LaunchedEffect
                     }
-                    Tones(
-                        test = test,
-                        answers = answers,
-                        phase = phase,
-                        onPlayAgain = {
-                            player.stop()
-                            replays++
-                        },
-                        onAnswer = { heard ->
-                            player.stop()
-                            test.answer(heard)
-                            answers++
-                            if (test.isDone) {
-                                val finished = test.result()
-                                result = finished
-                                // Saved now, so ear correction can still be chosen after leaving this screen.
-                                val output = Repo.output.value
-                                val record = HearingRecord.of(finished, output.label, System.currentTimeMillis())
-                                Repo.update { it.copy(hearings = it.hearings + (output.key to record)) }
-                                step = HearingStep.RESULT
-                            }
-                        },
-                        onCancel = onClose,
-                    )
+                    phase = TonePhase.PLAYING
+                    kotlinx.coroutines.delay(TonePlayer.TONE_MS)
+                    phase = TonePhase.ASKING
                 }
-                HearingStep.RESULT -> result?.let { Result(it, onClose) }
+                Tones(
+                    test = test,
+                    answers = answers,
+                    phase = phase,
+                    onPlayAgain = {
+                        player.stop()
+                        replays++
+                    },
+                    onAnswer = { heard ->
+                        player.stop()
+                        test.answer(heard)
+                        answers++
+                        if (test.isDone) {
+                            val finished = test.result()
+                            result = finished
+                            // Saved now, so ear correction can still be chosen after leaving this screen.
+                            val output = Repo.output.value
+                            val record = HearingRecord.of(finished, output.label, System.currentTimeMillis())
+                            Repo.update { it.copy(hearings = it.hearings + (output.key to record)) }
+                            step = HearingStep.RESULT
+                        }
+                    },
+                    onCancel = onClose,
+                )
             }
+            HearingStep.RESULT -> result?.let { Result(it, onClose) }
         }
     }
 }
 
 @Composable
 private fun Intro(onStart: () -> Unit, onCancel: () -> Unit) {
-    Text(stringResource(R.string.ui_hearing_check), style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
     Text(
         stringResource(R.string.ui_you_ll_hear_quiet_tones_in_one_ear_at_a),
         style = MaterialTheme.typography.bodyLarge,
@@ -153,10 +136,10 @@ private fun Intro(onStart: () -> Unit, onCancel: () -> Unit) {
     SettingsSection(stringResource(R.string.ui_before_you_start)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(
-                "Wear the headphones you want this for, and go somewhere quiet.",
-                "Turn on noise cancelling if you have it, and set the headphones' own EQ to flat.",
-                "Set your usual music volume, and don't change it during the check.",
-                "Stop if a tone is ever uncomfortable.",
+                stringResource(R.string.ui_wear_the_headphones_you_want_this),
+                stringResource(R.string.ui_turn_on_noise_cancelling_if_you),
+                stringResource(R.string.ui_set_your_usual_music_volume_and),
+                stringResource(R.string.ui_stop_if_a_tone_is_ever),
             ).forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium, color = Palette.Text) }
         }
     }
@@ -181,26 +164,23 @@ private fun Tones(
     val ear = test.ear ?: return
     val hz = test.hz ?: return
     // HearingTest isn't observable, so everything shown is read here, where each answer redraws it.
-    val progress = test.progress
-    Text("Listen with your ${ear.label} ear", style = MaterialTheme.typography.titleLarge, color = Palette.Text)
-    LinearProgressIndicator(
-        progress = { progress },
-        modifier = Modifier.fillMaxWidth(),
-        color = Palette.Lit,
-        trackColor = Palette.Track,
-        drawStopIndicator = {},
-    )
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        EarMark(left = ear == com.phonons.app.data.Ear.LEFT)
+        Text(stringResource(R.string.ui_listen_with_your_ear, ear.label), style = MaterialTheme.typography.titleLarge, color = Palette.Text)
+    }
+    Text(GraphicEq.formatFrequency(hz), style = BigReadout, color = Palette.Lit)
+    if (phase != TonePhase.FAILED) Lamps(count = 3, lit = phase.ordinal)
     Text(
-        "${GraphicEq.formatFrequency(hz)}, tone ${test.attempt}. Part ${test.stepNumber} of ${test.stepCount}, after $answers ${if (answers == 1) "answer" else "answers"}.",
+        appPlural(R.plurals.ui_hearing_status, answers, GraphicEq.formatFrequency(hz), test.attempt, test.stepNumber, test.stepCount, answers),
         style = MaterialTheme.typography.bodyMedium,
         color = Palette.TextDim,
     )
     Text(
         when (phase) {
-            TonePhase.WAITING -> "Next tone coming…"
-            TonePhase.PLAYING -> "Listen now: three short beeps…"
-            TonePhase.ASKING -> "Did you hear it?"
-            TonePhase.FAILED -> "This phone wouldn't play the tone. Try Play again."
+            TonePhase.WAITING -> stringResource(R.string.ui_next_tone_coming)
+            TonePhase.PLAYING -> stringResource(R.string.ui_listen_now_three_short_beeps)
+            TonePhase.ASKING -> stringResource(R.string.ui_did_you_hear_it)
+            TonePhase.FAILED -> stringResource(R.string.ui_this_phone_wouldn_t_play_the)
         },
         style = MaterialTheme.typography.titleMedium,
         color = when (phase) {
@@ -254,9 +234,9 @@ private fun Result(result: HearingResult, onClose: () -> Unit) {
     Text(stringResource(R.string.ui_your_curve), style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
     Text(
         if (hasCurve) {
-            "This lifts the frequencies you heard least well, by half the difference. These headphones' own tuning is part of the result, so it suits them best."
+            stringResource(R.string.ui_this_lifts_the_frequencies_you_heard)
         } else {
-            "Your results were about even across frequencies, so there's no shared curve to add."
+            stringResource(R.string.ui_your_results_were_about_even_across)
         },
         style = MaterialTheme.typography.bodyLarge,
         color = Palette.TextDim,
@@ -314,7 +294,7 @@ private fun Result(result: HearingResult, onClose: () -> Unit) {
         HearingGraph(result)
         Text(
             if (recommended) {
-                "Your ears differed by up to ${result.largestEarDifferenceDb().toInt()} dB at some frequencies, which can also come from fit. Eigentone can close half of that gap, frequency by frequency, with a separate EQ for each ear. It's saved for ${output.label}, and you can also do this later from the Sound tab, under Space."
+                stringResource(R.string.ui_your_ears_differed_by_up_to, result.largestEarDifferenceDb().toInt(), output.label)
             } else {
                 earsCloseNote(result)
             },
@@ -332,15 +312,15 @@ private fun Result(result: HearingResult, onClose: () -> Unit) {
             ) {
                 Text(
                     when {
-                        earsApplied -> "Each ear is now corrected"
-                        recommended -> "Correct each ear"
-                        else -> "Correct each ear anyway"
+                        earsApplied -> stringResource(R.string.ui_each_ear_is_now_corrected)
+                        recommended -> stringResource(R.string.ui_correct_each_ear)
+                        else -> stringResource(R.string.ui_correct_each_ear_anyway)
                     },
                 )
             }
         }
     }
-    TextButton(onClick = onClose, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (hasCurve) "Discard" else "Done") }
+    TextButton(onClick = onClose, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (hasCurve) stringResource(R.string.ui_discard) else stringResource(R.string.ui_done)) }
 }
 
 /** What each ear measured, side by side, so they can be compared whether or not they need correcting. */

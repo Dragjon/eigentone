@@ -193,12 +193,12 @@ fun ShapeBrowser(onClose: () -> Unit) {
     BackHandler { goBack() }
 
     val title = when {
-        searching -> "Search results"
-        favouritesOnly -> "Favourites"
+        searching -> stringResource(R.string.ui_search_results)
+        favouritesOnly -> stringResource(R.string.help_favorites_title)
         category != null -> category!!.label
-        showAll -> "All shapes"
+        showAll -> stringResource(R.string.ui_all_shapes)
         trait != null -> trait!!.label
-        else -> "Shape library"
+        else -> stringResource(R.string.help_shape_library_title)
     }
 
     Column(
@@ -264,7 +264,7 @@ fun ShapeBrowser(onClose: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        "${results.size} ${if (results.size == 1) "shape" else "shapes"}",
+                        appPlural(R.plurals.ui_shape_count, results.size, results.size),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Palette.TextDim,
                         modifier = Modifier.weight(1f),
@@ -361,8 +361,8 @@ fun ShapeBrowser(onClose: () -> Unit) {
                     hear(picked, amount)
                 },
                 silentReason = when {
-                    !state.enabled -> "Eigentone is off, so you won't hear this until it's on."
-                    state.bypass -> "Bypass is on, so you won't hear this until it's off."
+                    !state.enabled -> stringResource(R.string.ui_eigentone_is_off_so_you_won)
+                    state.bypass -> stringResource(R.string.ui_bypass_is_on_so_you_won)
                     else -> null
                 },
                 onAmount = {
@@ -400,7 +400,7 @@ private fun ShapeEditorDialog(draft: ShapeDraft, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Palette.Tooltip,
-        title = { Text(if (draft.id == null) "New shape" else "Edit shape") },
+        title = { Text(if (draft.id == null) stringResource(R.string.ui_new_shape) else stringResource(R.string.ui_edit_shape)) },
         text = {
             Column(
                 Modifier.verticalScroll(rememberScrollState()),
@@ -463,8 +463,8 @@ private fun FirstPage(
 ) {
     val counts = remember { ShapeLibrary.all.groupingBy { it.category }.eachCount() }
     val options = listOf(
-        BrowseOption("All shapes", "The whole library", ShapeLibrary.all.size, onAll),
-        BrowseOption("Favourites", "Shapes you've starred", favouriteCount, onFavourites),
+        BrowseOption(stringResource(R.string.ui_all_shapes), stringResource(R.string.ui_the_whole_library), ShapeLibrary.all.size, onAll),
+        BrowseOption(stringResource(R.string.help_favorites_title), stringResource(R.string.ui_shapes_you_ve_starred), favouriteCount, onFavourites),
         BrowseOption(ShapeCategory.YOURS.label, ShapeCategory.YOURS.examples, yourCount) { onCategory(ShapeCategory.YOURS) },
     ) + (ShapeCategory.entries - ShapeCategory.YOURS).map { category ->
         BrowseOption(category.label, category.examples, counts[category] ?: 0) { onCategory(category) }
@@ -531,7 +531,7 @@ private fun BrowseCard(option: BrowseOption, modifier: Modifier) {
 private fun SoundFilter(selected: ShapeTrait?, onSelect: (ShapeTrait?) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
-        val label = selected?.label ?: "Any sound"
+        val label = selected?.label ?: stringResource(R.string.ui_any_sound)
         if (selected != null) {
             Button(onClick = { open = true }) {
                 Text(label, maxLines = 1)
@@ -574,7 +574,7 @@ private fun EmptyResults(favouritesEmpty: Boolean, onClear: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            if (favouritesEmpty) "Tap the star on any shape to keep it here." else "No shapes match that.",
+            if (favouritesEmpty) stringResource(R.string.ui_tap_the_star_on_any_shape) else stringResource(R.string.ui_no_shapes_match_that),
             style = MaterialTheme.typography.bodyMedium,
             color = Palette.TextDim,
         )
@@ -597,7 +597,7 @@ private fun ShapeRow(
             .fillMaxWidth()
             .background(if (selected) Palette.SurfaceHigh else Palette.Background)
             .semantics { this.selected = selected }
-            .clickable(role = Role.Button, onClickLabel = "Hear ${shape.name}", onClick = onClick)
+            .clickable(role = Role.Button, onClickLabel = stringResource(R.string.ui_hear, shape.name), onClick = onClick)
             .heightIn(min = 64.dp)
             .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -620,14 +620,14 @@ private fun ShapeRow(
         }
         if (onEdit != null) {
             IconButton(onClick = onEdit) {
-                Icon(painterResource(R.drawable.ic_edit), contentDescription = "Edit ${shape.name}", tint = Palette.TextDim)
+                Icon(painterResource(R.drawable.ic_edit), contentDescription = stringResource(R.string.ui_edit, shape.name), tint = Palette.TextDim)
             }
         }
         IconButton(onClick = onToggleFavourite) {
             Icon(
                 // Filled against outlined, so the state doesn't rely on colour alone.
                 painterResource(if (favourite) R.drawable.ic_star else R.drawable.ic_star_border),
-                contentDescription = if (favourite) "Remove ${shape.name} from favourites" else "Add ${shape.name} to favourites",
+                contentDescription = if (favourite) stringResource(R.string.ui_remove_from_favourites, shape.name) else stringResource(R.string.ui_add_to_favourites, shape.name),
                 tint = if (favourite) Palette.Lit else Palette.TextDim,
             )
         }
@@ -709,12 +709,12 @@ private fun PreviewPanel(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    "$bands faders miss this shape by up to ${String.format(Locale.US, "%.1f", followError)} dB.",
+                    stringResource(R.string.ui_faders_miss_shape, bands, String.format(Locale.US, "%.1f", followError)),
                     style = MaterialTheme.typography.bodySmall,
                     color = Palette.Text,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = onFinerFaders) { Text("Use ${GraphicEq.BAND_OPTIONS.last()}") }
+                TextButton(onClick = onFinerFaders) { Text(stringResource(R.string.ui_use_2, GraphicEq.BAND_OPTIONS.last())) }
             }
         }
         Row(

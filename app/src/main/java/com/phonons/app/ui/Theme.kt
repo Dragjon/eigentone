@@ -106,6 +106,9 @@ val PanelLegend = TextStyle(
     letterSpacing = 1.2.sp,
 )
 
+/** A tool's main measurement, large enough to read at arm's length. */
+val BigReadout = TextStyle(fontFamily = ReadoutFamily, fontSize = 38.sp, lineHeight = 44.sp)
+
 /** Monospaced digits, so measurements stay still while their values change. */
 val Readout = TextStyle(fontFamily = ReadoutFamily, fontSize = 13.sp, lineHeight = 18.sp)
 

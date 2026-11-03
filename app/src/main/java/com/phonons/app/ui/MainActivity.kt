@@ -1,5 +1,7 @@
 package com.phonons.app.ui
 
+import com.phonons.app.R
+import androidx.compose.ui.res.stringResource
 import android.Manifest
 import android.app.ForegroundServiceStartNotAllowedException
 import android.content.Intent
@@ -21,6 +23,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        AppText.context = applicationContext
         notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         setContent { PhononsTheme { PhononsApp(onSetEnabled = ::setEnabled) } }
         handleShortcut(intent)
@@ -59,7 +62,7 @@ class MainActivity : ComponentActivity() {
             AudioService.start(this)
         } catch (e: ForegroundServiceStartNotAllowedException) {
             Log.w("Phonons", "Could not start engine", e)
-            Repo.status.value = Repo.status.value.copy(error = "Android blocked the background service: ${e.message}")
+            Repo.status.value = Repo.status.value.copy(error = appText(R.string.ui_android_blocked_the_background_service, e.message))
         }
     }
 }

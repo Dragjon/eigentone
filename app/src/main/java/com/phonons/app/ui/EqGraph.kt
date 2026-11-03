@@ -1,5 +1,7 @@
 package com.phonons.app.ui
 
+import com.phonons.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -75,6 +77,8 @@ fun EqGraph(
     modifier: Modifier = Modifier,
     heightDp: Int = 260,
     rangeDb: Double = RANGE_DB,
+    /** When this changes, such as the preset, the curves glide to their new shape. */
+    morphKey: Any? = null,
 ) {
     val currentFilters by rememberUpdatedState(filters)
     val measurer = rememberTextMeasurer()
@@ -93,6 +97,8 @@ fun EqGraph(
             DoubleArray(CURVE_POINTS + 1) { i -> Eq.curveDb(right, Eq.logFreq(i.toDouble() / CURVE_POINTS)) }
         }
     }
+    val shownCurve = rememberMorphed(curve, morphKey)
+    val shownRight = rememberMorphed(rightCurve ?: curve, morphKey)
     val rightColour = if (dimmed) Palette.TextDim else Palette.RightEar
     val nodeColour = if (dimmed) Palette.TextDim else Palette.Lit
     // Some edits don't change the curve, such as the compressor, and then there's nothing to show.
@@ -119,9 +125,9 @@ fun EqGraph(
             .height(heightDp.dp)
             .semantics {
                 contentDescription = if (rightCurveFilters == null) {
-                    "Equaliser curve. Use the filter controls below to adjust it."
+                    appText(R.string.ui_equaliser_curve_use_the_filter_controls)
                 } else {
-                    "Equaliser curves, with a separate curve for each ear."
+                    appText(R.string.ui_equaliser_curves_with_a_separate_curve)
                 }
             }
             .pointerInput(Unit) {
@@ -194,7 +200,7 @@ fun EqGraph(
         val zeroY = yOf(0.0, h, rangeDb)
         val curvePath = Path()
         val fill = Path().apply { moveTo(0f, zeroY) }
-        curve.forEachIndexed { i, db ->
+        shownCurve.forEachIndexed { i, db ->
             val x = w * i / CURVE_POINTS
             val y = yOf(db, h, rangeDb)
             if (i == 0) curvePath.moveTo(x, y) else curvePath.lineTo(x, y)
@@ -225,7 +231,7 @@ fun EqGraph(
 
         drawPath(curvePath, accent, style = Stroke(width = 2.dp.toPx()))
 
-        rightCurve?.let { points ->
+        if (rightCurve != null) shownRight.let { points ->
             val right = Path()
             points.forEachIndexed { i, db ->
                 val x = w * i / CURVE_POINTS
@@ -273,18 +279,18 @@ fun EqGraph(
         gridDb.filter { it != 0 }.forEach { db ->
             label(if (db > 0) "+$db" else "$db", 4f, yOf(db.toDouble(), h, rangeDb) + 2f)
         }
-        if (ghost != null) label("Saved", w * 0.42f, 4f)
+        if (ghost != null) label(appText(R.string.ui_saved_2), w * 0.42f, 4f)
         if (rightCurve != null) {
             val rightStyle = labelStyle.copy(color = rightColour)
-            val rightLabel = measurer.measure("Right ear", rightStyle).size.width + 8.dp.toPx()
+            val rightLabel = measurer.measure(appText(R.string.ui_right_ear), rightStyle).size.width + 8.dp.toPx()
             val mark = 4.dp.toPx()
             val stroke = 1.5.dp.toPx()
             val markY = 12.dp.toPx()
             val leftX = 10.dp.toPx()
             drawLine(accent, Offset(leftX - mark, markY - mark), Offset(leftX + mark, markY + mark), stroke)
             drawLine(accent, Offset(leftX - mark, markY + mark), Offset(leftX + mark, markY - mark), stroke)
-            label("Left ear", 18.dp.toPx(), 4f, labelStyle.copy(color = accent))
-            label("Right ear", w - rightLabel - 18.dp.toPx(), 4f, rightStyle)
+            label(appText(R.string.ui_left_ear), 18.dp.toPx(), 4f, labelStyle.copy(color = accent))
+            label(appText(R.string.ui_right_ear), w - rightLabel - 18.dp.toPx(), 4f, rightStyle)
             drawCircle(rightColour, mark, Offset(w - 10.dp.toPx(), markY), style = Stroke(stroke))
         }
 

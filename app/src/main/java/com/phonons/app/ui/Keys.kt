@@ -3,7 +3,14 @@ package com.phonons.app.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,12 +46,48 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.phonons.app.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.phonons.app.data.Preset
 import com.phonons.app.data.Repo
+
+/** A choice between a few words. Longer words get wider keys, so none of them is cut off. */
+@Composable
+fun WordSegments(labels: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
+            .selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        labels.forEachIndexed { i, label ->
+            val on = i == selected
+            Box(
+                Modifier
+                    .weight(label.length + 4f)
+                    .fillMaxHeight()
+                    .heightIn(min = 48.dp)
+                    .clip(KeyShape)
+                    .background(if (on) Palette.Lit else Palette.SurfaceHigh)
+                    .selectable(selected = on, role = Role.RadioButton, onClick = { onSelect(i) })
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (on) Palette.OnLit else Palette.Text,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                )
+            }
+        }
+    }
+}
 
 val KeyShape = RoundedCornerShape(4.dp)
 val PanelShape = RoundedCornerShape(4.dp)

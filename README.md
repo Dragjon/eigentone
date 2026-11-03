@@ -43,7 +43,7 @@ Crash reports stay on the phone. You choose whether to share one from the System
 Copy the latest `Eigentone-<version>.apk` to the phone and open it, or use USB debugging:
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.23.0.apk
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.24.0.apk
 ```
 
 ## Build

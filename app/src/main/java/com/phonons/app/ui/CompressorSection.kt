@@ -44,7 +44,7 @@ import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.round
 
-private val BAND_NAMES = listOf("Bass", "Mids", "Treble")
+private val BAND_NAMES = listOf(R.string.ui_band_bass, R.string.ui_band_mids, R.string.ui_band_treble)
 
 /** The manual compressor: a starting point, then each band's settings, with the details tucked away. */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
@@ -90,7 +90,7 @@ fun CompressorSection(state: AppState) {
             stringResource(R.string.ui_multiband_compressor),
             Help.compressor,
             compressor.enabled,
-            detail = if (compressor.enabled && nightActive) "Night mode is on, so it's used instead." else null,
+            detail = if (compressor.enabled && nightActive) stringResource(R.string.ui_night_mode_is_on_so_it) else null,
         ) { on ->
             change { it.copy(enabled = on) }
             Repo.commit()
@@ -133,13 +133,13 @@ fun CompressorSection(state: AppState) {
                     shape = SegmentedButtonDefaults.itemShape(index, BAND_NAMES.size, KeyShape),
                     colors = segmentColors(),
                     icon = {},
-                ) { Text(name, maxLines = 1) }
+                ) { Text(stringResource(name), maxLines = 1) }
             }
         }
         val band = compressor.bands[selected]
         fun changeBand(transform: (CompressorBand) -> CompressorBand) = change { it.withBand(selected, transform(it.bands[selected])) }
 
-        SwitchSetting("Compress ${BAND_NAMES[selected].lowercase()}", Help.compressorBand, band.enabled) { on ->
+        SwitchSetting(stringResource(R.string.ui_compress, stringResource(BAND_NAMES[selected]).lowercase()), Help.compressorBand, band.enabled) { on ->
             changeBand { it.copy(enabled = on) }
             Repo.commit()
         }
@@ -172,7 +172,7 @@ fun CompressorSection(state: AppState) {
                 value = band.makeupDb.toFloat(),
                 range = Dynamics.MAKEUP_DB.start.toFloat()..Dynamics.MAKEUP_DB.endInclusive.toFloat(),
                 default = 0f,
-                detail = if (band.makeupDb > 0 && !state.limiter) "The limiter is off, so a lot of makeup can distort." else null,
+                detail = if (band.makeupDb > 0 && !state.limiter) stringResource(R.string.ui_the_limiter_is_off_so_a) else null,
                 onChange = { v -> changeBand { it.copy(makeupDb = halfStep(v)) } },
                 onFinished = Repo::commit,
             )
@@ -182,7 +182,7 @@ fun CompressorSection(state: AppState) {
             modifier = Modifier
                 .padding(horizontal = 8.dp)
                 .heightIn(min = 48.dp),
-        ) { Text(if (details) "Hide timing and crossovers" else "Timing and crossovers") }
+        ) { Text(if (details) stringResource(R.string.ui_hide_timing_and_crossovers) else stringResource(R.string.ui_timing_and_crossovers)) }
         if (details) {
             if (band.enabled) {
                 LogSlider(
@@ -268,7 +268,7 @@ private fun LogSlider(
 /** Level in against level out. The straight line is no change, and the coloured line is this setting. */
 @Composable
 private fun TransferCurve(band: CompressorBand) {
-    val description = "Compression curve. Levels above ${band.thresholdDb.toInt()} dB are reduced at ${String.format(Locale.US, "%.1f", band.ratio)} to 1."
+    val description = stringResource(R.string.ui_compression_curve_description, band.thresholdDb.toInt(), String.format(Locale.US, "%.1f", band.ratio))
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Canvas(
             Modifier

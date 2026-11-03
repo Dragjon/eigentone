@@ -413,4 +413,225 @@
     <string name="ui_your_headphones_may_have_their_own_eq" formatted="false">Your headphones may have their own EQ</string>
     <string name="ui_your_marks" formatted="false">Your marks</string>
     <string name="ui_your_sound" formatted="false">Your sound</string>
+    <string name="ui_tab_eq" formatted="false">EQ</string>
+    <string name="ui_tab_sound" formatted="false">Sound</string>
+    <string name="ui_tab_presets" formatted="false">Presets</string>
+    <string name="ui_tab_tune" formatted="false">Tune</string>
+    <string name="ui_tab_system" formatted="false">System</string>
+    <string name="ui_mode_cancelling" formatted="false">Cancelling</string>
+    <string name="ui_mode_transparency" formatted="false">Transparency</string>
+    <string name="ui_mode_off" formatted="false">Off</string>
+    <string name="ui_route_auto" formatted="false">Auto</string>
+    <string name="ui_route_global" formatted="false">Global</string>
+    <string name="ui_route_per_app" formatted="false">Per app</string>
+    <string name="ui_my_current_sound_2" formatted="false">My current sound: %1$s</string>
+    <string name="ui_which_do_you_prefer" formatted="false">Which do you prefer?</string>
+    <string name="ui_the_buttons_are_in_a_random" formatted="false">The buttons are in a random order, and you\'ll find out which is which after you choose. Try more than one song.</string>
+    <string name="ui_switch_back_and_forth_ideally_on" formatted="false">Switch back and forth, ideally on more than one song.</string>
+    <string name="ui_i_prefer" formatted="false">I prefer %1$s</string>
+    <string name="ui_use" formatted="false">Use %1$s: %2$s</string>
+    <string name="ui_you_preferred" formatted="false">You preferred %1$s</string>
+    <string name="ui_the_other_one_was_a_single" formatted="false">The other one was %1$s. A single choice can be down to chance, so it\'s worth trying again if the two were close.</string>
+    <string name="ui_use_2" formatted="false">Use %1$s</string>
+    <string name="ui_night_mode_is_on_so_it" formatted="false">Night mode is on, so it\'s used instead.</string>
+    <string name="ui_compress" formatted="false">Compress %1$s</string>
+    <string name="ui_the_limiter_is_off_so_a" formatted="false">The limiter is off, so a lot of makeup can distort.</string>
+    <string name="ui_timing_and_crossovers" formatted="false">Timing and crossovers</string>
+    <string name="ui_hide_timing_and_crossovers" formatted="false">Hide timing and crossovers</string>
+    <string name="ui_listening_on" formatted="false">• Listening on: %1$s</string>
+    <string name="ui_my_current_sound_recommended" formatted="false">My current sound: %1$s (recommended)</string>
+    <string name="ui_correction" formatted="false">%1$s correction</string>
+    <string name="ui_correction_2" formatted="false">%1$s correction%2$s</string>
+    <string name="ui_question_of" formatted="false">Question %1$s of %2$s</string>
+    <string name="ui_play_version" formatted="false">Play version %1$s</string>
+    <string name="ui_tap_to_hear" formatted="false">Tap to hear</string>
+    <string name="ui_playing" formatted="false">Playing</string>
+    <string name="ui_new" formatted="false">New</string>
+    <string name="ui_changes_from" formatted="false">Changes from %1$s</string>
+    <string name="ui_before" formatted="false">Before</string>
+    <string name="ui_after" formatted="false">After</string>
+    <string name="ui_lower" formatted="false">Lower %1$s</string>
+    <string name="ui_raise" formatted="false">Raise %1$s</string>
+    <string name="ui_browse_all_shapes" formatted="false">Browse all %1$s shapes</string>
+    <string name="ui_wear_the_headphones_you_want_this" formatted="false">Wear the headphones you want this for, and go somewhere quiet.</string>
+    <string name="ui_turn_on_noise_cancelling_if_you" formatted="false">Turn on noise cancelling if you have it, and set the headphones\' own EQ to flat.</string>
+    <string name="ui_set_your_usual_music_volume_and" formatted="false">Set your usual music volume, and don\'t change it during the check.</string>
+    <string name="ui_stop_if_a_tone_is_ever" formatted="false">Stop if a tone is ever uncomfortable.</string>
+    <string name="ui_listen_with_your_ear" formatted="false">Listen with your %1$s ear</string>
+    <string name="ui_next_tone_coming" formatted="false">Next tone coming…</string>
+    <string name="ui_listen_now_three_short_beeps" formatted="false">Listen now: three short beeps…</string>
+    <string name="ui_did_you_hear_it" formatted="false">Did you hear it?</string>
+    <string name="ui_this_phone_wouldn_t_play_the" formatted="false">This phone wouldn\'t play the tone. Try Play again.</string>
+    <string name="ui_this_lifts_the_frequencies_you_heard" formatted="false">This lifts the frequencies you heard least well, by half the difference. These headphones\' own tuning is part of the result, so it suits them best.</string>
+    <string name="ui_your_results_were_about_even_across" formatted="false">Your results were about even across frequencies, so there\'s no shared curve to add.</string>
+    <string name="ui_your_ears_differed_by_up_to" formatted="false">Your ears differed by up to %1$s dB at some frequencies, which can also come from fit. Eigentone can close half of that gap, frequency by frequency, with a separate EQ for each ear. It\'s saved for %2$s, and you can also do this later from the Sound tab, under Space.</string>
+    <string name="ui_each_ear_is_now_corrected" formatted="false">Each ear is now corrected</string>
+    <string name="ui_correct_each_ear" formatted="false">Correct each ear</string>
+    <string name="ui_correct_each_ear_anyway" formatted="false">Correct each ear anyway</string>
+    <string name="ui_you_ll_hear_a_note_alternating" formatted="false">You\'ll hear a note alternating with the notes just beside it, and say whether it stands out. There are about %1$s short questions, then a few more about anything you flagged. It takes around 3 minutes.</string>
+    <string name="ui_keep_your_volume_low_and_stop" formatted="false">Keep your volume low, and stop if a tone is ever uncomfortable.</string>
+    <string name="ui_if_you_re_unsure_answer_same" formatted="false">If you\'re unsure, answer Same. Only clear differences are worth fixing.</string>
+    <string name="ui_step_of" formatted="false">Step %1$s of %2$s</string>
+    <string name="ui_does_this_note_stand_out_from" formatted="false">Does this note stand out from the ones beside it?</string>
+    <string name="ui_checking_again_does_this_note_stand" formatted="false">Checking again: does this note stand out from the ones beside it?</string>
+    <string name="ui_playing_the_note_beside_it" formatted="false">Playing: the note beside it</string>
+    <string name="ui_playing_this_note" formatted="false">Playing: this note</string>
+    <string name="ui_stands_out" formatted="false">Stands out</string>
+    <string name="ui_same" formatted="false">Same</string>
+    <string name="ui_weaker" formatted="false">Weaker</string>
+    <string name="ui_which_of_these_two_notes_is" formatted="false">Which of these two notes is %1$s?</string>
+    <string name="ui_playing_second_note" formatted="false">Playing: second note</string>
+    <string name="ui_playing_first_note" formatted="false">Playing: first note</string>
+    <string name="ui_first" formatted="false">First</string>
+    <string name="ui_second" formatted="false">Second</string>
+    <string name="ui_about_the_same" formatted="false">About the same</string>
+    <string name="ui_with_filters" formatted="false">With filters</string>
+    <string name="ui_hear_tuned" formatted="false">Hear tuned</string>
+    <string name="ui_eq_in_a_headphone_app_such" formatted="false">EQ in a headphone app, such as soundcore, Sony or Galaxy Wearable, adds to this one, so changes can apply twice. For the clearest results, set it to flat or default, and turn off any bass boost.</string>
+    <string name="ui_correct" formatted="false">Correct %1$s?</string>
+    <string name="ui_a_correction_evens_out_these_headphones" formatted="false">A correction evens out these headphones\' sound, using published measurements. You can undo it or turn it down at any time.</string>
+    <string name="ui_find_a_correction" formatted="false">Find a correction</string>
+    <string name="ui_looking" formatted="false">Looking…</string>
+    <string name="ui_last_playing" formatted="false">Last playing: %1$s</string>
+    <string name="ui_play_something_to_set_up_its" formatted="false">Play something to set up its preset.</string>
+    <string name="ui_use_for_this_app" formatted="false">Use %1$s for this app</string>
+    <string name="ui_preset_was_deleted" formatted="false">Preset was deleted</string>
+    <string name="ui_another_audio_app_has_control_try" formatted="false">Another audio app has control. Try closing or turning off: %1$s.</string>
+    <string name="ui_copy_status_details" formatted="false">Copy status details</string>
+    <string name="ui_copied" formatted="false">Copied</string>
+    <string name="ui_no_filters_yet_add_one_to" formatted="false">No filters yet. Add one to start shaping the sound.</string>
+    <string name="ui_tap_a_point_on_the_curve" formatted="false">Tap a point on the curve to edit it.</string>
+    <string name="ui_this_phone_refused_the_analyser" formatted="false">This phone refused the analyser.</string>
+    <string name="ui_filter_of" formatted="false">Filter %1$s of %2$s</string>
+    <string name="ui_bell" formatted="false">Bell</string>
+    <string name="ui_low_shelf" formatted="false">Low shelf</string>
+    <string name="ui_high_shelf" formatted="false">High shelf</string>
+    <string name="ui_high_pass" formatted="false">High pass</string>
+    <string name="ui_low_pass" formatted="false">Low pass</string>
+    <string name="ui_bass_tuner" formatted="false">Bass tuner</string>
+    <string name="ui_android_s_own_spatial_audio_is" formatted="false">Android\'s own spatial audio is on, and adds to this. Try one at a time.</string>
+    <string name="ui_centre" formatted="false">Centre</string>
+    <string name="ui_a_separate_eq_for_each_ear" formatted="false">A separate EQ for each ear, for %1$s</string>
+    <string name="ui_for_from_your_hearing_check_on" formatted="false">For %1$s, from your hearing check on %2$s.</string>
+    <string name="ui_for_from_your_check_on" formatted="false">For %1$s, from your check on %2$s. %3$s</string>
+    <string name="ui_ear_correction_is_also_saved_for" formatted="false">Ear correction is also saved for %1$s, and turns on when connected.</string>
+    <string name="ui_nothing_added_at_this_volume" formatted="false">Nothing added at this volume.</string>
+    <string name="ui_now_adding_bass_and_treble" formatted="false">Now adding %1$s bass and %2$s treble.</string>
+    <string name="ui_this_preset_s_compressor_is_on" formatted="false">This preset\'s compressor is on, so it\'s used instead.</string>
+    <string name="ui_loud_music_could_reach_which_can" formatted="false">Loud music could reach %1$s, which can distort. Turn on the limiter, or lower the preamp or compressor makeup.</string>
+    <string name="ui_loud_music_could_reach_the_limiter" formatted="false">Loud music could reach %1$s. The limiter is holding it back, which can flatten peaks. Lowering the preamp or compressor makeup avoids that.</string>
+    <string name="ui_level_going_into_the_eq" formatted="false">Level going into the EQ: %1$s</string>
+    <string name="ui_none" formatted="false">None</string>
+    <string name="ui_use_correction" formatted="false">Use %1$s correction</string>
+    <string name="ui_assign" formatted="false">Assign %1$s</string>
+    <string name="ui_current_preset_assigned" formatted="false">Current preset assigned</string>
+    <string name="ui_your_presets" formatted="false">Your presets</string>
+    <string name="ui_liberty_4_nc_correction" formatted="false">Liberty 4 NC correction</string>
+    <string name="ui_general" formatted="false">General</string>
+    <string name="ui_add_to_favourites" formatted="false">Add %1$s to favourites</string>
+    <string name="ui_remove_from_favourites" formatted="false">Remove %1$s from favourites</string>
+    <string name="ui_edit" formatted="false">Edit %1$s</string>
+    <string name="ui_delete" formatted="false">Delete %1$s</string>
+    <string name="ui_update" formatted="false">Update %1$s</string>
+    <string name="ui_this_preset_uses_faders_or_a" formatted="false">This preset uses faders or a curve, so use Export EQ file instead.</string>
+    <string name="ui_save_preset" formatted="false">Save preset</string>
+    <string name="ui_yes" formatted="false">Yes</string>
+    <string name="ui_not_checked_yet" formatted="false">Not checked yet</string>
+    <string name="ui_this_phone_only_allowed_bands_so" formatted="false">This phone only allowed %1$s bands, so narrow filters will be less accurate.</string>
+    <string name="ui_with_earbuds_fit_matters_more_than" formatted="false">With earbuds, fit matters more than any setting. If bass sounds thin, try other ear tips before adding EQ.</string>
+    <string name="ui_get_a_good_seal" formatted="false">Get a good seal</string>
+    <string name="ui_eq_in_a_headphone_app_such_2" formatted="false">EQ in a headphone app, such as soundcore, adds to this one. Set it to flat or default, or changes can apply twice.</string>
+    <string name="ui_use_one_eq_at_a_time" formatted="false">Use one EQ at a time</string>
+    <string name="ui_it_picks_a_correction_for_your" formatted="false">It picks a correction for your headphones if one is known, then tunes it to what you prefer. It always checks the result against what you had.</string>
+    <string name="ui_start_with_find_my_sound" formatted="false">Start with Find my sound</string>
+    <string name="ui_a_change_of_2_or_3" formatted="false">A change of 2 or 3 dB is clearly audible. Very large boosts usually add distortion and lower the overall level.</string>
+    <string name="ui_change_a_little_at_a_time" formatted="false">Change a little at a time</string>
+    <string name="ui_if_something_is_too_loud_cutting" formatted="false">If something is too loud, cutting it often sounds cleaner than boosting everything else.</string>
+    <string name="ui_prefer_cuts_to_boosts" formatted="false">Prefer cuts to boosts</string>
+    <string name="ui_your_ears_adapt_within_minutes_so" formatted="false">Your ears adapt within minutes, so switch back and forth. If you can\'t hear a benefit, keep the simpler setting.</string>
+    <string name="ui_compare_with_bypass" formatted="false">Compare with Bypass</string>
+    <string name="ui_one_track_can_mislead_you_test" formatted="false">One track can mislead you. Test with a few you know well before settling on a sound.</string>
+    <string name="ui_try_several_songs" formatted="false">Try several songs</string>
+    <string name="ui_search_results" formatted="false">Search results</string>
+    <string name="ui_all_shapes" formatted="false">All shapes</string>
+    <string name="ui_eigentone_is_off_so_you_won" formatted="false">Eigentone is off, so you won\'t hear this until it\'s on.</string>
+    <string name="ui_bypass_is_on_so_you_won" formatted="false">Bypass is on, so you won\'t hear this until it\'s off.</string>
+    <string name="ui_edit_shape" formatted="false">Edit shape</string>
+    <string name="ui_the_whole_library" formatted="false">The whole library</string>
+    <string name="ui_shapes_you_ve_starred" formatted="false">Shapes you\'ve starred</string>
+    <string name="ui_no_shapes_match_that" formatted="false">No shapes match that.</string>
+    <string name="ui_tap_the_star_on_any_shape" formatted="false">Tap the star on any shape to keep it here.</string>
+    <string name="ui_hear" formatted="false">Hear %1$s</string>
+    <string name="ui_start_tone" formatted="false">Start tone</string>
+    <string name="ui_stop_tone" formatted="false">Stop tone</string>
+    <string name="ui_climb" formatted="false">Climb</string>
+    <string name="ui_pause_climb" formatted="false">Pause climb</string>
+    <string name="ui_compare_with_nearby_notes" formatted="false">Compare with nearby notes</string>
+    <string name="ui_stop_comparing" formatted="false">Stop comparing</string>
+    <string name="ui_add_to_my_sound_2" formatted="false">Add %1$s to my sound</string>
+    <string name="ui_discard_marks" formatted="false">Discard marks</string>
+    <string name="ui_choose_a" formatted="false">Choose A</string>
+    <string name="ui_choose_b" formatted="false">Choose B</string>
+    <string name="ui_i_prefer_a" formatted="false">I prefer A</string>
+    <string name="ui_i_prefer_b" formatted="false">I prefer B</string>
+    <string name="ui_effect_on" formatted="false">%1$s on</string>
+    <string name="ui_effect_off" formatted="false">%1$s off</string>
+    <string name="ui_band_bass" formatted="false">Bass</string>
+    <string name="ui_band_mids" formatted="false">Mids</string>
+    <string name="ui_band_treble" formatted="false">Treble</string>
+    <string name="ui_unchanged" formatted="false">Unchanged</string>
+    <string name="ui_faders_miss_shape" formatted="false">%1$s faders miss this shape by up to %2$s dB.</string>
+    <string name="ui_compression_curve_description" formatted="false">Compression curve. Levels above %1$s dB are reduced at %2$s to 1.</string>
+    <string name="ui_sweep_now" formatted="false">Now: %1$s. Your spot plays every other note. If it stands out from the notes beside it, mark it too loud. If it sinks below them, mark it too quiet.</string>
+    <string name="ui_sweep_now_your_spot" formatted="false">Now: %1$s, your spot. Your spot plays every other note. If it stands out from the notes beside it, mark it too loud. If it sinks below them, mark it too quiet.</string>
+    <string name="ui_backup_saved" formatted="false">Backup saved.</string>
+    <string name="ui_could_not_save_backup" formatted="false">Could not save backup: %1$s</string>
+    <string name="ui_eq_file_saved" formatted="false">EQ file saved.</string>
+    <string name="ui_could_not_save_file" formatted="false">Could not save the file: %1$s</string>
+    <string name="ui_saved" formatted="false">%1$s (saved)</string>
+    <string name="ui_choose_below" formatted="false">Choose below</string>
+    <string name="ui_my_current_sound" formatted="false">My current sound</string>
+    <string name="ui_equaliser_curve_use_the_filter_controls" formatted="false">Equaliser curve. Use the filter controls below to adjust it.</string>
+    <string name="ui_equaliser_curves_with_a_separate_curve" formatted="false">Equaliser curves, with a separate curve for each ear.</string>
+    <string name="ui_saved_2" formatted="false">Saved</string>
+    <string name="ui_right_ear" formatted="false">Right ear</string>
+    <string name="ui_left_ear" formatted="false">Left ear</string>
+    <string name="ui_my_sound" formatted="false">My sound</string>
+    <string name="ui_current_shape" formatted="false">Current shape: %1$s</string>
+    <string name="ui_band_faders_use_the_band_controls" formatted="false">%1$s band faders. Use the band controls below to change them one at a time.</string>
+    <string name="ui_music_is_playing" formatted="false">Music is playing</string>
+    <string name="ui_current_sound_curve" formatted="false">Current sound curve</string>
+    <string name="ui_android_blocked_the_background_service" formatted="false">Android blocked the background service: %1$s</string>
+    <string name="ui_added" formatted="false">Added %1$s.</string>
+    <string name="ui_couldn_t_get_the_headphone_list" formatted="false">Couldn\'t get the headphone list. Check your connection and try again.</string>
+    <string name="ui_share" formatted="false">Share %1$s</string>
+    <string name="ui_other_audio_effect_apps" formatted="false">Other audio effect apps: %1$s</string>
+    <string name="ui_edited" formatted="false">%1$s (edited)</string>
+    <string name="ui_problem_see_the_system_tab" formatted="false">Problem. See the System tab</string>
+    <string name="ui_starting" formatted="false">Starting…</string>
+    <string name="ui_another_audio_app_has_taken_control" formatted="false">Another audio app has taken control</string>
+    <string name="ui_deleted" formatted="false">Deleted %1$s</string>
+    <string name="ui_could_not_read_that_file" formatted="false">Could not read that file: %1$s</string>
+    <string name="ui_imported_eq" formatted="false">Imported EQ</string>
+    <string name="ui_imported_filters" formatted="false">Imported %1$s filters.</string>
+    <string name="ui_imported_a_curve_with_points" formatted="false">Imported a curve with %1$s points.</string>
+    <string name="ui_no_eq_found_choose_an_autoeq" formatted="false">No EQ found. Choose an AutoEq or Equalizer APO ParametricEQ or GraphicEQ file.</string>
+    <string name="ui_could_not_read_that_file_2" formatted="false">Could not read that file.</string>
+    <string name="ui_backup_restored" formatted="false">Backup restored.</string>
+    <string name="ui_that_isn_t_an_eigentone_backup" formatted="false">That isn\'t an Eigentone backup.</string>
+    <string name="ui_updated" formatted="false">Updated %1$s.</string>
+    <string name="ui_could_not_load_the_headphone_list" formatted="false">Could not load the headphone list: %1$s</string>
+    <string name="ui_could_not_download_that_profile_it" formatted="false">Could not download that profile. It may have no parametric version.</string>
+    <plurals name="ui_shape_count">
+        <item quantity="one" formatted="false">%1$d shape</item>
+        <item quantity="other" formatted="false">%1$d shapes</item>
+    </plurals>
+    <plurals name="ui_room_for_filters">
+        <item quantity="one" formatted="false">This preset only has room for %1$d more filter, so the rest won\'t be added.</item>
+        <item quantity="other" formatted="false">This preset only has room for %1$d more filters, so the rest won\'t be added.</item>
+    </plurals>
+    <plurals name="ui_hearing_status">
+        <item quantity="one" formatted="false">%1$s, tone %2$d. Part %3$d of %4$d, after %5$d answer.</item>
+        <item quantity="other" formatted="false">%1$s, tone %2$d. Part %3$d of %4$d, after %5$d answers.</item>
+    </plurals>
 </resources>
