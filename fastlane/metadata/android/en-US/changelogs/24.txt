@@ -1,0 +1,1 @@
+Each preset now keeps its own compressor settings, and stereo width is the default space effect. If you had the compressor on, every saved preset keeps it, so your sound doesn't change.

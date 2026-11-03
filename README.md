@@ -16,8 +16,8 @@ A free system-wide equaliser for Android 14 and newer. No ads, no account, and n
 - **Hearing check** that builds a gentle curve for how you hear, with a separate EQ for each ear if they differ, saved per pair of headphones and drawn as a curve for each ear. It isn't a medical test.
 - **EQ files**: import ParametricEQ and GraphicEQ files, and export any sound as a 127-point GraphicEQ file. Imported GraphicEQ curves keep every point rather than being rounded to faders.
 - **Presets** that load automatically per output, per earbud noise mode and per app.
-- **Multiband compressor**, free and fully adjustable, with three bands, adjustable crossovers, a live response curve and starting styles.
-- **Volume leveller**, night mode with a schedule, loudness compensation, limiter, balance, virtual surround and stereo width.
+- **Multiband compressor**, free and fully adjustable and saved per preset, with three bands, adjustable crossovers, a live response curve and starting styles.
+- **Volume leveller**, night mode with a schedule, loudness compensation, limiter, balance, stereo width and virtual surround.
 - **Share codes**, backups, a Quick Settings tile and a home-screen widget.
 
 ## Privacy
@@ -38,7 +38,7 @@ Crash reports stay on the phone. You choose whether to share one from the System
 Copy the latest `Eigentone-<version>.apk` to the phone and open it, or use USB debugging:
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.16.1.apk
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.17.0.apk
 ```
 
 ## Build
@@ -67,7 +67,7 @@ The Liberty 4 NC presets and headphone corrections use [AutoEq](https://github.c
 
 ## How the sound is built
 
-A preset holds a whole sound: parametric filters, graphic EQ, tone, surround, strength, correction amount and preamp. Balance, ear correction, night mode, the leveller, the compressor, loudness compensation and limiter settings stay global.
+A preset holds a whole sound: parametric filters, graphic EQ, tone, surround, compressor, strength, correction amount and preamp. Balance, ear correction, night mode, the leveller, loudness compensation and limiter settings stay global.
 
 Preset changes morph rather than jump (`data/GainRamp.kt`). Bands and the input level move together in steps of at most 4 dB, so if the old and new sounds are each safe from clipping, so is every step between them. Bypass, comparisons and the hearing check still switch at once.
 
@@ -87,7 +87,7 @@ The **hearing check** finds a threshold per frequency and ear with a "down 10, u
 
 - **EQ in the headphones adds to Eigentone**, because it runs on the headphones themselves. Eigentone reminds you to set it flat, and it can't read or change it.
 - **Stereo width** (`data/StereoWidth.kt`) leans frequency ranges left and right using a separate EQ per channel. It's subtle, because Android doesn't let an app mix one channel into the other, so it can't do crossfeed or real surround.
-- **Android has no full replacement for `Virtualizer`.** It's deprecated in favour of `Spatializer`, but that only describes an app's own playback, and turning it on requires a system permission. It remains the default because it's audibly much stronger than stereo width, forced to binaural mode, and stereo width takes over if a phone refuses it. It has no head tracking, and on a Galaxy A54 it reads `mode=0` while audibly working.
+- **Android has no full replacement for `Virtualizer`.** It's deprecated in favour of `Spatializer`, but that only describes an app's own playback, and turning it on requires a system permission. It remains as an opt-in, forced to binaural mode, and stereo width takes over if a phone refuses it. It's audibly stronger, but stereo width is the default because it sounded better in listening tests on a Galaxy A54. It has no head tracking, and on a Galaxy A54 it reads `mode=0` while audibly working.
 - **Reverb** was removed. On session 0 the public API only provides an auxiliary reverb, which receives no audio, and Android 16 blocks the method needed to control the insert version.
 - **Noise-mode profiles** are chosen by hand, because Android can't read the earbuds' mode.
 - **Session 0 is deprecated** by Android and varies by phone. Eigentone falls back to per-app mode, and the System tab shows what the phone accepted.

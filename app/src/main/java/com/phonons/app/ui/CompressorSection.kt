@@ -50,11 +50,11 @@ private val BAND_NAMES = listOf("Bass", "Mids", "Treble")
 @Composable
 fun CompressorSection(state: AppState) {
     val scheduledNight by Repo.scheduledNight.collectAsStateWithLifecycle()
-    val compressor = state.compressor
+    val compressor = state.current.tone.compressor
     val nightActive = state.nightMode > 0.001 || scheduledNight
     var selected by remember { mutableIntStateOf(0) }
     var details by remember { mutableStateOf(false) }
-    fun change(transform: (Compressor) -> Compressor) = Repo.update { it.copy(compressor = transform(it.compressor)) }
+    fun change(transform: (Compressor) -> Compressor) = Repo.editTone { it.copy(compressor = transform(it.compressor)) }
 
     SettingsSection("Compressor") {
         SwitchSetting(
@@ -62,7 +62,10 @@ fun CompressorSection(state: AppState) {
             Help.compressor,
             compressor.enabled,
             detail = if (compressor.enabled && nightActive) "Night mode is on, so it's used instead." else null,
-        ) { on -> change { it.copy(enabled = on) } }
+        ) { on ->
+            change { it.copy(enabled = on) }
+            Repo.commit()
+        }
         if (!compressor.enabled) return@SettingsSection
 
         RowDivider()
@@ -75,7 +78,10 @@ fun CompressorSection(state: AppState) {
             Dynamics.styles.forEach { style ->
                 FilterChip(
                     selected = compressor == style.compressor,
-                    onClick = { change { style.compressor } },
+                    onClick = {
+                        change { style.compressor }
+                        Repo.commit()
+                    },
                     label = { Text(style.name) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = Palette.Amber,
@@ -106,6 +112,7 @@ fun CompressorSection(state: AppState) {
 
         SwitchSetting("Compress ${BAND_NAMES[selected].lowercase()}", Help.compressorBand, band.enabled) { on ->
             changeBand { it.copy(enabled = on) }
+            Repo.commit()
         }
         if (band.enabled) {
             TransferCurve(band)
@@ -117,6 +124,7 @@ fun CompressorSection(state: AppState) {
                 range = Dynamics.THRESHOLD_DB.start.toFloat()..Dynamics.THRESHOLD_DB.endInclusive.toFloat(),
                 default = CompressorBand().thresholdDb.toFloat(),
                 onChange = { v -> changeBand { it.copy(thresholdDb = halfStep(v)) } },
+                onFinished = Repo::commit,
             )
             LogSlider(
                 title = "Ratio",
@@ -126,6 +134,7 @@ fun CompressorSection(state: AppState) {
                 range = Dynamics.RATIO,
                 default = CompressorBand().ratio,
                 onChange = { v -> changeBand { it.copy(ratio = round(v * 10) / 10) } },
+                onFinished = Repo::commit,
             )
             SliderSetting(
                 title = "Makeup",
@@ -136,6 +145,7 @@ fun CompressorSection(state: AppState) {
                 default = 0f,
                 detail = if (band.makeupDb > 0 && !state.limiter) "The limiter is off, so a lot of makeup can distort." else null,
                 onChange = { v -> changeBand { it.copy(makeupDb = halfStep(v)) } },
+                onFinished = Repo::commit,
             )
         }
         TextButton(
@@ -154,6 +164,7 @@ fun CompressorSection(state: AppState) {
                     range = Dynamics.ATTACK_MS,
                     default = CompressorBand().attackMs,
                     onChange = { v -> changeBand { it.copy(attackMs = round(v * 10) / 10) } },
+                    onFinished = Repo::commit,
                 )
                 LogSlider(
                     title = "Release",
@@ -163,6 +174,7 @@ fun CompressorSection(state: AppState) {
                     range = Dynamics.RELEASE_MS,
                     default = CompressorBand().releaseMs,
                     onChange = { v -> changeBand { it.copy(releaseMs = round(v)) } },
+                    onFinished = Repo::commit,
                 )
                 SliderSetting(
                     title = "Knee",
@@ -172,6 +184,7 @@ fun CompressorSection(state: AppState) {
                     range = Dynamics.KNEE_DB.start.toFloat()..Dynamics.KNEE_DB.endInclusive.toFloat(),
                     default = CompressorBand().kneeDb.toFloat(),
                     onChange = { v -> changeBand { it.copy(kneeDb = halfStep(v)) } },
+                    onFinished = Repo::commit,
                 )
             }
             RowDivider()
@@ -183,6 +196,7 @@ fun CompressorSection(state: AppState) {
                 range = Dynamics.LOW_CROSSOVER_HZ,
                 default = Compressor().lowCrossoverHz,
                 onChange = { v -> change { it.copy(lowCrossoverHz = round(v)) } },
+                onFinished = Repo::commit,
             )
             LogSlider(
                 title = "Mids to treble",
@@ -192,6 +206,7 @@ fun CompressorSection(state: AppState) {
                 range = Dynamics.HIGH_CROSSOVER_HZ,
                 default = Compressor().highCrossoverHz,
                 onChange = { v -> change { it.copy(highCrossoverHz = round(v / 10) * 10) } },
+                onFinished = Repo::commit,
             )
         }
     }
@@ -207,6 +222,7 @@ private fun LogSlider(
     range: ClosedFloatingPointRange<Double>,
     default: Double,
     onChange: (Double) -> Unit,
+    onFinished: () -> Unit,
 ) {
     SliderSetting(
         title = title,
@@ -216,6 +232,7 @@ private fun LogSlider(
         range = ln(range.start).toFloat()..ln(range.endInclusive).toFloat(),
         default = ln(default).toFloat(),
         onChange = { v -> onChange(exp(v.toDouble()).coerceIn(range)) },
+        onFinished = onFinished,
     )
 }
 

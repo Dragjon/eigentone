@@ -28,6 +28,7 @@ data class Tone(
     val importedCurve: List<ShapePoint> = emptyList(),
     /** What was last applied to the faders, for showing its name. */
     val shape: AppliedShape? = null,
+    val compressor: Compressor = Compressor(),
 ) {
     /**
      * Names what the faders hold. Moving a fader afterwards shows as edited, because the name no longer
@@ -155,9 +156,10 @@ data class AppState(
     /** From before these were per headphone. Moved by [withLegacyEarsMovedTo] when the headphones are known. */
     val earCorrection: EarCorrection? = null,
     val hearing: HearingRecord? = null,
+    /** From before each preset had its own. Moved by [withLegacyCompressorMoved]. */
     val compressor: Compressor = Compressor(),
-    /** Uses the phone's own Virtualizer for the Space amount, which is much stronger than stereo width. */
-    val useSystemSurround: Boolean = true,
+    /** Uses the phone's own Virtualizer for the Space amount, rather than Eigentone's stereo width. */
+    val useSystemSurround: Boolean = false,
     /** Which one-time updates this saved state has had. A fresh install starts at the latest. */
     val stateVersion: Int = 0,
     val listeningMode: ListeningMode = ListeningMode.NOISE_CANCELLING,
@@ -198,6 +200,19 @@ data class AppState(
         )
     }
 
+    /**
+     * The compressor used to apply to every preset, so one that was on moves into each of them, which
+     * means nobody's sound changes. A preset that already has its own settings keeps them.
+     */
+    fun withLegacyCompressorMoved(): AppState {
+        val none = Compressor()
+        if (compressor == none) return this
+        if (!compressor.enabled) return copy(compressor = none)
+        fun moved(preset: Preset) =
+            if (preset.tone.compressor == none) preset.copy(tone = preset.tone.copy(compressor = compressor)) else preset
+        return copy(current = moved(current), presets = presets.map(::moved), compressor = none)
+    }
+
     /** Keeps presets, output choices and power, and clears everything that shapes the sound. */
     fun resetSound(): AppState {
         val defaults = AppState()
@@ -234,7 +249,9 @@ data class AppState(
         }
         // A preview's temporary level can only be here if the app was closed during one.
         val clean = current.copy(tone = current.tone.copy(trimDb = 0.0))
-        return withCurve.copy(stateVersion = CURRENT_STATE_VERSION, current = clean).withoutLegacyTone()
+        return withCurve.copy(stateVersion = CURRENT_STATE_VERSION, current = clean)
+            .withoutLegacyTone()
+            .withLegacyCompressorMoved()
     }
 
     /** Moves settings saved by older versions into the current preset, so nobody's sound changes. */
@@ -262,7 +279,7 @@ data class AppState(
     }
 
     companion object {
-        const val CURRENT_STATE_VERSION = 1
+        const val CURRENT_STATE_VERSION = 2
 
         private val OWNER_CURVE = CustomShape(
             "custom:my-soundcore-curve",

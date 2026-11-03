@@ -123,7 +123,7 @@ object Help {
     )
     val systemSurround = Tip(
         "Use the phone's virtual surround",
-        "Uses the effect built into your phone, which is much stronger than Eigentone's own stereo width but varies by phone. Android has deprecated it, so a future update could remove it. If your phone refuses it, stereo width takes over. Turn this off to use stereo width, a gentler effect that works wherever the EQ does.",
+        "Swaps Eigentone's stereo width for the effect built into your phone. It's stronger, but it varies by phone and can colour the sound. Android has deprecated it, so a future update could remove it. If your phone refuses it, stereo width takes over.",
     )
     val balance = Tip("Balance", "Shifts sound towards the left or right ear. Useful if one side sounds quieter to you.")
 
@@ -168,7 +168,7 @@ object Help {
         "Favourites",
         "Star the presets you switch between. The notification's Next preset button moves through your starred presets, or all of them if none are starred.",
     )
-    val saveNew = Tip("Save as new", "Saves the current sound as a new preset of your own: filters, graphic EQ, tone, surround and preamp.")
+    val saveNew = Tip("Save as new", "Saves the current sound as a new preset of your own: filters, graphic EQ, tone, surround, compressor and preamp.")
     val update = Tip("Update preset", "Replaces your saved preset with the edits you've just made.")
     val find = Tip(
         "Find headphones",
@@ -176,7 +176,7 @@ object Help {
     )
     val compressor = Tip(
         "Multiband compressor",
-        "Brings loud and quiet parts closer together, separately for bass, mids and treble. Start from a style and adjust by ear. Night mode takes over while it's on, and this replaces the volume leveller.",
+        "Brings loud and quiet parts closer together, separately for bass, mids and treble. Start from a style and adjust by ear. Night mode takes over while it's on, and this replaces the volume leveller. It's saved with each preset.",
     )
     val compressorBand = Tip("Compress this band", "Turn this off to leave this range of frequencies untouched.")
     val compressorThreshold = Tip(
@@ -212,11 +212,11 @@ object Help {
     )
     val backup = Tip(
         "Back up presets",
-        "Saves your presets, your shapes, output and per-app choices, and favourites to a file. Ear correction, hearing checks and compressor settings are included. Other settings that aren't part of a preset, such as balance and night mode, aren't.",
+        "Saves your presets, your shapes, output and per-app choices, and favourites to a file. Ear correction and hearing checks are included. Other settings that aren't part of a preset, such as balance and night mode, aren't.",
     )
     val restore = Tip(
         "Restore presets",
-        "Adds presets, your shapes, per-app choices, ear correction, hearing checks and compressor settings from a backup file. Anything with the same identity is replaced, and the rest is kept.",
+        "Adds presets, your shapes, per-app choices, ear correction and hearing checks from a backup file. Anything with the same identity is replaced, and the rest is kept.",
     )
 
     val engineMode = Tip(

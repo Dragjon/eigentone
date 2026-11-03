@@ -304,17 +304,70 @@ class NewFeaturesTest {
         assertEquals(CompressorBand(thresholdDb = -24.0, ratio = 3.0, attackMs = 50.0, releaseMs = 1000.0, kneeDb = 6.0, makeupDb = 6.0), leveller)
     }
 
+    private fun compressed(c: Compressor) = Preset("user:c", "Compressed", tone = Tone(compressor = c))
+
     @Test
     fun scheduledNightOverridesTheManualCompressor() {
         val manual = Dynamics.styles.first().compressor
-        val state = AppState(compressor = manual, nightSchedule = NightSchedule(enabled = true, amount = 0.6))
+        val state = AppState(current = compressed(manual), nightSchedule = NightSchedule(enabled = true, amount = 0.6))
         assertEquals(manual, Processing.target(state, 0.0).dynamics)
         assertEquals(-18.0, Processing.target(state, 0.0, scheduledNight = true).dynamics.low.thresholdDb, 0.0001)
     }
 
     @Test
+    fun eachPresetUsesItsOwnCompressor() {
+        val punchy = Dynamics.styles.first { it.name == "Punchy" }.compressor
+        val state = AppState(current = compressed(punchy))
+        assertEquals(punchy, Processing.target(state, 0.0).dynamics)
+        assertFalse(Processing.target(state.copy(current = BuiltIns.flat), 0.0).dynamics.enabled)
+    }
+
+    @Test
+    fun presetsAreSavedWithTheirCompressor() {
+        val punchy = Dynamics.styles.first { it.name == "Punchy" }.compressor
+        val preset = compressed(punchy)
+        assertEquals(punchy, ShareCode.decode(ShareCode.encode(preset))!!.tone.compressor)
+        val backup = BackupCodec.decode(BackupCodec.encode(AppState(presets = listOf(preset))))!!
+        assertEquals(punchy, backup.presets.single().tone.compressor)
+    }
+
+    @Test
+    fun sharedCompressorSettingsAreChecked() {
+        val wild = compressed(Compressor(enabled = true, low = CompressorBand(ratio = 500.0, makeupDb = 90.0)))
+        val low = ShareCode.decode(ShareCode.encode(wild))!!.tone.compressor.low
+        assertEquals(Dynamics.RATIO.endInclusive, low.ratio, 0.0)
+        assertEquals(Dynamics.MAKEUP_DB.endInclusive, low.makeupDb, 0.0)
+    }
+
+    @Test
+    fun aGlobalCompressorThatWasOnMovesIntoEveryPreset() {
+        val punchy = Dynamics.styles.first { it.name == "Punchy" }.compressor
+        val own = Dynamics.styles.first { it.name == "Gentle" }.compressor
+        val old = AppState(
+            stateVersion = 1,
+            compressor = punchy,
+            current = quiet,
+            presets = listOf(boomy, compressed(own)),
+        ).migrated()
+        assertEquals(punchy, old.current.tone.compressor)
+        assertEquals(punchy, old.presets[0].tone.compressor)
+        // Already has its own settings, so they're left alone.
+        assertEquals(own, old.presets[1].tone.compressor)
+        assertEquals(Compressor(), old.compressor)
+        assertEquals(old, old.migrated())
+    }
+
+    @Test
+    fun aGlobalCompressorThatWasOffChangesNothing() {
+        val leftover = Dynamics.styles.first { it.name == "Punchy" }.compressor.copy(enabled = false)
+        val old = AppState(stateVersion = 1, compressor = leftover, current = quiet).migrated()
+        assertEquals(Compressor(), old.current.tone.compressor)
+        assertEquals(Compressor(), old.compressor)
+    }
+
+    @Test
     fun bypassAndTheHearingCheckTurnTheCompressorOff() {
-        val state = AppState(compressor = Dynamics.styles.first().compressor)
+        val state = AppState(current = compressed(Dynamics.styles.first().compressor))
         assertTrue(Processing.target(state, 0.0).dynamics.enabled)
         for (match in listOf(true, false)) {
             assertFalse(Processing.target(state.copy(bypass = true, matchBypass = match), 0.0).dynamics.enabled)
@@ -340,23 +393,20 @@ class NewFeaturesTest {
     }
 
     @Test
-    fun compressorSurvivesBackupAndIsChecked() {
-        val punchy = Dynamics.styles.first { it.name == "Punchy" }.compressor
-        val restored = BackupCodec.merge(AppState(), BackupCodec.decode(BackupCodec.encode(AppState(compressor = punchy)))!!)
-        assertEquals(punchy, restored.compressor)
-        // An older backup leaves the current settings alone.
-        assertEquals(punchy, BackupCodec.merge(AppState(compressor = punchy), BackupCodec.decode("{}")!!).compressor)
-
-        val edited = """{"compressor":{"enabled":true,"low":{"ratio":500.0,"makeupDb":90.0,"thresholdDb":-500.0}}}"""
-        val low = BackupCodec.decode(edited)!!.compressor!!.low
+    fun anOlderBackupsCompressorMovesIntoItsPresets() {
+        val text = """{"presets":[{"id":"user:a","name":"A"}],"compressor":{"enabled":true,"low":{"ratio":500.0,"makeupDb":90.0,"thresholdDb":-500.0}}}"""
+        val restored = BackupCodec.merge(AppState(), BackupCodec.decode(text)!!)
+        val low = restored.presets.single().tone.compressor.low
         assertEquals(Dynamics.RATIO.endInclusive, low.ratio, 0.0)
         assertEquals(Dynamics.MAKEUP_DB.endInclusive, low.makeupDb, 0.0)
         assertEquals(Dynamics.THRESHOLD_DB.start, low.thresholdDb, 0.0)
+        assertEquals(Compressor(), restored.compressor)
     }
 
     @Test
     fun resetTurnsTheCompressorOff() {
-        assertFalse(AppState(compressor = Dynamics.styles.first().compressor).resetSound().compressor.enabled)
+        val state = AppState(current = compressed(Dynamics.styles.first().compressor))
+        assertFalse(state.resetSound().current.tone.compressor.enabled)
     }
 
     private val unevenEars = HearingResult(
@@ -569,9 +619,9 @@ class NewFeaturesTest {
     }
 
     @Test
-    fun thePhonesEffectIsTheDefaultAndResetReturnsToIt() {
-        assertTrue(AppState().useSystemSurround)
-        assertTrue(AppState(useSystemSurround = false).resetSound().useSystemSurround)
+    fun widthIsTheDefaultAndResetReturnsToIt() {
+        assertFalse(AppState().useSystemSurround)
+        assertFalse(AppState(useSystemSurround = true).resetSound().useSystemSurround)
     }
 
     @Test

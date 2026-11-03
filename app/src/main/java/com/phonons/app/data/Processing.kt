@@ -155,7 +155,7 @@ object Processing {
                 surround = if (state.useSystemSurround) state.current.tone.surround else 0.0,
                 leveller = state.leveller,
                 rightFilters = right,
-                dynamics = Dynamics.resolve(night, state.leveller, state.compressor),
+                dynamics = Dynamics.resolve(night, state.leveller, state.current.tone.compressor),
             )
         }
         if (!state.matchBypass) {

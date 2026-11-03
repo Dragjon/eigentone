@@ -46,7 +46,6 @@ object BackupCodec {
             hearings = state.hearings,
             earCorrection = state.earCorrection,
             hearing = state.hearing,
-            compressor = state.compressor,
         ),
     )
 
@@ -87,7 +86,7 @@ object BackupCodec {
             earCorrection = backup.earCorrection ?: state.earCorrection,
             hearing = backup.hearing ?: state.hearing,
             compressor = backup.compressor ?: state.compressor,
-        )
+        ).withLegacyCompressorMoved()
     }
 
     private fun sanitise(ears: EarCorrection) =
@@ -128,6 +127,7 @@ object BackupCodec {
             strength = safe(tone.strength, 1.0).coerceIn(0.0, 1.5),
             correction = safe(tone.correction, 1.0).coerceIn(0.0, 1.0),
             importedCurve = ShapeText.cleanCurve(tone.importedCurve),
+            compressor = tone.compressor.clamped(),
             shape = tone.shape?.takeIf { it.name.isNotBlank() }?.let { shape ->
                 AppliedShape(shape.name.take(Tone.MAX_SHAPE_LABEL), shape.faders.take(bands).map { GraphicEq.snap(safe(it, 0.0)) })
             },

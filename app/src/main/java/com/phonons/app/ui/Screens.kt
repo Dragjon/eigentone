@@ -839,7 +839,7 @@ private fun DynamicsSection(state: AppState, attenuation: Double) {
             detail = when {
                 state.leveller <= 0.001 -> null
                 state.nightMode > 0.001 || scheduledNight -> "Night mode is on, so it's used instead."
-                state.compressor.enabled -> "The compressor is on, so it's used instead."
+                state.current.tone.compressor.enabled -> "This preset's compressor is on, so it's used instead."
                 else -> null
             },
             onChange = { v -> Repo.update { it.copy(leveller = if (v < 0.02f) 0.0 else v.toDouble()) } },
