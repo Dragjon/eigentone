@@ -661,4 +661,11 @@
     <string name="ui_target_prompt_title" formatted="false">Sounds thin? Try the Harman target</string>
     <string name="ui_target_prompt_body" formatted="false">This correction aims for less bass than most listeners preferred in Harman\'s tests. You can compare them on your music.</string>
     <string name="ui_target_prompt_action" formatted="false">Compare targets</string>
+    <string name="ui_appearance" formatted="false">Appearance</string>
+    <string name="ui_theme" formatted="false">Theme</string>
+    <string name="ui_theme_device" formatted="false">Device</string>
+    <string name="ui_theme_light" formatted="false">Light</string>
+    <string name="ui_theme_dark" formatted="false">Dark</string>
+    <string name="help_theme_title" formatted="false">Theme</string>
+    <string name="help_theme_body" formatted="false">Device follows your phone\'s light or dark setting, including any schedule. Light suits bright places, and Dark suits low light. The sound isn\'t affected.</string>
 </resources>

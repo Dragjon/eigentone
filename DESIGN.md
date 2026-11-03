@@ -192,7 +192,7 @@ Colour always carries meaning. Blue and red belong to the left and right ear, as
 
 Six decisions came directly from the user and override the original direction contract. They are binding: no horizontal scrolling; preset switching by dropdown under the app name; a deep green status strip; effects in the strip with a drawn tick or cross; bars darker than the page with no scroll fades; ivory filter points on graphs.
 
-**Known limits:** Dark theme only. No authored motion beyond the playing pulse; anything else that moves is stock Material behaviour. Left and right are only partly mirrored, in graph legends and curves. Tool and test screens (hearing check, sweep, peak finder, Find my sound, A/B compare, shape browser) inherit these tokens but were not redesigned. No tablet layout: content is simply capped at 640dp and centred.
+**Known limits:** No authored motion beyond the playing pulse; anything else that moves is stock Material behaviour. Left and right are only partly mirrored, in graph legends and curves. Tool and test screens (hearing check, sweep, peak finder, Find my sound, A/B compare, shape browser) inherit these tokens but were not redesigned. No tablet layout: content is simply capped at 640dp and centred.
 
 **Key Characteristics:**
 - Graphite surfaces separated by tone, with no shadows on panels or keys
@@ -236,6 +236,32 @@ Near-neutral graphite with one warm ivory, two ear colours, one warning orange a
 **The Ivory Rule.** Ivory means lit, active, or a handle you can grip. Plain text stays Text, including text buttons and the app name, so that ivory keeps its meaning. Filter points are ivory because they apply to both ears (user decision).
 
 **The Green Strip Rule.** Green is the one exception to "the ears are the only chroma" besides Danger Orange, and it belongs to the status strip alone (user decision). Do not reuse it for accents, and keep the band's hue clear of the ear colours.
+
+### Light Theme: The Audiometer in Daylight
+
+Selected in **System → Appearance**: Device (default), Light or Dark. `DarkColors` and `LightColors` in `Theme.kt` hold every role, and `Palette` reads whichever is active. The dark theme's values are locked by a test.
+
+Light is composed, not inverted: a warm putty faceplate, as on lab equipment. A lit control can't glow in daylight, so it becomes a dark inked key carrying the same ivory as its legend, which keeps ivory meaning "active".
+
+| Role | Token | Light |
+|---|---|---|
+| Page | `Background` | #E9E6DC |
+| Bars, still darker than the page | `Bar` | #D9D5C8 |
+| Panels | `Surface` | #F5F3EC |
+| Unlit keys | `SurfaceHigh` | #DFDBCF |
+| Menus and dialogs | `Tooltip` | #FFFEFA |
+| Hairlines | `Line` | #D3CFC3 |
+| Control outline | `Outline` | #77746A |
+| Rails | `Track` | #838075 |
+| Text and dim text | `Text`, `TextDim` | #1B1A17, #55534B |
+| Inked key, and its pressed state | `Lit`, `LitPressed` | #2C2718, #4A4331 |
+| Legend on an inked key | `OnLit` | #F2E8CF |
+| Warning | `Danger` | #8F3F00 |
+| Left and right ear | `LeftEar`, `RightEar` | #0A5FAD, #C4231A |
+
+**The Fixed Green Rule.** The status strip stays Deep Green in both themes, so everything on it uses `StripText`, `StripOn`, `StripDim` and `StripDanger`, never the page's colours (user decision).
+
+**Not themed:** the home-screen widget and launcher icon stay dark.
 
 ## Typography
 

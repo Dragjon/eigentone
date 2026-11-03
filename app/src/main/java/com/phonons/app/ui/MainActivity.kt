@@ -4,7 +4,9 @@ import com.phonons.app.R
 import androidx.compose.ui.res.stringResource
 import android.Manifest
 import android.app.ForegroundServiceStartNotAllowedException
+import android.app.UiModeManager
 import android.content.Intent
+import android.graphics.Color
 import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
@@ -12,9 +14,17 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.activity.result.contract.ActivityResultContracts
 import com.phonons.app.data.Repo
+import com.phonons.app.data.ThemeMode
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import com.phonons.app.engine.AudioService
 import com.phonons.app.engine.OutputDetector
 import com.phonons.app.engine.PresetShortcuts
@@ -40,9 +50,34 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         AppText.context = applicationContext
         notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-        setContent { PhononsTheme { PhononsApp(onSetEnabled = ::setEnabled) } }
+        setContent {
+            val modes = remember { Repo.state.map { it.themeMode }.distinctUntilChanged() }
+            val mode by modes.collectAsStateWithLifecycle(Repo.state.value.themeMode)
+            val dark = isDarkTheme(mode)
+            LaunchedEffect(dark) { matchSystemBars(dark) }
+            LaunchedEffect(mode) { matchWindowToTheme(mode) }
+            PhononsTheme(dark) { PhononsApp(onSetEnabled = ::setEnabled) }
+        }
         // Otherwise reopening from recents after Android closed the app would load the preset again.
         if (savedInstanceState == null) handleShortcut(intent)
+    }
+
+    /** Dark icons on a light bar and light icons on a dark one, whatever the phone itself is set to. */
+    private fun matchSystemBars(dark: Boolean) {
+        val clear = Color.TRANSPARENT
+        val style = if (dark) SystemBarStyle.dark(clear) else SystemBarStyle.light(clear, clear)
+        enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+    }
+
+    /** Android remembers this, so the window behind the app opens in the right colour next time, with no flash. */
+    private fun matchWindowToTheme(mode: ThemeMode) {
+        getSystemService(UiModeManager::class.java).setApplicationNightMode(
+            when (mode) {
+                ThemeMode.DEVICE -> UiModeManager.MODE_NIGHT_AUTO
+                ThemeMode.LIGHT -> UiModeManager.MODE_NIGHT_NO
+                ThemeMode.DARK -> UiModeManager.MODE_NIGHT_YES
+            },
+        )
     }
 
     override fun onNewIntent(intent: Intent) {

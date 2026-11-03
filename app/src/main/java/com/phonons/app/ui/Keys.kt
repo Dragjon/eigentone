@@ -92,7 +92,6 @@ fun WordSegments(labels: List<String>, selected: Int, onSelect: (Int) -> Unit, m
 val KeyShape = RoundedCornerShape(4.dp)
 val PanelShape = RoundedCornerShape(4.dp)
 
-private val LitPressed = Color(0xFFD6CCB4)
 
 /** A lit key: the primary action on a screen. */
 @Composable
@@ -112,7 +111,7 @@ fun Button(
         shape = KeyShape,
         interactionSource = source,
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (pressed) LitPressed else Palette.Lit,
+            containerColor = if (pressed) Palette.LitPressed else Palette.Lit,
             contentColor = Palette.OnLit,
             disabledContainerColor = Palette.SurfaceHigh,
             disabledContentColor = Palette.TextDim,

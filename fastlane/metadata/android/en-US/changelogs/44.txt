@@ -1,0 +1,1 @@
+- New light theme. Choose Device, Light or Dark in System, under Appearance

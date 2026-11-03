@@ -22,6 +22,7 @@ A free system-wide equaliser for Android 13 and newer. No ads, no account, and n
 - **Dynamic EQ**, with a harshness tamer and a boom tamer that only act while those ranges get loud.
 - **Multiband compressor**, free and fully adjustable and saved per preset, with three bands, adjustable crossovers, a live response curve and starting styles.
 - **Volume leveller**, night mode with a schedule, loudness compensation, limiter, balance, stereo width and virtual surround.
+- **Light and dark themes**, following your phone by default.
 - **Undo and redo**, a saved-curve overlay while editing and a warning when settings could clip.
 - **Preset search and folders**, app icon shortcuts to your favourites, and a tuner that adds bass or treble back to a correction.
 - **Share codes**, backups, a Quick Settings tile and a home-screen widget.
@@ -44,7 +45,7 @@ Crash reports stay on the phone. You choose whether to share one from the System
 Download the APK from [Releases](https://github.com/Dragjon/eigentone/releases), and open it on the phone. Eigentone is a pre-release, and has only been tested on a Galaxy A54 running Android 16. Or use USB debugging:
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.27.0.apk
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.28.0.apk
 ```
 
 ## Build

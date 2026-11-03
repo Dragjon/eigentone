@@ -121,6 +121,7 @@ import com.phonons.app.data.Processing
 import com.phonons.app.data.Profiles
 import com.phonons.app.data.Repo
 import com.phonons.app.data.ShapeText
+import com.phonons.app.data.ThemeMode
 import com.phonons.app.data.Tone
 import com.phonons.app.dsp.AutoEqParser
 import com.phonons.app.dsp.Eq
@@ -1584,6 +1585,25 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
     LifecycleResumeEffect(Unit) {
         exempt = context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
         onPauseOrDispose { }
+    }
+
+    SettingsSection(stringResource(R.string.ui_appearance)) {
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.ui_theme), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
+                InfoButton(Help.theme)
+            }
+            val modes = ThemeMode.entries
+            WordSegments(
+                labels = listOf(
+                    stringResource(R.string.ui_theme_device),
+                    stringResource(R.string.ui_theme_light),
+                    stringResource(R.string.ui_theme_dark),
+                ),
+                selected = modes.indexOf(state.themeMode),
+                onSelect = { i -> Repo.update { it.copy(themeMode = modes[i]) } },
+            )
+        }
     }
 
     SettingsSection(stringResource(R.string.ui_engine)) {

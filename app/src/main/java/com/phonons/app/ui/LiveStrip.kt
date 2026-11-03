@@ -88,18 +88,18 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
         Icon(
             painterResource(outputIcon(output)),
             contentDescription = null,
-            tint = if (working) Palette.Lit else Palette.StripDim,
+            tint = if (working) Palette.StripOn else Palette.StripDim,
             modifier = Modifier.size(16.dp),
         )
         Text(
             output.label,
             style = MaterialTheme.typography.bodySmall,
-            color = Palette.Text,
+            color = Palette.StripText,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        if (clipping) EffectPill(stringResource(R.string.ui_clip_risk), Palette.Danger)
+        if (clipping) EffectPill(stringResource(R.string.ui_clip_risk), Palette.StripDanger)
         effects.forEach { EffectTag(it) }
         PlayingDot()
         if (showCurve) MiniCurve(state, output.key, working)
@@ -109,7 +109,7 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
 /** A tick or a cross as well as the colour, so the state doesn't rely on colour alone. */
 @Composable
 private fun EffectTag(effect: EffectState) {
-    val colour = if (effect.on) Palette.Lit else Palette.StripDim
+    val colour = if (effect.on) Palette.StripOn else Palette.StripDim
     val description = stringResource(if (effect.on) R.string.ui_effect_on else R.string.ui_effect_off, effect.name)
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -126,7 +126,7 @@ private fun EffectTag(effect: EffectState) {
 }
 
 @Composable
-private fun EffectPill(name: String, colour: androidx.compose.ui.graphics.Color = Palette.Lit) {
+private fun EffectPill(name: String, colour: androidx.compose.ui.graphics.Color = Palette.StripOn) {
     Text(
         name,
         fontSize = 11.sp,
@@ -150,7 +150,7 @@ private fun PlayingDot() {
             animationSpec = infiniteRepeatable(tween(PULSE_MS, easing = LinearEasing), RepeatMode.Reverse),
             label = "pulse",
         )
-        Canvas(modifier) { drawCircle(Palette.Lit.copy(alpha = pulse)) }
+        Canvas(modifier) { drawCircle(Palette.StripOn.copy(alpha = pulse)) }
     }
 }
 

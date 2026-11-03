@@ -148,6 +148,10 @@ data class Preset(
     val folder: String? = null,
 )
 
+/** Which colours the app uses. Device follows the phone's own light or dark setting. */
+@Serializable
+enum class ThemeMode { DEVICE, LIGHT, DARK }
+
 @Serializable
 enum class EngineMode(val label: String) {
     AUTO("Auto"),
@@ -202,6 +206,7 @@ data class AppState(
     val analyser: Boolean = false,
     val limiterThresholdDb: Double = -1.0,
     val guidedSetupSeen: Boolean = false,
+    val themeMode: ThemeMode = ThemeMode.DEVICE,
     /** The output last acted on, so restarting the EQ on the same output leaves the chosen preset alone. */
     val lastOutputKey: String? = null,
     // Older versions kept these outside the preset. They're only read once, by migrated().
