@@ -1,0 +1,1 @@
+A free multiband compressor with three adjustable bands, crossovers, a response curve and starting styles. The graphic EQ now shows which shape is on.

@@ -622,6 +622,7 @@ private fun SoundTab(state: AppState) {
     ToneSection(state)
     SpaceSection(state)
     DynamicsSection(state, attenuation)
+    CompressorSection(state)
     LevelSection(state, attenuation)
 }
 
@@ -718,6 +719,7 @@ private fun SpaceSection(state: AppState) {
 
 @Composable
 private fun DynamicsSection(state: AppState, attenuation: Double) {
+    val scheduledNight by Repo.scheduledNight.collectAsStateWithLifecycle()
     SettingsSection("Dynamics") {
         SwitchSetting("Adapt to volume", Help.loudness, state.loudness) { on ->
             Repo.update { it.copy(loudness = on) }
@@ -757,7 +759,12 @@ private fun DynamicsSection(state: AppState, attenuation: Double) {
             value = state.leveller.toFloat(),
             range = 0f..1f,
             default = 0f,
-            detail = if (state.leveller > 0.001 && state.nightMode > 0.001) "Night mode is on, so it's used instead." else null,
+            detail = when {
+                state.leveller <= 0.001 -> null
+                state.nightMode > 0.001 || scheduledNight -> "Night mode is on, so it's used instead."
+                state.compressor.enabled -> "The compressor is on, so it's used instead."
+                else -> null
+            },
             onChange = { v -> Repo.update { it.copy(leveller = if (v < 0.02f) 0.0 else v.toDouble()) } },
         )
         RowDivider()

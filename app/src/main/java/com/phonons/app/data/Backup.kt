@@ -16,6 +16,7 @@ data class Backup(
     val favoriteShapes: Set<String> = emptySet(),
     val appProfiles: Map<String, String> = emptyMap(),
     val earCorrection: EarCorrection? = null,
+    val compressor: Compressor? = null,
 )
 
 /** Reads and writes preset backups. Restored files are sanitised, since they could be edited. */
@@ -38,6 +39,7 @@ object BackupCodec {
             favoriteShapes = state.favoriteShapes,
             appProfiles = state.appProfiles,
             earCorrection = state.earCorrection,
+            compressor = state.compressor,
         ),
     )
 
@@ -50,6 +52,7 @@ object BackupCodec {
                 .filter { it.id.startsWith("user:") && it.name.isNotBlank() }
                 .map(::sanitise),
             customShapes = backup.customShapes.mapNotNull(::sanitise),
+            compressor = backup.compressor?.clamped(),
             earCorrection = backup.earCorrection?.let { ears ->
                 ears.copy(left = ShapeText.cleanCurve(ears.left, MAX_EAR_DB), right = ShapeText.cleanCurve(ears.right, MAX_EAR_DB))
             },
@@ -72,6 +75,7 @@ object BackupCodec {
             favoriteShapes = state.favoriteShapes + backup.favoriteShapes,
             appProfiles = state.appProfiles + backup.appProfiles.filterValues { it in known },
             earCorrection = backup.earCorrection ?: state.earCorrection,
+            compressor = backup.compressor ?: state.compressor,
         )
     }
 
@@ -104,6 +108,9 @@ object BackupCodec {
             strength = safe(tone.strength, 1.0).coerceIn(0.0, 1.5),
             correction = safe(tone.correction, 1.0).coerceIn(0.0, 1.0),
             importedCurve = ShapeText.cleanCurve(tone.importedCurve),
+            shape = tone.shape?.takeIf { it.name.isNotBlank() }?.let { shape ->
+                AppliedShape(shape.name.take(Tone.MAX_SHAPE_LABEL), shape.faders.take(bands).map { GraphicEq.snap(safe(it, 0.0)) })
+            },
         )
     }
 

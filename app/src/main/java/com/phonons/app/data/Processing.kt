@@ -20,6 +20,8 @@ data class ProcessingTarget(
     val leveller: Double = 0.0,
     /** Differs from [filters], which is then the left ear, only while ear correction is on. */
     val rightFilters: List<Filter> = filters,
+    /** What the compressor does, once night mode, the leveller and manual settings are resolved. */
+    val dynamics: Compressor = Compressor(),
 )
 
 /** Turns the user's settings into the final processing. Pure, so it can be unit tested. */
@@ -121,14 +123,16 @@ object Processing {
             } else {
                 min(inputOf(state.current, left, state.autoHeadroom), inputOf(state.current, right, state.autoHeadroom))
             }
+            val night = if (scheduledNight) maxOf(state.nightMode, state.nightSchedule.amount) else state.nightMode
             return ProcessingTarget(
                 left, shared, state.limiter,
-                nightMode = if (scheduledNight) maxOf(state.nightMode, state.nightSchedule.amount) else state.nightMode,
+                nightMode = night,
                 effectEnabled = true,
                 limiterThresholdDb = state.limiterThresholdDb,
                 surround = state.current.tone.surround,
                 leveller = state.leveller,
                 rightFilters = right,
+                dynamics = Dynamics.resolve(night, state.leveller, state.compressor),
             )
         }
         if (!state.matchBypass) {

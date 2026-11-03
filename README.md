@@ -13,6 +13,7 @@ A free system-wide equaliser for Android 14 and newer. No ads, no account, and n
 - **Hearing check** that builds a gentle curve for how you hear, with a separate EQ for each ear if they differ. It isn't a medical test.
 - **EQ files**: import ParametricEQ and GraphicEQ files, and export any sound as a 127-point GraphicEQ file. Imported GraphicEQ curves keep every point rather than being rounded to faders.
 - **Presets** that load automatically per output, per earbud noise mode and per app.
+- **Multiband compressor**, free and fully adjustable, with three bands, adjustable crossovers, a live response curve and starting styles.
 - **Volume leveller**, night mode with a schedule, loudness compensation, limiter, balance and virtual surround.
 - **Share codes**, backups, a Quick Settings tile and a home-screen widget.
 
@@ -34,7 +35,7 @@ Crash reports stay on the phone. You choose whether to share one from the System
 Copy the latest `Phonons-<version>.apk` to the phone and open it, or use USB debugging:
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Phonons-0.11.0.apk
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Phonons-0.12.0.apk
 ```
 
 ## Build
@@ -61,7 +62,9 @@ The Liberty 4 NC presets and headphone corrections use [AutoEq](https://github.c
 
 ## How the sound is built
 
-A preset holds a whole sound: parametric filters, graphic EQ, tone, surround, strength, correction amount and preamp. Balance, night mode, the leveller, loudness compensation and limiter settings stay global.
+A preset holds a whole sound: parametric filters, graphic EQ, tone, surround, strength, correction amount and preamp. Balance, ear correction, night mode, the leveller, the compressor, loudness compensation and limiter settings stay global.
+
+The phone has one compressor, so night mode, manual settings and the leveller share it, in that order of priority (`data/Dynamics.kt`).
 
 The graphic EQ defines its curve directly from the faders rather than using overlapping bell filters. Bells of every width measured strayed by up to 3.3 dB between faders. This works because the audio engine takes a curve sampled on 128 bands.
 

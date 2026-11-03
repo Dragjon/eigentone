@@ -15,6 +15,7 @@ Shape it yourself
 
 Made for daily use
 - Presets that load automatically for each output, earbud noise mode and app
+- A free three-band compressor with adjustable crossovers, a response curve and starting styles
 - Volume leveller, scheduled night mode, loudness compensation and limiter
 - Balance and virtual surround
 - Share a sound with a text code

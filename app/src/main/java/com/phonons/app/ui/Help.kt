@@ -78,7 +78,7 @@ object Help {
     )
     val leveller = Tip(
         "Volume leveller",
-        "Slowly evens out loud and quiet passages, which helps when apps and tracks differ in level. Higher values sound flatter. Night mode takes priority while it's on.",
+        "Slowly evens out loud and quiet passages, which helps when apps and tracks differ in level. Higher values sound flatter. Night mode and the compressor take priority while they're on.",
     )
     val nightSchedule = Tip(
         "Night mode schedule",
@@ -158,6 +158,30 @@ object Help {
         "Find headphones",
         "Searches AutoEq's published correction profiles and adds the one you pick. It needs internet access. Measurements are a starting point, and your ears and fit still matter.",
     )
+    val compressor = Tip(
+        "Multiband compressor",
+        "Brings loud and quiet parts closer together, separately for bass, mids and treble. Start from a style and adjust by ear. Night mode takes over while it's on, and this replaces the volume leveller.",
+    )
+    val compressorBand = Tip("Compress this band", "Turn this off to leave this range of frequencies untouched.")
+    val compressorThreshold = Tip(
+        "Threshold",
+        "Anything louder than this gets turned down. Lower values compress more of the music. Phone volume doesn't change this, because it happens before the volume control.",
+    )
+    val compressorRatio = Tip(
+        "Ratio",
+        "How strongly levels above the threshold are turned down. At 4 : 1, going 4 dB over the threshold only comes out 1 dB over. Around 2 : 1 is subtle.",
+    )
+    val compressorMakeup = Tip("Makeup", "Turns this band back up afterwards, to make up for the level that compression took away.")
+    val compressorAttack = Tip(
+        "Attack",
+        "How quickly it reacts once a sound crosses the threshold. Slower values let the start of drum hits through, which keeps them punchy.",
+    )
+    val compressorRelease = Tip(
+        "Release",
+        "How quickly it lets go afterwards. Very short values can make the sound flutter, and long values make it steadier.",
+    )
+    val compressorKnee = Tip("Knee", "How gradually compression starts around the threshold. Higher values are smoother and less noticeable.")
+    val compressorCrossover = Tip("Crossover", "The frequency where one band ends and the next begins.")
     val importFile = Tip(
         "Import EQ file",
         "Adds a preset from an AutoEq or Equalizer APO file, either ParametricEQ or GraphicEQ. A GraphicEQ file keeps every point, with no rounding to faders.",
@@ -172,11 +196,11 @@ object Help {
     )
     val backup = Tip(
         "Back up presets",
-        "Saves your presets, your shapes, output and per-app choices, and favourites to a file. Ear correction is included. Other settings that aren't part of a preset, such as balance and night mode, aren't.",
+        "Saves your presets, your shapes, output and per-app choices, and favourites to a file. Ear correction and compressor settings are included. Other settings that aren't part of a preset, such as balance and night mode, aren't.",
     )
     val restore = Tip(
         "Restore presets",
-        "Adds presets, your shapes, per-app choices and ear correction from a backup file. Anything with the same identity is replaced, and the rest is kept.",
+        "Adds presets, your shapes, per-app choices, ear correction and compressor settings from a backup file. Anything with the same identity is replaced, and the rest is kept.",
     )
 
     val engineMode = Tip(

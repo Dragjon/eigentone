@@ -49,6 +49,10 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.remember
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.phonons.app.dsp.GraphicShape
 import com.phonons.app.R
 import com.phonons.app.data.Repo
 import com.phonons.app.data.Tone
@@ -70,7 +74,16 @@ fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
     val band = selected.coerceIn(0, bands - 1)
     val freqs = GraphicEq.frequencies(bands)
 
-    fun setGains(new: List<Double>) = Repo.editTone { it.copy(graphicDb = new, graphicBands = bands) }
+    fun setGains(new: List<Double>) = Repo.editTone {
+        it.copy(graphicDb = new, graphicBands = bands, shape = it.shape.takeUnless { GraphicEq.isFlat(new) })
+    }
+
+    val appState by Repo.state.collectAsStateWithLifecycle()
+    // Remembered because matching older sounds against the whole library is too slow to do on every frame.
+    val shapeLabel = remember(gains, bands, tone.shape, appState.customShapes) {
+        val yours = appState.customShapes.map { custom -> GraphicShape(custom.name, custom.points.map { it.hz to it.db }) }
+        tone.faderLabel(yours + GraphicEq.shapes + ShapeLibrary.all.map { it.shape })
+    }
 
     SettingsSection(
         "Graphic EQ",
@@ -84,13 +97,25 @@ fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
             }
         },
     ) {
+        Text(
+            shapeLabel,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (shapeLabel == Tone.FLAT_LABEL || shapeLabel == Tone.CUSTOM_LABEL) Palette.TextDim else Palette.Amber,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .semantics { contentDescription = "Current shape: $shapeLabel" },
+        )
         Faders(
             gains = gains,
             selected = band,
             onSelect = { selected = it },
             // Takes the band count from the faders themselves. A reference to setGains can be remembered
             // across recompositions, which kept the first band count and reset the layout to it.
-            onChange = { new -> Repo.editTone { it.copy(graphicDb = new, graphicBands = new.size) } },
+            onChange = { new ->
+                Repo.editTone { it.copy(graphicDb = new, graphicBands = new.size, shape = it.shape.takeUnless { GraphicEq.isFlat(new) }) }
+            },
             onFinished = Repo::commit,
         )
 
@@ -140,8 +165,11 @@ fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
                         selected = bands == option,
                         onClick = {
                             if (bands != option) {
+                                val moved = GraphicEq.resample(gains, bands, option)
                                 Repo.editTone {
-                                    it.copy(graphicDb = GraphicEq.resample(gains, bands, option), graphicBands = option)
+                                    // Changing the layout isn't an edit, so an unedited shape stays that way.
+                                    val kept = it.shape?.let { shape -> if (shape.faders == gains) shape.copy(faders = moved) else shape }
+                                    it.copy(graphicDb = moved, graphicBands = option, shape = kept)
                                 }
                                 Repo.commit()
                             }
@@ -175,7 +203,7 @@ fun GraphicEqConsole(tone: Tone, onBrowseShapes: () -> Unit) {
                     FilterChip(
                         selected = shapeGains == gains,
                         onClick = {
-                            setGains(shapeGains)
+                            Repo.editTone { it.withShape(shape.name, shapeGains, bands) }
                             Repo.commit()
                         },
                         label = { Text(shape.name, maxLines = 1) },

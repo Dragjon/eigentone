@@ -3,6 +3,7 @@ package com.phonons.app.data
 import com.phonons.app.dsp.Filter
 import com.phonons.app.dsp.FilterType
 import com.phonons.app.dsp.GraphicEq
+import com.phonons.app.dsp.GraphicShape
 import kotlinx.serialization.Serializable
 
 /** The adjustments layered over a preset's filters. They're saved with it, so a preset is a whole sound. */
@@ -25,7 +26,44 @@ data class Tone(
     val trimDb: Double = 0.0,
     /** A curve imported at full detail, such as a GraphicEQ file. Scaled by [correction], like filters. */
     val importedCurve: List<ShapePoint> = emptyList(),
-)
+    /** What was last applied to the faders, for showing its name. */
+    val shape: AppliedShape? = null,
+) {
+    /**
+     * Names what the faders hold. Moving a fader afterwards shows as edited, because the name no longer
+     * tells the whole story. Sounds set before names were saved are matched against [known] shapes.
+     */
+    fun faderLabel(known: List<GraphicShape> = emptyList()): String {
+        val gains = GraphicEq.normalized(graphicDb, graphicBands)
+        return when {
+            GraphicEq.isFlat(gains) -> FLAT_LABEL
+            shape == null -> known.firstOrNull { GraphicEq.apply(it, graphicBands) == gains }?.name ?: CUSTOM_LABEL
+            shape.faders == gains -> shape.name
+            else -> "${shape.name}, edited"
+        }
+    }
+
+    /** Sets the faders from a named shape. When layering, the name also says what it was added to. */
+    fun withShape(name: String, faders: List<Double>, bands: Int, layered: Boolean = false): Tone {
+        val before = GraphicEq.normalized(graphicDb, graphicBands)
+        val label = if (layered && !GraphicEq.isFlat(before)) "${faderLabel()} + $name" else name
+        return copy(
+            graphicDb = faders,
+            graphicBands = bands,
+            shape = if (GraphicEq.isFlat(faders)) null else AppliedShape(label.take(MAX_SHAPE_LABEL), faders),
+        )
+    }
+
+    companion object {
+        const val FLAT_LABEL = "Flat"
+        const val CUSTOM_LABEL = "Custom"
+        const val MAX_SHAPE_LABEL = 80
+    }
+}
+
+/** A shape's name, with the faders as it left them, which shows whether they've been moved since. */
+@Serializable
+data class AppliedShape(val name: String, val faders: List<Double>)
 
 @Serializable
 data class ShapePoint(val hz: Double, val db: Double)
@@ -108,6 +146,7 @@ data class AppState(
     /** Evens out loud and quiet tracks, from 0 to 1. Night mode takes priority when both are on. */
     val leveller: Double = 0.0,
     val earCorrection: EarCorrection? = null,
+    val compressor: Compressor = Compressor(),
     /** Which one-time updates this saved state has had. A fresh install starts at the latest. */
     val stateVersion: Int = 0,
     val listeningMode: ListeningMode = ListeningMode.NOISE_CANCELLING,
@@ -141,6 +180,7 @@ data class AppState(
             leveller = defaults.leveller,
             balance = defaults.balance,
             earCorrection = defaults.earCorrection,
+            compressor = defaults.compressor,
             loudness = defaults.loudness,
             loudnessStrength = defaults.loudnessStrength,
             matchBypass = defaults.matchBypass,

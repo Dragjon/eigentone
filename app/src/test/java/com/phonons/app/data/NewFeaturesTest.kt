@@ -245,6 +245,180 @@ class NewFeaturesTest {
         assertEquals(0.0, points.getValue(1000.0), 0.0)
     }
 
+    @Test
+    fun compressorCurveFollowsThresholdAndRatio() {
+        val band = CompressorBand(thresholdDb = -20.0, ratio = 4.0, kneeDb = 0.0, makeupDb = 0.0)
+        assertEquals(-40.0, band.outputDb(-40.0), 0.0001)
+        assertEquals(-20.0, band.outputDb(-20.0), 0.0001)
+        assertEquals(-15.0, band.outputDb(0.0), 0.0001)
+        assertEquals(-12.0, band.copy(makeupDb = 3.0).outputDb(0.0), 0.0001)
+        assertEquals(0.0, band.copy(enabled = false).outputDb(0.0), 0.0)
+    }
+
+    @Test
+    fun compressorKneeIsSmoothAndNeverBoosts() {
+        val band = CompressorBand(thresholdDb = -20.0, ratio = 4.0, kneeDb = 12.0)
+        // Meets the straight lines at both edges of the knee.
+        assertEquals(-26.0, band.outputDb(-26.0), 0.0001)
+        assertEquals(-20.0 + 6.0 / 4, band.outputDb(-14.0), 0.0001)
+        var previous = band.outputDb(-60.0)
+        for (step in 1..600) {
+            val input = -60.0 + step / 10.0
+            val output = band.outputDb(input)
+            assertTrue(output <= input + 0.0001)
+            assertTrue("Should only rise at $input", output >= previous)
+            assertTrue("Should have no jumps at $input", output - previous < 0.11)
+            previous = output
+        }
+    }
+
+    @Test
+    fun compressorStartsOffAndDoesNothing() {
+        val target = Processing.target(AppState(), 0.0)
+        assertFalse(target.dynamics.enabled)
+    }
+
+    @Test
+    fun nightModeWinsThenManualThenLeveller() {
+        val manual = Dynamics.styles.first { it.name == "Punchy" }.compressor
+        assertEquals(manual, Dynamics.resolve(0.0, 0.0, manual))
+        assertEquals(manual, Dynamics.resolve(0.0, 0.5, manual))
+
+        val night = Dynamics.resolve(0.5, 0.5, manual)
+        assertTrue(night.enabled)
+        assertEquals(-15.0, night.low.thresholdDb, 0.0)
+
+        val leveller = Dynamics.resolve(0.0, 0.5, manual.copy(enabled = false))
+        assertTrue(leveller.enabled)
+        assertEquals(-12.0, leveller.mid.thresholdDb, 0.0)
+
+        assertFalse(Dynamics.resolve(0.0, 0.0, manual.copy(enabled = false)).enabled)
+    }
+
+    /** Night mode and the leveller moved into shared code, and must sound exactly as they did before. */
+    @Test
+    fun nightModeAndLevellerKeepTheirOriginalSettings() {
+        val night = Dynamics.resolve(1.0, 0.0, Compressor()).high
+        assertEquals(CompressorBand(thresholdDb = -30.0, ratio = 4.0, attackMs = 8.0, releaseMs = 120.0, kneeDb = 6.0, makeupDb = 9.0), night)
+        val leveller = Dynamics.resolve(0.0, 1.0, Compressor()).low
+        assertEquals(CompressorBand(thresholdDb = -24.0, ratio = 3.0, attackMs = 50.0, releaseMs = 1000.0, kneeDb = 6.0, makeupDb = 6.0), leveller)
+    }
+
+    @Test
+    fun scheduledNightOverridesTheManualCompressor() {
+        val manual = Dynamics.styles.first().compressor
+        val state = AppState(compressor = manual, nightSchedule = NightSchedule(enabled = true, amount = 0.6))
+        assertEquals(manual, Processing.target(state, 0.0).dynamics)
+        assertEquals(-18.0, Processing.target(state, 0.0, scheduledNight = true).dynamics.low.thresholdDb, 0.0001)
+    }
+
+    @Test
+    fun bypassAndTheHearingCheckTurnTheCompressorOff() {
+        val state = AppState(compressor = Dynamics.styles.first().compressor)
+        assertTrue(Processing.target(state, 0.0).dynamics.enabled)
+        for (match in listOf(true, false)) {
+            assertFalse(Processing.target(state.copy(bypass = true, matchBypass = match), 0.0).dynamics.enabled)
+        }
+    }
+
+    @Test
+    fun everyCompressorStyleIsValid() {
+        assertEquals(Dynamics.styles.size, Dynamics.styles.map { it.name }.distinct().size)
+        for (style in Dynamics.styles) {
+            assertTrue(style.name, style.compressor.enabled)
+            assertTrue(style.name, style.compressor.bands.any { it.enabled })
+            assertEquals(style.name, style.compressor, style.compressor.clamped())
+            assertTrue(style.name, style.compressor.lowCrossoverHz < style.compressor.highCrossoverHz)
+        }
+    }
+
+    @Test
+    fun crossoverLimitsKeepBandsInOrder() {
+        assertTrue(Dynamics.LOW_CROSSOVER_HZ.endInclusive < Dynamics.HIGH_CROSSOVER_HZ.start)
+        val wild = Compressor(lowCrossoverHz = 99999.0, highCrossoverHz = 1.0).clamped()
+        assertTrue(wild.lowCrossoverHz < wild.highCrossoverHz)
+    }
+
+    @Test
+    fun compressorSurvivesBackupAndIsChecked() {
+        val punchy = Dynamics.styles.first { it.name == "Punchy" }.compressor
+        val restored = BackupCodec.merge(AppState(), BackupCodec.decode(BackupCodec.encode(AppState(compressor = punchy)))!!)
+        assertEquals(punchy, restored.compressor)
+        // An older backup leaves the current settings alone.
+        assertEquals(punchy, BackupCodec.merge(AppState(compressor = punchy), BackupCodec.decode("{}")!!).compressor)
+
+        val edited = """{"compressor":{"enabled":true,"low":{"ratio":500.0,"makeupDb":90.0,"thresholdDb":-500.0}}}"""
+        val low = BackupCodec.decode(edited)!!.compressor!!.low
+        assertEquals(Dynamics.RATIO.endInclusive, low.ratio, 0.0)
+        assertEquals(Dynamics.MAKEUP_DB.endInclusive, low.makeupDb, 0.0)
+        assertEquals(Dynamics.THRESHOLD_DB.start, low.thresholdDb, 0.0)
+    }
+
+    @Test
+    fun resetTurnsTheCompressorOff() {
+        assertFalse(AppState(compressor = Dynamics.styles.first().compressor).resetSound().compressor.enabled)
+    }
+
+    private val warmFaders = List(10) { if (it < 3) 3.0 else 0.0 }
+
+    @Test
+    fun faderLabelNamesTheAppliedShape() {
+        assertEquals("Flat", Tone().faderLabel())
+        assertEquals("Warm", Tone().withShape("Warm", warmFaders, 10).faderLabel())
+        // Faders with no name stay honest about it.
+        assertEquals("Custom", Tone(graphicDb = warmFaders, graphicBands = 10).faderLabel())
+    }
+
+    @Test
+    fun faderLabelShowsAnEditOnceAFaderMoves() {
+        val tone = Tone().withShape("Warm", warmFaders, 10)
+        val moved = warmFaders.toMutableList().also { it[5] = 2.0 }
+        assertEquals("Warm, edited", tone.copy(graphicDb = moved).faderLabel())
+        // Putting it back exactly means it's the shape again.
+        assertEquals("Warm", tone.copy(graphicDb = moved).copy(graphicDb = warmFaders).faderLabel())
+    }
+
+    @Test
+    fun faderLabelFollowsLayers() {
+        val warm = Tone().withShape("Warm", warmFaders, 10)
+        val both = warm.withShape("Bright at 60%", warmFaders.map { it + 1.0 }, 10, layered = true)
+        assertEquals("Warm + Bright at 60%", both.faderLabel())
+
+        val edited = warm.copy(graphicDb = warmFaders.map { it + 2.0 })
+        val onEdited = edited.withShape("Bright", warmFaders.map { it + 3.0 }, 10, layered = true)
+        assertEquals("Warm, edited + Bright", onEdited.faderLabel())
+
+        // Layering onto nothing is just the shape.
+        assertEquals("Bright", Tone().withShape("Bright", warmFaders, 10, layered = true).faderLabel())
+        val long = Tone().withShape("x".repeat(500), warmFaders, 10)
+        assertEquals(Tone.MAX_SHAPE_LABEL, long.faderLabel().length)
+    }
+
+    @Test
+    fun faderLabelRecognisesSoundsSavedBeforeNamesWere() {
+        val shape = com.phonons.app.dsp.GraphicEq.shapes.first { it.name == "Warm" }
+        val saved = Tone(graphicDb = com.phonons.app.dsp.GraphicEq.apply(shape, 15), graphicBands = 15)
+        assertEquals("Warm", saved.faderLabel(com.phonons.app.dsp.GraphicEq.shapes))
+    }
+
+    @Test
+    fun aFlatShapeHasNoName() {
+        assertNull(Tone().withShape("Flat", List(10) { 0.0 }, 10).shape)
+    }
+
+    @Test
+    fun theShapeNameTravelsWithThePreset() {
+        val tone = Tone().withShape("Warm", warmFaders, 10)
+        val preset = Preset("user:x", "X", tone = tone)
+        assertEquals("Warm", ShareCode.decode(ShareCode.encode(preset))!!.tone.faderLabel())
+
+        val backup = BackupCodec.decode(BackupCodec.encode(AppState(presets = listOf(preset))))!!
+        assertEquals("Warm", backup.presets.single().tone.faderLabel())
+
+        val longName = Preset("user:x", "X", tone = tone.copy(shape = AppliedShape("y".repeat(500), warmFaders)))
+        assertEquals(Tone.MAX_SHAPE_LABEL, ShareCode.decode(ShareCode.encode(longName))!!.tone.shape!!.name.length)
+    }
+
     private fun earResult(left: Double, right: Double) =
         HearingResult(mapOf(Ear.LEFT to mapOf(1000.0 to left), Ear.RIGHT to mapOf(1000.0 to right)))
 

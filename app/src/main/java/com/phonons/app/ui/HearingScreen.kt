@@ -223,7 +223,12 @@ private fun Result(result: HearingResult, onClose: () -> Unit) {
                 val shape = save()
                 val graphic = GraphicShape(shape.name, shape.points.map { it.hz to it.db })
                 Repo.editTone { tone ->
-                    tone.copy(graphicDb = GraphicEq.layered(tone.graphicDb, graphic, tone.graphicBands))
+                    tone.withShape(
+                        shape.name,
+                        GraphicEq.layered(tone.graphicDb, graphic, tone.graphicBands),
+                        tone.graphicBands,
+                        layered = true,
+                    )
                 }
                 Repo.commit()
                 onClose()

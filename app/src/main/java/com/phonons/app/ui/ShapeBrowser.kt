@@ -149,8 +149,9 @@ fun ShapeBrowser(onClose: () -> Unit) {
     val list = rememberLazyListState()
     LaunchedEffect(query, category, trait, favouritesOnly) { list.scrollToItem(0) }
 
-    fun toneFor(shape: LibraryShape, level: Float) = before.tone.copy(
-        graphicDb = if (layering) {
+    fun toneFor(shape: LibraryShape, level: Float) = before.tone.withShape(
+        name = if (level == 1f) shape.shape.name else "${shape.shape.name} at ${kotlin.math.round(level * 100).toInt()}%",
+        faders = if (layering) {
             GraphicEq.layered(
                 GraphicEq.normalized(before.tone.graphicDb, before.tone.graphicBands).let {
                     GraphicEq.resample(it, before.tone.graphicBands, bands)
@@ -160,7 +161,8 @@ fun ShapeBrowser(onClose: () -> Unit) {
         } else {
             GraphicEq.apply(shape.shape, bands, level.toDouble())
         },
-        graphicBands = bands,
+        bands = bands,
+        layered = layering,
     )
 
     // Matched to the sound before, so a shape isn't favoured just for being louder.

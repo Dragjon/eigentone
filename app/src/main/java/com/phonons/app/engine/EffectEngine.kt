@@ -5,6 +5,7 @@ import android.media.audiofx.DynamicsProcessing
 import android.media.audiofx.Virtualizer
 import android.util.Log
 import com.phonons.app.data.AppState
+import com.phonons.app.data.Compressor
 import com.phonons.app.data.EngineMode
 import com.phonons.app.data.EngineStatus
 import com.phonons.app.data.Processing
@@ -33,8 +34,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         val lastRightGains = FloatArray(bandCount) { Float.NaN }
         var lastInput = Float.NaN
         var lastBalance = Double.NaN
-        var lastNight = Double.NaN
-        var lastLeveller = Double.NaN
+        var lastDynamics: Compressor? = null
         var lastLimiter: Boolean? = null
         var lastEnabled: Boolean? = null
         var verified = false
@@ -95,8 +95,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
             chain.lastRightGains.fill(Float.NaN)
             chain.lastInput = Float.NaN
             chain.lastBalance = Double.NaN
-            chain.lastNight = Double.NaN
-            chain.lastLeveller = Double.NaN
+            chain.lastDynamics = null
             chain.lastLimiter = null
             chain.lastEnabled = null
             chain.lastLimiterThreshold = Double.NaN
@@ -238,10 +237,9 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
                 chain.lastLimiterThreshold = target.limiterThresholdDb
             }
 
-            if (target.nightMode != chain.lastNight || target.leveller != chain.lastLeveller) {
-                pushDynamics(dp, target.nightMode, target.leveller)
-                chain.lastNight = target.nightMode
-                chain.lastLeveller = target.leveller
+            if (target.dynamics != chain.lastDynamics) {
+                pushDynamics(chain, target.dynamics)
+                chain.lastDynamics = target.dynamics
             }
 
             val wanted = target.effectEnabled
@@ -322,32 +320,30 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         if (rejected > 0) error = "${chain.label} did not accept $rejected of $total EQ bands"
     }
 
-    /**
-     * Both modes bring loud and quiet parts closer, with makeup gain so overall level stays similar.
-     * Night mode reacts quickly to tame sudden moments. The leveller is slow and gentle, so it evens
-     * out whole passages and tracks without flattening individual drum hits. There's only one
-     * compressor, so night mode takes priority.
-     */
-    private fun pushDynamics(dp: DynamicsProcessing, night: Double, leveller: Double) {
-        val useNight = night > 0.001
-        val amount = if (useNight) night else leveller
-        val on = amount > 0.001
-        val threshold = ((if (useNight) -30.0 else -24.0) * amount).toFloat()
-        val ratio = (1.0 + (if (useNight) 3.0 else 2.0) * amount).toFloat()
-        val makeup = ((if (useNight) 9.0 else 6.0) * amount).toFloat()
-        val attack = if (useNight) 8f else 50f
-        val release = if (useNight) 120f else 1000f
-        val mbc = DynamicsProcessing.Mbc(true, on, MBC_BANDS)
-        MBC_CUTOFFS.forEachIndexed { i, cutoff ->
+    private fun pushDynamics(chain: Chain, dynamics: Compressor) {
+        val cutoffs = floatArrayOf(dynamics.lowCrossoverHz.toFloat(), dynamics.highCrossoverHz.toFloat(), MBC_TOP_HZ)
+        val mbc = DynamicsProcessing.Mbc(true, dynamics.enabled, MBC_BANDS)
+        dynamics.bands.forEachIndexed { i, band ->
             mbc.setBand(
                 i,
                 DynamicsProcessing.MbcBand(
-                    on, cutoff, attack, release, ratio, threshold,
-                    /* knee */ 6f, /* gate */ -90f, /* expander */ 1f, /* pre */ 0f, makeup,
+                    dynamics.enabled && band.enabled, cutoffs[i], band.attackMs.toFloat(), band.releaseMs.toFloat(),
+                    band.ratio.toFloat(), band.thresholdDb.toFloat(), band.kneeDb.toFloat(),
+                    /* gate */ -90f, /* expander */ 1f, /* pre */ 0f, band.makeupDb.toFloat(),
                 ),
             )
         }
-        dp.setMbcAllChannelsTo(mbc)
+        chain.dp.setMbcAllChannelsTo(mbc)
+        if (dynamics.enabled) logDynamics(chain)
+    }
+
+    /** Reads back what the phone kept, so a device that changes these values shows up in the log. */
+    private fun logDynamics(chain: Chain) {
+        val bands = (0 until MBC_BANDS).map { chain.dp.getMbcBandByChannelIndex(1, it) }
+        val summary = bands.joinToString { b ->
+            "${b.cutoffFrequency.toInt()}Hz on=${b.isEnabled} ${b.threshold}dB ${b.ratio}:1 +${b.postGain}dB"
+        }
+        Log.i(TAG, "Compressor on ${chain.label}: $summary")
     }
 
     private fun channelTrimDb(amount: Double): Float {
@@ -389,6 +385,6 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         private const val LIMITER_RATIO = 10f
         private const val MAX_EFFECT_STRENGTH = 1000
         private val BAND_COUNTS = listOf(128, 64, 32, 16)
-        private val MBC_CUTOFFS = floatArrayOf(200f, 2500f, 24000f)
+        private const val MBC_TOP_HZ = 24000f
     }
 }
