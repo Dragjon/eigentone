@@ -15,7 +15,7 @@ import kotlin.math.sin
  * rather than a surround effect. Pure, so it can be unit tested.
  */
 object StereoWidth {
-    const val MAX_LEAN_DB = 4.0
+    const val MAX_LEAN_DB = 6.0
 
     /** How wide each left and right pair of ranges is. Narrow enough to spread a voice, wide enough to not sound hollow. */
     private const val CYCLE_OCTAVES = 2.0 / 3.0

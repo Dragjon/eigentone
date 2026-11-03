@@ -1,0 +1,1 @@
+Stereo width can now go 50% stronger. Each preset keeps its own compressor settings.
