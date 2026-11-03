@@ -82,6 +82,15 @@ object Processing {
     fun bassTunerFilters(gainDb: Double, freqHz: Double): List<Filter> =
         if (gainDb != 0.0) listOf(Filter(-5, FilterType.LOW_SHELF, freqHz, gainDb, SHELF_Q)) else emptyList()
 
+    /** How much to turn the left channel down. Balance towards the right (above 0) makes the left quieter. */
+    fun leftTrimDb(balance: Double): Double = sideTrimDb(balance)
+
+    /** How much to turn the right channel down. Balance towards the left (below 0) makes the right quieter. */
+    fun rightTrimDb(balance: Double): Double = sideTrimDb(-balance)
+
+    private fun sideTrimDb(amount: Double): Double =
+        if (amount <= 0) 0.0 else 20 * log10(kotlin.math.max(1.0 - amount, MIN_SIDE_LEVEL))
+
     /** Everything a preset contributes: its filters and its tone adjustments. */
     fun presetFilters(preset: Preset): List<Filter> {
         val tone = preset.tone
@@ -283,6 +292,7 @@ object Processing {
         return 20 * log10(numerator / denominator) + 2.0
     }
 
+    private const val MIN_SIDE_LEVEL = 0.001
     private const val LOUDNESS_STEPS = 120
     private const val EXPORT_POINTS = 127
     private const val PEAK_STEPS = 240

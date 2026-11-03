@@ -93,6 +93,16 @@ class AuditFixesTest {
     }
 
     @Test
+    fun balanceTowardsASideTurnsTheOtherSideDown() {
+        org.junit.Assert.assertTrue(Processing.leftTrimDb(0.5) < 0.0)
+        assertEquals(0.0, Processing.rightTrimDb(0.5), 0.0)
+        org.junit.Assert.assertTrue(Processing.rightTrimDb(-0.5) < 0.0)
+        assertEquals(0.0, Processing.leftTrimDb(-0.5), 0.0)
+        assertEquals(0.0, Processing.leftTrimDb(0.0), 0.0)
+        assertEquals(0.0, Processing.rightTrimDb(0.0), 0.0)
+    }
+
+    @Test
     fun anImportedPreampStaysInASafeRange() {
         assertEquals(30.0, AutoEqParser.parse("Preamp: 9999 dB\nFilter 1: ON PK Fc 1000 Hz Gain 1 dB Q 1")!!.preampDb, 0.0)
         assertEquals(-30.0, AutoEqParser.parse("Preamp: -9999 dB\nFilter 1: ON PK Fc 1000 Hz Gain 1 dB Q 1")!!.preampDb, 0.0)

@@ -15,8 +15,6 @@ import com.phonons.app.data.ProcessingTarget
 import com.phonons.app.data.Tamers
 import com.phonons.app.dsp.CurveMapper
 import kotlin.math.abs
-import kotlin.math.log10
-import kotlin.math.max
 
 /**
  * Drives android.media.audiofx.DynamicsProcessing.
@@ -309,8 +307,8 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
 
     private fun pushInput(chain: Chain, input: Float, balance: Double) {
         if (input == chain.lastInput && balance == chain.lastBalance) return
-        chain.dp.setInputGainbyChannel(0, input + channelTrimDb(-balance))
-        chain.dp.setInputGainbyChannel(1, input + channelTrimDb(balance))
+        chain.dp.setInputGainbyChannel(0, input + Processing.leftTrimDb(balance).toFloat())
+        chain.dp.setInputGainbyChannel(1, input + Processing.rightTrimDb(balance).toFloat())
         chain.lastInput = input
         chain.lastBalance = balance
     }
@@ -419,11 +417,6 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
             "${b.cutoffFrequency.toInt()}Hz on=${b.isEnabled} ${b.threshold}dB ${b.ratio}:1 +${b.postGain}dB"
         }
         Log.i(TAG, "Compressor on ${chain.label}: $summary")
-    }
-
-    private fun channelTrimDb(amount: Double): Float {
-        if (amount <= 0) return 0f
-        return (20 * log10(max(1.0 - amount, 0.001))).toFloat()
     }
 
     private fun publish() {

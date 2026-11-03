@@ -1,0 +1,1 @@
+- Fixed Balance moving the sound to the opposite side
