@@ -78,7 +78,7 @@ Eigentone is free software under the [GNU General Public License v3.0](LICENSE).
 
 ## Credits
 
-Thanks to [Natcuber](https://github.com/Natcuber) for suggesting many of the improvements in Eigentone.
+HUGE THANKS to the goated [Natcuber](https://github.com/Natcuber) for suggesting many of the improvements in Eigentone and testing the app extensively!!! 
 
 Barlow and JetBrains Mono are used under the SIL Open Font License 1.1.
 
