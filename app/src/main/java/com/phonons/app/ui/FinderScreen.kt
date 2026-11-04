@@ -423,10 +423,12 @@ private fun Result(
         onValueChange = { name = it },
         singleLine = true,
         label = { Text(stringResource(R.string.ui_preset_name)) },
+        isError = com.phonons.app.data.PresetOrganiser.nameTaken(state, name),
+        supportingText = if (com.phonons.app.data.PresetOrganiser.nameTaken(state, name)) ({ Text(stringResource(R.string.ui_name_taken, name.trim())) }) else null,
         modifier = Modifier.fillMaxWidth(),
     )
     Button(
-        enabled = name.isNotBlank(),
+        enabled = name.isNotBlank() && !com.phonons.app.data.PresetOrganiser.nameTaken(state, name),
         onClick = {
             Repo.edit { finished }
             Repo.saveCurrentAs(name.trim())

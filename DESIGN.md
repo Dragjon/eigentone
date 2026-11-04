@@ -241,7 +241,7 @@ Near-neutral graphite with one warm ivory, two ear colours, one warning orange a
 
 ### Light Theme: The Audiometer in Daylight
 
-Selected in **System → Appearance**: Device (default), Light or Dark. `DarkColors` and `LightColors` in `Theme.kt` hold every role, and `Palette` reads whichever is active. The dark theme's values are locked by a test.
+Selected in **Settings → Appearance**: Device (default), Light or Dark. `DarkColors` and `LightColors` in `Theme.kt` hold every role, and `Palette` reads whichever is active. The dark theme's values are locked by a test.
 
 Light is composed, not inverted: a warm putty faceplate, as on lab equipment. A lit control can't glow in daylight, so it becomes a dark inked key carrying the same ivory as its legend, which keeps ivory meaning "active".
 
@@ -328,6 +328,7 @@ Built to feel like hardware controls: rectangular, labelled and precise.
 - **Chips:** used for short shape sets that wrap. Selected is ivory.
 
 ### Cards / Containers
+- **Folding section** (`SettingsSection` with a summary): on the Sound tab, Space and Compressor fold, and on the Settings tab so do Dynamics, Level and Stereo and ears, under their legend with a chevron. While closed, a one-line amber summary lists what's on, or "All off" in dim text, so nothing changed is hidden. Preset and Tone stay open.
 - **Settings panel** (`SettingsSection`): Enamel, 4dp, no border, with an optional Panel Legend above and 16dp-inset Hairline dividers between rows.
 - **Prompt panel:** Raised Key, 16dp padding, 8dp internal gaps.
 - **Comparison card** (`SideCard`): 140dp tall with a 1dp border. Selected fills with ivory.

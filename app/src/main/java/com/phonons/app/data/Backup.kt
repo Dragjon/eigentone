@@ -132,6 +132,7 @@ object BackupCodec {
             compressor = tone.compressor.clamped(),
             harshTamer = safe(tone.harshTamer, 0.0).coerceIn(0.0, 1.0),
             boomTamer = safe(tone.boomTamer, 0.0).coerceIn(0.0, 1.0),
+            bassCharacter = tone.bassCharacter,
             reverb = tone.reverb,
             reverbAmount = safe(tone.reverbAmount, 0.6).coerceIn(0.0, 1.0),
             targetId = HeadphoneTarget.of(tone.targetId)?.id,

@@ -321,6 +321,117 @@ class AuditFixesTest {
     }
 
     @Test
+    fun theLimiterCantBeSetToClip() {
+        val wild = LimiterSettings(attackMs = -5.0, releaseMs = 9999.0, ratio = 0.0, thresholdDb = -4.0, postGainDb = 10.0).clamped()
+        assertEquals(4.0, wild.postGainDb, 0.0)
+        assertEquals(0.0, wild.ceilingDb, 0.0)
+        org.junit.Assert.assertTrue(wild.attackMs >= 0.1 && wild.releaseMs <= 1000.0 && wild.ratio >= 1.0)
+    }
+
+    @Test
+    fun theLimiterSettingsReachTheEngineAndBypassDropsThem() {
+        val state = AppState(enabled = true, limiterAttackMs = 5.0, limiterRatio = 20.0, limiterThresholdDb = -3.0, limiterPostGainDb = 2.0)
+        val target = Processing.target(state, 0.0)
+        assertEquals(LimiterSettings(5.0, 60.0, 20.0, -3.0, 2.0), target.limiterSettings)
+        org.junit.Assert.assertFalse(Processing.target(state.copy(bypass = true, matchBypass = false), 0.0).limiter)
+    }
+
+    @Test
+    fun naturalBassAddsNoCompressorBand() {
+        val plan = Dynamics.plan(Compressor(), Tamers(bassAmount = 6.0))
+        org.junit.Assert.assertTrue(plan.none { it.active })
+    }
+
+    @Test
+    fun punchAndSustainShapeOnlyTheDeepBass() {
+        for (character in listOf(BassCharacter.PUNCH, BassCharacter.SUSTAIN)) {
+            val plan = Dynamics.plan(Compressor(), Tamers(bass = character, bassAmount = 6.0))
+            assertEquals(Dynamics.FULL_BANDS, plan.size)
+            val active = plan.filter { it.active }
+            assertEquals(1, active.size)
+            assertEquals(Dynamics.BOOM_TOP_HZ, active.single().cutoffHz, 0.0)
+            for (other in plan - active.single()) for (level in loudLevels) assertEquals(0.0, androidGainDb(other.band, level), 0.0)
+        }
+        val punch = Dynamics.characterBand(Tamers(bass = BassCharacter.PUNCH, bassAmount = 6.0))!!
+        val sustain = Dynamics.characterBand(Tamers(bass = BassCharacter.SUSTAIN, bassAmount = 6.0))!!
+        // Punch waits before catching a hit, and Sustain catches it at once and holds on longer.
+        org.junit.Assert.assertTrue(punch.attackMs > sustain.attackMs && sustain.releaseMs > punch.releaseMs)
+        org.junit.Assert.assertTrue(punch.makeupDb > 0.0 && sustain.makeupDb > 0.0)
+    }
+
+    @Test
+    fun aCharacterNeedsAddedBass() {
+        org.junit.Assert.assertNull(Dynamics.characterBand(Tamers(bass = BassCharacter.SUSTAIN, bassAmount = 0.0)))
+        val cut = Preset("user:c", "C", tone = Tone(bassDb = -4.0, bassCharacter = BassCharacter.PUNCH))
+        assertEquals(0.0, Processing.target(AppState(enabled = true, current = cut), 0.0).tamers.bassAmount, 0.0)
+    }
+
+    @Test
+    fun theBoomTamerKeepsControlAlongsideACharacter() {
+        val both = Dynamics.plan(Compressor(), Tamers(boom = 1.0, bass = BassCharacter.SUSTAIN, bassAmount = 6.0)).first { it.active }
+        val boom = Dynamics.boomBand(1.0)
+        org.junit.Assert.assertTrue(both.band.thresholdDb <= boom.thresholdDb && both.band.ratio >= boom.ratio)
+    }
+
+    @Test
+    fun theBassCharacterIsSavedWithThePreset() {
+        val preset = Preset("user:b", "B", tone = Tone(bassDb = 3.0, bassCharacter = BassCharacter.PUNCH))
+        assertEquals(BassCharacter.PUNCH, BackupCodec.sanitise(preset).tone.bassCharacter)
+        assertEquals(BassCharacter.PUNCH, ShareCode.decode(ShareCode.encode(preset))!!.tone.bassCharacter)
+    }
+
+    @Test
+    fun editsToAPresetSurviveSwitchingAwayAndBack() {
+        Repo.update { AppState(current = BuiltIns.flat) }
+        val warm = Repo.findPreset("builtin:warm")!!
+        Repo.loadPreset(warm)
+        Repo.edit { it.copy(preampDb = -3.0) }
+        Repo.loadPreset(BuiltIns.flat)
+        assertEquals(BuiltIns.flat, Repo.state.value.current)
+        org.junit.Assert.assertTrue("builtin:warm" in Repo.editedIds.value)
+        Repo.loadPreset(warm)
+        assertEquals(-3.0, Repo.state.value.current.preampDb, 0.0)
+        // Discarding goes back to the saved version, and switching away then leaves nothing kept.
+        Repo.discardEdits()
+        assertEquals(warm, Repo.state.value.current)
+        Repo.loadPreset(BuiltIns.flat)
+        Repo.loadPreset(warm)
+        assertEquals(warm, Repo.state.value.current)
+        org.junit.Assert.assertTrue(Repo.editedIds.value.isEmpty())
+    }
+
+    @Test
+    fun theSwitcherOffersTheSamePresetsWhicheverIsInUse() {
+        val own = List(3) { Preset("user:$it", "P$it") }
+        val built = listOf(BuiltIns.flat, Preset("builtin:warm", "Warm"), Preset("builtin:liberty4nc", "Liberty"))
+        val available = built + own
+        val onFlat = PresetOrganiser.quickKeys(AppState(current = BuiltIns.flat), available).map { it.id }.toSet()
+        val onOwn = PresetOrganiser.quickKeys(AppState(current = own[0]), available).map { it.id }.toSet()
+        assertEquals(available.map { it.id }.toSet(), onFlat)
+        assertEquals(onFlat, onOwn)
+    }
+
+    @Test
+    fun aPresetNameCanOnlyBeUsedOnce() {
+        val state = AppState(presets = listOf(Preset("user:1", "Commute")))
+        org.junit.Assert.assertTrue(PresetOrganiser.nameTaken(state, " commute "))
+        org.junit.Assert.assertFalse(PresetOrganiser.nameTaken(state, "Commute", exceptId = "user:1"))
+        org.junit.Assert.assertTrue(PresetOrganiser.nameTaken(state, BuiltIns.flat.name))
+        assertEquals("Commute 2", PresetOrganiser.freeName(state, "Commute"))
+        assertEquals("Gym", PresetOrganiser.freeName(state, "Gym"))
+    }
+
+    @Test
+    fun eachOutputKeepsItsOwnLoudnessStrength() {
+        val state = AppState(loudness = true, loudnessStrength = 0.8, loudnessStrengths = mapOf("speaker" to 0.3))
+        assertEquals(0.3, state.loudnessStrengthFor("speaker"), 0.0)
+        assertEquals(0.8, state.loudnessStrengthFor("Bluetooth:Buds"), 0.0)
+        val speaker = com.phonons.app.dsp.Eq.curveDb(Processing.effectiveFilters(state, 40.0, "speaker"), 63.0)
+        val buds = com.phonons.app.dsp.Eq.curveDb(Processing.effectiveFilters(state, 40.0, "Bluetooth:Buds"), 63.0)
+        org.junit.Assert.assertTrue(buds > speaker * 2)
+    }
+
+    @Test
     fun anImportedPreampStaysInASafeRange() {
         assertEquals(30.0, AutoEqParser.parse("Preamp: 9999 dB\nFilter 1: ON PK Fc 1000 Hz Gain 1 dB Q 1")!!.preampDb, 0.0)
         assertEquals(-30.0, AutoEqParser.parse("Preamp: -9999 dB\nFilter 1: ON PK Fc 1000 Hz Gain 1 dB Q 1")!!.preampDb, 0.0)

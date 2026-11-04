@@ -73,6 +73,13 @@ object Help {
     val balance = Tip(R.string.help_balance_title, R.string.help_balance_body)
 
     val loudness = Tip(R.string.help_loudness_title, R.string.help_loudness_body)
+    val discardEdits = Tip(R.string.help_discard_edits_title, R.string.help_discard_edits_body)
+    val bassCharacter = Tip(R.string.help_bass_character_title, R.string.help_bass_character_body)
+    val limiterAttack = Tip(R.string.help_limiter_attack_title, R.string.help_limiter_attack_body)
+    val limiterRelease = Tip(R.string.help_limiter_release_title, R.string.help_limiter_release_body)
+    val limiterRatio = Tip(R.string.help_limiter_ratio_title, R.string.help_limiter_ratio_body)
+    val limiterPostGain = Tip(R.string.help_limiter_post_gain_title, R.string.help_limiter_post_gain_body)
+    val usualVolume = Tip(R.string.help_usual_volume_title, R.string.help_usual_volume_body)
     val loudnessStrength = Tip(R.string.help_loudness_strength_title, R.string.help_loudness_strength_body)
     val nightMode = Tip(R.string.help_night_mode_title, R.string.help_night_mode_body)
 

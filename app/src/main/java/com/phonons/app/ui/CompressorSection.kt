@@ -58,7 +58,12 @@ fun CompressorSection(state: AppState) {
     fun change(transform: (Compressor) -> Compressor) = Repo.editTone { it.copy(compressor = transform(it.compressor)) }
 
     val status by Repo.status.collectAsStateWithLifecycle()
-    SettingsSection(stringResource(R.string.ui_dynamic_eq), trailing = { InfoButton(Help.dynamicEq) }) {
+    val tamerParts = buildList {
+        val tone = state.current.tone
+        if (tone.harshTamer > 0.0) add(stringResource(R.string.ui_harshness_tamer) + " " + "${round(tone.harshTamer * 100).toInt()}%")
+        if (tone.boomTamer > 0.0) add(stringResource(R.string.ui_boom_tamer) + " " + "${round(tone.boomTamer * 100).toInt()}%")
+    }
+    SettingsSection(stringResource(R.string.ui_dynamic_eq), trailing = { InfoButton(Help.dynamicEq) }, summary = foldSummary(tamerParts)) {
         val tone = state.current.tone
         val off = stringResource(R.string.ui_off)
         fun amount(value: Double) = if (value <= 0.0) off else "${round(value * 100).toInt()}%"
@@ -85,7 +90,12 @@ fun CompressorSection(state: AppState) {
             onFinished = Repo::commit,
         )
     }
-    SettingsSection(stringResource(R.string.ui_compressor)) {
+    val compressorParts = if (compressor.enabled) {
+        listOf(Dynamics.styles.firstOrNull { it.compressor == compressor }?.name ?: stringResource(R.string.ui_state_on))
+    } else {
+        emptyList()
+    }
+    SettingsSection(stringResource(R.string.ui_compressor), summary = foldSummary(compressorParts)) {
         SwitchSetting(
             stringResource(R.string.ui_multiband_compressor),
             Help.compressor,

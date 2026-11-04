@@ -65,6 +65,27 @@ object Repo {
     private val _canRedo = MutableStateFlow(false)
     val canRedo: StateFlow<Boolean> = _canRedo.asStateFlow()
     private var committed: Preset = BuiltIns.flat
+
+    /**
+     * Edits to presets that were switched away from without saving, by preset id, so switching back brings
+     * them back. Kept until the app is closed, or until they're saved or discarded.
+     */
+    private val unsaved = HashMap<String, Preset>()
+    private val _editedIds = MutableStateFlow<Set<String>>(emptySet())
+
+    /** Presets with edits waiting from earlier, for marking them in the list. */
+    val editedIds: StateFlow<Set<String>> = _editedIds.asStateFlow()
+
+    private fun keepEditsOf(current: Preset) {
+        val saved = findPreset(current.id) ?: return
+        if (saved == current) unsaved.remove(current.id) else unsaved[current.id] = current.copy(tone = current.tone.copy(trimDb = 0.0))
+        _editedIds.value = unsaved.keys.toSet()
+    }
+
+    private fun forgetEdits(id: String) {
+        unsaved.remove(id)
+        _editedIds.value = unsaved.keys.toSet()
+    }
     private var file: AtomicFile? = null
 
     @OptIn(FlowPreview::class)
@@ -151,9 +172,25 @@ object Repo {
         _canRedo.value = redoStack.isNotEmpty()
     }
 
+    /** Switches preset. Unsaved edits to the one being left are kept, and the new one's are brought back. */
+    @Synchronized
     fun loadPreset(preset: Preset) {
         commit()
-        _state.update { it.copy(current = preset) }
+        val leaving = _state.value.current
+        if (leaving.id != preset.id) keepEditsOf(leaving)
+        val arriving = if (leaving.id != preset.id) unsaved[preset.id] ?: preset else preset
+        _state.update { it.copy(current = arriving) }
+        commit()
+    }
+
+    /** Puts the current preset back as it was saved, dropping its edits. */
+    @Synchronized
+    fun discardEdits() {
+        val current = _state.value.current
+        val saved = findPreset(current.id) ?: return
+        forgetEdits(current.id)
+        commit()
+        _state.update { it.copy(current = saved) }
         commit()
     }
 
@@ -172,6 +209,7 @@ object Repo {
         _state.update { s ->
             s.copy(presets = s.presets.map { if (it.id == s.current.id) s.current else it })
         }
+        forgetEdits(_state.value.current.id)
     }
 
     /** Renames a user preset, including the working copy if it's the one in use. */
@@ -203,12 +241,15 @@ object Repo {
 
     /** Returns the sound to a clean start. Presets and output choices are kept. */
     fun resetSound() {
+        unsaved.clear()
+        _editedIds.value = emptySet()
         commit()
         _state.update { it.resetSound() }
         commit()
     }
 
     fun deletePreset(id: String) {
+        forgetEdits(id)
         _state.update { s ->
             s.copy(
                 presets = s.presets.filterNot { it.id == id },

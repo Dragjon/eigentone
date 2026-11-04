@@ -1,5 +1,10 @@
 package com.phonons.app.ui
 
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.animation.animateContentSize
 import com.phonons.app.R
 import androidx.compose.ui.res.stringResource
 import android.media.AudioDeviceCallback
@@ -71,36 +76,77 @@ private const val DOUBLE_TAP_MS = 300L
 private const val MUSIC_CHECK_MS = 1000L
 private const val TRACK_TICKS = 20
 
-/** A heading above a group of settings on one surface. */
+/**
+ * A heading above a group of settings on one surface. With a [summary], the group folds away under its
+ * heading, and the summary says what's on while it's closed, so nothing changed is ever hidden from view.
+ */
 @Composable
-fun SettingsSection(title: String?, trailing: @Composable (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth()) {
+fun SettingsSection(
+    title: String?,
+    trailing: @Composable (() -> Unit)? = null,
+    summary: String? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val folds = summary != null && title != null
+    var open by rememberSaveable(title) { mutableStateOf(false) }
+    val shown = !folds || open
+    Column(Modifier.fillMaxWidth().animateContentSize()) {
         if (title != null) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 40.dp)
+                    .heightIn(min = if (folds) 48.dp else 40.dp)
+                    .then(
+                        if (folds) {
+                            Modifier.clickable(
+                                role = Role.Button,
+                                onClickLabel = stringResource(if (open) R.string.ui_fold_close else R.string.ui_fold_open),
+                            ) { open = !open }
+                        } else {
+                            Modifier
+                        },
+                    )
                     .padding(start = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    title.uppercase(),
-                    style = PanelLegend,
-                    color = Palette.TextDim,
-                    modifier = Modifier.weight(1f),
-                )
+                Column(Modifier.weight(1f)) {
+                    Text(title.uppercase(), style = PanelLegend, color = Palette.TextDim)
+                    if (folds && !open) {
+                        Text(
+                            summary.orEmpty(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (summary == stringResource(R.string.ui_all_off)) Palette.TextDim else Palette.Lit,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
                 trailing?.invoke()
+                if (folds) {
+                    Icon(
+                        if (open) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = Palette.TextDim,
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                    )
+                }
             }
         }
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .clip(PanelShape)
-                .background(Palette.Surface),
-            content = content,
-        )
+        if (shown) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(PanelShape)
+                    .background(Palette.Surface),
+                content = content,
+            )
+        }
     }
 }
+
+/** Joins what's on into one short line for a folded section, or says that nothing is. */
+@Composable
+fun foldSummary(parts: List<String>): String = parts.joinToString(" · ").ifEmpty { stringResource(R.string.ui_all_off) }
 
 @Composable
 fun RowDivider() {
@@ -222,6 +268,8 @@ fun SliderSetting(
     detail: String? = null,
     onChange: (Float) -> Unit,
     onFinished: () -> Unit = {},
+    /** Where a double tap returns it, such as the value saved in the preset. */
+    resetTo: Float = default,
 ) {
     val changed = abs(value - default) > (range.endInclusive - range.start) * 0.005f
     Column(
@@ -247,6 +295,7 @@ fun SliderSetting(
             default = default,
             onChange = onChange,
             onFinished = onFinished,
+            resetTo = resetTo,
         )
         if (detail != null) {
             Text(detail, style = MaterialTheme.typography.bodySmall, color = Palette.TextDim)
@@ -261,7 +310,7 @@ fun SliderSetting(
  *   setting, and a stray tap does nothing.
  * - The value moves relative to the finger rather than jumping to it.
  * - It fills from [origin], so a centred control at 0 dB looks untouched.
- * - A double tap returns to [default].
+ * - A double tap returns to [resetTo], which is [default] unless given.
  *
  * It stays a real slider for screen readers through its progress semantics.
  */
@@ -275,11 +324,12 @@ fun ValueTrack(
     default: Float,
     onChange: (Float) -> Unit,
     onFinished: () -> Unit,
+    resetTo: Float = default,
 ) {
     val current by rememberUpdatedState(value)
     val change by rememberUpdatedState(onChange)
     val finished by rememberUpdatedState(onFinished)
-    val resetTo by rememberUpdatedState(default)
+    val resetValue by rememberUpdatedState(resetTo)
     val span = range.endInclusive - range.start
     val clamped = value.coerceIn(range)
 
@@ -309,7 +359,7 @@ fun ValueTrack(
                         if (isTap) {
                             val now = up!!.uptimeMillis
                             if (now - lastTapAt < DOUBLE_TAP_MS) {
-                                change(resetTo)
+                                change(resetValue)
                                 finished()
                                 lastTapAt = 0L
                             } else {

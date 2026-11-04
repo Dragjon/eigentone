@@ -93,7 +93,9 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.draw.clip
@@ -123,6 +125,9 @@ import com.phonons.app.data.Processing
 import com.phonons.app.data.Profiles
 import com.phonons.app.data.Repo
 import com.phonons.app.data.ReverbRoom
+import com.phonons.app.data.EqualLoudness
+import com.phonons.app.dsp.GraphicEq
+import com.phonons.app.data.LimiterSettings
 import com.phonons.app.data.ShapeText
 import com.phonons.app.data.ThemeMode
 import com.phonons.app.data.Tone
@@ -179,6 +184,7 @@ private val LocalOpenHearing = compositionLocalOf<() -> Unit> { error("No hearin
 
 private const val SEARCH_FROM_PRESETS = 6
 private const val TAB_FADE_MS = 140
+private const val UNSAVED_BAR_ROOM_DP = 80
 
 private val LocalOpenPresets = compositionLocalOf<() -> Unit> { error("No presets tab") }
 
@@ -305,7 +311,8 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
                             Modifier
                                 .widthIn(max = 640.dp)
                                 .fillMaxWidth()
-                                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
+                                // Room at the end, so the last setting can scroll clear of the floating save bar.
+                                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = UNSAVED_BAR_ROOM_DP.dp),
                             verticalArrangement = SectionSpacing,
                         ) {
                             when (shownTab) {
@@ -317,6 +324,19 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
                             }
                         }
                     }
+                }
+                // Floats over the page rather than sitting in it, so appearing can never move anything,
+                // such as a fader under a finger that's still dragging it.
+                val savedVersion = Repo.allPresets(state).firstOrNull { it.id == state.current.id }
+                if ((tab == Tab.EQ || tab == Tab.SOUND) && savedVersion != null && savedVersion != state.current) {
+                    UnsavedBar(
+                        state,
+                        savedVersion,
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .widthIn(max = 640.dp)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
                 }
             }
         }
@@ -400,7 +420,7 @@ private fun EqTab(state: AppState) {
     val openFinder = LocalOpenFinder.current
     val selected = filters.firstOrNull { it.id == selectedId }
     val attenuation by Repo.attenuationDb.collectAsStateWithLifecycle()
-    val curveFilters = remember(state, attenuation) { Processing.effectiveFilters(state, attenuation) }
+    val curveFilters = remember(state, attenuation, Repo.output.value.key) { Processing.effectiveFilters(state, attenuation, Repo.output.value.key) }
     val graphOutput by Repo.output.collectAsStateWithLifecycle()
     val earCurves = remember(curveFilters, state.earCorrections, graphOutput.key, state.useSystemSurround, state.bypass) {
         if (state.bypass) null else Processing.channelFilters(state, graphOutput.key, curveFilters)
@@ -420,7 +440,7 @@ private fun EqTab(state: AppState) {
     val savedPreset = Repo.allPresets(state).firstOrNull { it.id == state.current.id }
     val savedCurve = remember(savedPreset, state.current, state.loudness, state.loudnessStrength, attenuation, state.bypass) {
         savedPreset?.takeIf { it != state.current && !state.bypass }
-            ?.let { Processing.effectiveFilters(state.copy(current = it), attenuation) }
+            ?.let { Processing.effectiveFilters(state.copy(current = it), attenuation, Repo.output.value.key) }
     }
     val spectrumState = Repo.spectrum.collectAsStateWithLifecycle()
 
@@ -545,6 +565,52 @@ private fun EqTab(state: AppState) {
     }
 
     SettingsSection(stringResource(R.string.ui_display)) { AnalyserSetting(state) }
+}
+
+/** Shown while the preset has changes, so they can be kept or dropped without leaving the EQ. */
+@Composable
+private fun UnsavedBar(state: AppState, saved: Preset, modifier: Modifier = Modifier) {
+    val scope = rememberCoroutineScope()
+    val snackbar = LocalSnackbar.current
+    var naming by remember { mutableStateOf(false) }
+    val own = state.presets.any { it.id == saved.id }
+    Row(
+        modifier
+            .fillMaxWidth()
+            .shadow(6.dp, PanelShape)
+            .clip(PanelShape)
+            .background(Palette.Tooltip)
+            .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            stringResource(R.string.ui_unsaved_changes, saved.name),
+            style = MaterialTheme.typography.bodyMedium,
+            color = Palette.Text,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = {
+            Repo.discardEdits()
+            scope.notify(snackbar, appText(R.string.ui_edits_discarded, saved.name))
+        }) { Text(stringResource(R.string.ui_discard)) }
+        Button(onClick = {
+            if (own) {
+                Repo.overwriteCurrent()
+                scope.notify(snackbar, appText(R.string.ui_updated, saved.name))
+            } else {
+                naming = true
+            }
+        }) { Text(stringResource(if (own) R.string.ui_save else R.string.ui_save_as_new), maxLines = 1) }
+    }
+    if (naming) {
+        SaveDialog(initial = saved.name, onDismiss = { naming = false }) { name ->
+            Repo.saveCurrentAs(name)
+            naming = false
+            scope.notify(snackbar, appText(R.string.ui_saved_as, name))
+        }
+    }
 }
 
 /** Runs the analyser only while the EQ tab is visible, and only if it has been turned on. */
@@ -718,9 +784,27 @@ private fun snapTone(value: Float): Double = kotlin.math.round(value * 2.0) / 2.
 
 private val toneRange = -Processing.MAX_TONE_DB.toFloat()..Processing.MAX_TONE_DB.toFloat()
 
+/** The preset as last saved, where a double tap on one of its settings returns it. */
+@Composable
+private fun savedPreset(state: AppState): Preset? =
+    remember(state.presets, state.current.id) { Repo.allPresets(state).firstOrNull { it.id == state.current.id } }
+
+/** Says which settings a tab changes: the preset in use, or every preset. */
+@Composable
+private fun ScopeNote(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = Palette.TextDim,
+        modifier = Modifier.padding(horizontal = 4.dp),
+    )
+}
+
+/** Everything here is part of the preset in use, saved and shared with it. */
 @Composable
 private fun SoundTab(state: AppState) {
-    val attenuation by Repo.attenuationDb.collectAsStateWithLifecycle()
+    val saved = savedPreset(state)?.tone
+    ScopeNote(stringResource(R.string.ui_sound_scope, state.current.name))
     SettingsSection(state.current.name) {
         SliderSetting(
             title = stringResource(R.string.ui_preset_strength),
@@ -732,6 +816,7 @@ private fun SoundTab(state: AppState) {
             origin = 1f,
             onChange = { v -> Repo.editTone { it.copy(strength = kotlin.math.round(v * 20.0) / 20.0) } },
             onFinished = Repo::commit,
+            resetTo = (saved?.strength ?: 1.0).toFloat(),
         )
         if (state.current.filters.any { it.gainDb != 0.0 || !it.type.hasGain } || state.current.tone.importedCurve.isNotEmpty()) {
             RowDivider()
@@ -744,18 +829,40 @@ private fun SoundTab(state: AppState) {
                 default = 1f,
                 onChange = { v -> Repo.editTone { it.copy(correction = kotlin.math.round(v * 20.0) / 20.0) } },
                 onFinished = Repo::commit,
+                resetTo = (saved?.correction ?: 1.0).toFloat(),
             )
         }
+        RowDivider()
+        SliderSetting(
+            title = stringResource(R.string.ui_preamp),
+            tip = Help.preamp,
+            readout = formatDb(state.current.preampDb),
+            value = state.current.preampDb.toFloat(),
+            range = -24f..12f,
+            default = 0f,
+            origin = 0f,
+            onChange = { v -> Repo.edit { it.copy(preampDb = v.toDouble()) } },
+            onFinished = Repo::commit,
+            resetTo = (savedPreset(state)?.preampDb ?: 0.0).toFloat(),
+        )
     }
-    ToneSection(state)
-    SpaceSection(state)
-    DynamicsSection(state, attenuation)
+    ToneSection(state, saved)
+    SpaceSection(state, saved)
     CompressorSection(state)
+}
+
+/** What applies whichever preset is in use, at the top of Settings. */
+@Composable
+private fun EveryPresetSections(state: AppState) {
+    val attenuation by Repo.attenuationDb.collectAsStateWithLifecycle()
+    ScopeNote(stringResource(R.string.ui_settings_scope))
+    DynamicsSection(state, attenuation)
     LevelSection(state, attenuation)
+    StereoSection(state)
 }
 
 @Composable
-private fun ToneSection(state: AppState) {
+private fun ToneSection(state: AppState, saved: Tone?) {
     val tone = state.current.tone
     val modified = tone.bassDb != 0.0 || tone.trebleDb != 0.0 || tone.vocalsDb != 0.0 || tone.bassTunerDb != 0.0 ||
         tone.bassHz != Tone.DEFAULT_BASS_HZ
@@ -770,7 +877,7 @@ private fun ToneSection(state: AppState) {
             }
         },
     ) {
-        ToneSlider(stringResource(R.string.ui_bass), Help.bass, tone.bassDb) { v -> Repo.editTone { it.copy(bassDb = v) } }
+        ToneSlider(stringResource(R.string.ui_bass), Help.bass, tone.bassDb, saved?.bassDb ?: 0.0) { v -> Repo.editTone { it.copy(bassDb = v) } }
         // Only means something once there's a bass change to place.
         if (tone.bassDb != 0.0) {
             SliderSetting(
@@ -782,12 +889,34 @@ private fun ToneSection(state: AppState) {
                 default = Tone.DEFAULT_BASS_HZ.toFloat(),
                 onChange = { v -> Repo.editTone { it.copy(bassHz = v.toDouble()) } },
                 onFinished = Repo::commit,
+                resetTo = (saved?.bassHz ?: Tone.DEFAULT_BASS_HZ).toFloat(),
             )
         }
+        // Only shapes bass that's been added, so it only shows then.
+        if (tone.bassDb > 0.0) {
+            Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.ui_bass_character), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
+                    InfoButton(Help.bassCharacter)
+                }
+                WordSegments(
+                    labels = listOf(
+                        stringResource(R.string.ui_bass_natural),
+                        stringResource(R.string.ui_bass_punch),
+                        stringResource(R.string.ui_bass_sustain),
+                    ),
+                    selected = com.phonons.app.data.BassCharacter.entries.indexOf(tone.bassCharacter),
+                    onSelect = { i ->
+                        Repo.editTone { it.copy(bassCharacter = com.phonons.app.data.BassCharacter.entries[i]) }
+                        Repo.commit()
+                    },
+                )
+            }
+        }
         RowDivider()
-        ToneSlider(stringResource(R.string.help_vocals_title), Help.vocals, tone.vocalsDb) { v -> Repo.editTone { it.copy(vocalsDb = v) } }
+        ToneSlider(stringResource(R.string.help_vocals_title), Help.vocals, tone.vocalsDb, saved?.vocalsDb ?: 0.0) { v -> Repo.editTone { it.copy(vocalsDb = v) } }
         RowDivider()
-        ToneSlider(stringResource(R.string.ui_treble), Help.treble, tone.trebleDb) { v -> Repo.editTone { it.copy(trebleDb = v) } }
+        ToneSlider(stringResource(R.string.ui_treble), Help.treble, tone.trebleDb, saved?.trebleDb ?: 0.0) { v -> Repo.editTone { it.copy(trebleDb = v) } }
         // Only on a sound from an earlier version that used both bass controls. Setting it to zero retires it.
         if (tone.bassTunerDb != 0.0) {
             RowDivider()
@@ -799,7 +928,7 @@ private fun ToneSection(state: AppState) {
 }
 
 @Composable
-private fun ToneSlider(title: String, tip: Tip, value: Double, onChange: (Double) -> Unit) {
+private fun ToneSlider(title: String, tip: Tip, value: Double, saved: Double = 0.0, onChange: (Double) -> Unit) {
     SliderSetting(
         title = title,
         tip = tip,
@@ -810,14 +939,22 @@ private fun ToneSlider(title: String, tip: Tip, value: Double, onChange: (Double
         origin = 0f,
         onChange = { onChange(snapTone(it)) },
         onFinished = Repo::commit,
+        resetTo = saved.toFloat(),
     )
 }
 
 @Composable
-private fun SpaceSection(state: AppState) {
+private fun SpaceSection(state: AppState, saved: Tone?) {
     val status by Repo.status.collectAsStateWithLifecycle()
     val systemSpatialAudio = rememberSystemSpatialAudio()
-    SettingsSection(stringResource(R.string.ui_space)) {
+    val spaceParts = buildList {
+        val surround = state.current.tone.surround
+        if (surround > 0.0) {
+            add(stringResource(if (state.useSystemSurround) R.string.help_surround_title else R.string.help_stereo_width_title) + " " + formatPercent(surround))
+        }
+        if (state.current.tone.reverb != ReverbRoom.OFF) add(stringResource(R.string.ui_reverb) + " " + stringResource(reverbName(state.current.tone.reverb)).lowercase())
+    }
+    SettingsSection(stringResource(R.string.ui_space), summary = foldSummary(spaceParts)) {
         SliderSetting(
             title = if (state.useSystemSurround) stringResource(R.string.help_surround_title) else stringResource(R.string.help_stereo_width_title),
             tip = if (state.useSystemSurround) Help.surround else Help.stereoWidth,
@@ -829,11 +966,27 @@ private fun SpaceSection(state: AppState) {
                 state.useSystemSurround && status.spatialError != null -> status.spatialError
                 state.current.tone.surround > 0.0 && systemSpatialAudio ->
                     stringResource(R.string.ui_android_s_own_spatial_audio_is)
+                state.useSystemSurround -> stringResource(R.string.ui_surround_from_settings)
                 else -> null
             },
             onChange = { v -> Repo.editTone { it.copy(surround = if (v < 0.02f) 0.0 else v.toDouble()) } },
             onFinished = Repo::commit,
+            resetTo = (saved?.surround ?: 0.0).toFloat(),
         )
+        RowDivider()
+        ReverbRow(state, status, saved)
+    }
+}
+
+/** Stereo and ear settings, which belong to the phone and the headphones rather than to a preset. */
+@Composable
+private fun StereoSection(state: AppState) {
+    val parts = buildList {
+        if (state.useSystemSurround) add(stringResource(R.string.ui_virtual_surround_short))
+        if (kotlin.math.abs(state.balance) > 0.005) add(stringResource(R.string.ui_balance))
+        if (state.earsFor(Repo.output.value.key)?.enabled == true) add(stringResource(R.string.ui_fx_ears))
+    }
+    SettingsSection(stringResource(R.string.ui_stereo_and_ears), summary = foldSummary(parts)) {
         SwitchSetting(stringResource(R.string.ui_use_the_phone_s_virtual_surround), Help.systemSurround, state.useSystemSurround) { on ->
             Repo.update { it.copy(useSystemSurround = on) }
         }
@@ -852,8 +1005,6 @@ private fun SpaceSection(state: AppState) {
             origin = 0f,
             onChange = { v -> Repo.update { it.copy(balance = v.toDouble()) } },
         )
-        RowDivider()
-        ReverbRow(state, status)
         EarCorrectionRows(state)
     }
 }
@@ -861,7 +1012,7 @@ private fun SpaceSection(state: AppState) {
 /** Says which apps it really reaches, because Android only allows a reverb on apps that announce their audio. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ReverbRow(state: AppState, status: EngineStatus) {
+private fun ReverbRow(state: AppState, status: EngineStatus, saved: Tone?) {
     val context = LocalContext.current
     val chosen = state.current.tone.reverb
     Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
@@ -896,6 +1047,7 @@ private fun ReverbRow(state: AppState, status: EngineStatus) {
                 default = 0.6f,
                 onChange = { v -> Repo.editTone { it.copy(reverbAmount = v.toDouble()) } },
                 onFinished = Repo::commit,
+                resetTo = (saved?.takeIf { it.reverb != ReverbRoom.OFF }?.reverbAmount ?: 0.6).toFloat(),
             )
         }
         fun names(packages: List<String>) = packages.joinToString { appLabel(context, it) }
@@ -987,27 +1139,17 @@ private fun EarCorrectionRows(state: AppState) {
 @Composable
 private fun DynamicsSection(state: AppState, attenuation: Double) {
     val scheduledNight by Repo.scheduledNight.collectAsStateWithLifecycle()
-    SettingsSection(stringResource(R.string.ui_dynamics)) {
+    val volumeParts = buildList {
+        if (state.loudness) add(stringResource(R.string.ui_adapt_to_volume))
+        if (state.nightMode > 0.001) add(stringResource(R.string.ui_night_mode) + " " + formatPercent(state.nightMode))
+        if (state.leveller > 0.001) add(stringResource(R.string.ui_volume_leveller) + " " + formatPercent(state.leveller))
+        if (state.nightSchedule.enabled) add(stringResource(R.string.ui_night_mode_schedule))
+    }
+    SettingsSection(stringResource(R.string.ui_dynamics), summary = foldSummary(volumeParts)) {
         SwitchSetting(stringResource(R.string.ui_adapt_to_volume), Help.loudness, state.loudness) { on ->
             Repo.update { it.copy(loudness = on) }
         }
-        if (state.loudness) {
-            val added = Processing.loudnessFilters(attenuation, state.loudnessStrength)
-            SliderSetting(
-                title = stringResource(R.string.ui_strength),
-                tip = Help.loudnessStrength,
-                readout = formatPercent(state.loudnessStrength),
-                value = state.loudnessStrength.toFloat(),
-                range = 0f..1f,
-                default = 0.5f,
-                detail = if (added.isEmpty()) {
-                    stringResource(R.string.ui_nothing_added_at_this_volume)
-                } else {
-                    stringResource(R.string.ui_now_adding_bass_and_treble, formatDb(added[0].gainDb), formatDb(added[1].gainDb))
-                },
-                onChange = { v -> Repo.update { it.copy(loudnessStrength = v.toDouble()) } },
-            )
-        }
+        if (state.loudness) EqualLoudnessRows(state, attenuation)
         RowDivider()
         SliderSetting(
             title = stringResource(R.string.ui_night_mode),
@@ -1063,6 +1205,187 @@ private fun DynamicsSection(state: AppState, attenuation: Double) {
     }
 }
 
+/**
+ * Equal loudness: what's being added right now, drawn live, and the usual volume it works from, which each
+ * pair of headphones keeps separately because they play at different levels.
+ */
+@Composable
+private fun EqualLoudnessRows(state: AppState, attenuation: Double) {
+    val output by Repo.output.collectAsStateWithLifecycle()
+    val usual = state.usualVolumeDb(output.key)
+    val quieter = EqualLoudness.quieter(attenuation, usual)
+    val strength = state.loudnessStrengthFor(output.key)
+    val added = remember(quieter, strength) { EqualLoudness.correction(quieter, strength) }
+    fun at(hz: Double) = if (added.isEmpty()) 0.0 else GraphicEq.interpolate(added.map { it.hz to it.db }, hz)
+    fun setUsual(db: Double) = Repo.update { it.copy(loudnessUsual = it.loudnessUsual + (output.key to db.coerceIn(0.0, USUAL_MAX_DB))) }
+
+    LoudnessGraph(added, Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp))
+    Text(
+        if (added.isEmpty()) {
+            stringResource(R.string.ui_loudness_none)
+        } else {
+            stringResource(R.string.ui_loudness_now, formatAmount(quieter), formatDb(at(LOUDNESS_LOW_HZ)), formatDb(at(LOUDNESS_HIGH_HZ)))
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = if (added.isEmpty()) Palette.TextDim else Palette.Text,
+        modifier = Modifier.padding(horizontal = 16.dp),
+    )
+    SliderSetting(
+        title = stringResource(R.string.ui_usual_volume),
+        tip = Help.usualVolume,
+        readout = stringResource(R.string.ui_db_below_full, formatAmount(usual)),
+        value = usual.toFloat(),
+        range = 0f..USUAL_MAX_DB.toFloat(),
+        default = EqualLoudness.DEFAULT_USUAL_DB.toFloat(),
+        detail = stringResource(R.string.ui_usual_volume_for, output.label, formatAmount(attenuation)),
+        onChange = { v -> setUsual(kotlin.math.round(v * 2.0) / 2.0) },
+    )
+    Row(Modifier.padding(horizontal = 16.dp)) {
+        FilledTonalButton(onClick = { setUsual(attenuation) }) { Text(stringResource(R.string.ui_use_current_volume)) }
+    }
+    SliderSetting(
+        title = stringResource(R.string.ui_strength),
+        tip = Help.loudnessStrength,
+        readout = formatPercent(strength),
+        value = strength.toFloat(),
+        range = 0f..1f,
+        default = 1f,
+        detail = stringResource(R.string.ui_strength_for, output.label),
+        onChange = { v -> Repo.update { it.copy(loudnessStrengths = it.loudnessStrengths + (output.key to kotlin.math.round(v * 20.0) / 20.0)) } },
+    )
+}
+
+/** The correction being added right now, from 20 Hz to 20 kHz, on a 0 to 15 dB scale. */
+@Composable
+private fun LoudnessGraph(points: List<com.phonons.app.data.ShapePoint>, modifier: Modifier) {
+    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+    val labelStyle = androidx.compose.ui.text.TextStyle(color = Palette.TextDim, fontSize = androidx.compose.ui.unit.TextUnit(10f, androidx.compose.ui.unit.TextUnitType.Sp), fontFamily = ReadoutFamily)
+    androidx.compose.foundation.Canvas(
+        modifier
+            .fillMaxWidth()
+            .height(96.dp)
+            .clip(PanelShape)
+            .background(Palette.SurfaceHigh)
+            .semantics { contentDescription = appText(R.string.ui_loudness_graph) },
+    ) {
+        val pad = 6.dp.toPx()
+        val h = size.height - pad * 2
+        fun x(hz: Double) = (Eq.logPosition(hz) * size.width).toFloat()
+        fun y(db: Double) = (pad + (1 - (db + LOUDNESS_GRAPH_FLOOR) / (EqualLoudness.MAX_BOOST_DB + LOUDNESS_GRAPH_FLOOR)) * h).toFloat()
+        for (hz in listOf(100.0, 1000.0, 10000.0)) {
+            drawLine(Palette.Line, androidx.compose.ui.geometry.Offset(x(hz), 0f), androidx.compose.ui.geometry.Offset(x(hz), size.height), strokeWidth = 1f)
+        }
+        drawLine(Palette.Outline, androidx.compose.ui.geometry.Offset(0f, y(0.0)), androidx.compose.ui.geometry.Offset(size.width, y(0.0)), strokeWidth = 1f)
+        val curve = androidx.compose.ui.graphics.Path()
+        val samples = 64
+        for (i in 0..samples) {
+            val hz = Eq.logFreq(i.toDouble() / samples)
+            val db = if (points.isEmpty()) 0.0 else GraphicEq.interpolate(points.map { it.hz to it.db }, hz)
+            if (i == 0) curve.moveTo(x(hz), y(db)) else curve.lineTo(x(hz), y(db))
+        }
+        drawPath(curve, if (points.isEmpty()) Palette.TextDim else Palette.Lit, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx()))
+        val top = measurer.measure("+${EqualLoudness.MAX_BOOST_DB.toInt()}", labelStyle)
+        drawText(top, topLeft = androidx.compose.ui.geometry.Offset(4.dp.toPx(), y(EqualLoudness.MAX_BOOST_DB)))
+        val zero = measurer.measure("0", labelStyle)
+        drawText(zero, topLeft = androidx.compose.ui.geometry.Offset(4.dp.toPx(), y(0.0) - zero.size.height))
+    }
+}
+
+private const val USUAL_MAX_DB = 45.0
+private const val LOUDNESS_LOW_HZ = 50.0
+private const val LOUDNESS_HIGH_HZ = 10000.0
+private const val LOUDNESS_GRAPH_FLOOR = 3.0
+
+private fun formatAmount(db: Double): String = String.format(Locale.US, "%.0f", db)
+
+/** One-tap limiter settings. Each is a designed starting point, adjustable afterwards. */
+private enum class LimiterStyle(val label: Int, val settings: LimiterSettings) {
+    SAFE(R.string.ui_limiter_safe, LimiterSettings()),
+    TRANSPARENT(R.string.ui_limiter_transparent, LimiterSettings(attackMs = 5.0, releaseMs = 250.0, ratio = 10.0, thresholdDb = -1.0)),
+    BRICKWALL(R.string.ui_limiter_brickwall, LimiterSettings(attackMs = 0.5, releaseMs = 40.0, ratio = 50.0, thresholdDb = -1.0)),
+    LOUD(R.string.ui_limiter_loud, LimiterSettings(attackMs = 1.0, releaseMs = 80.0, ratio = 20.0, thresholdDb = -6.0, postGainDb = 5.0)),
+}
+
+private fun AppState.withLimiter(l: LimiterSettings) = copy(
+    limiterAttackMs = l.attackMs,
+    limiterReleaseMs = l.releaseMs,
+    limiterRatio = l.ratio,
+    limiterThresholdDb = l.thresholdDb,
+    limiterPostGainDb = l.postGainDb,
+)
+
+/** Styles, and the timing and gain controls tucked away until wanted. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun LimiterDetails(state: AppState) {
+    val current = state.limiterSettings()
+    var open by rememberSaveable { mutableStateOf(false) }
+    FlowRow(
+        Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        LimiterStyle.entries.forEach { style ->
+            FilterChip(
+                selected = current == style.settings.clamped(),
+                onClick = { Repo.update { it.withLimiter(style.settings) } },
+                label = { Text(stringResource(style.label), maxLines = 1) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = Palette.Lit,
+                    selectedLabelColor = Palette.OnLit,
+                    labelColor = Palette.Text,
+                ),
+            )
+        }
+    }
+    Text(
+        stringResource(R.string.ui_limiter_ceiling, formatDb(current.ceilingDb)),
+        style = MaterialTheme.typography.bodySmall,
+        color = Palette.TextDim,
+        modifier = Modifier.padding(horizontal = 16.dp),
+    )
+    TextButton(onClick = { open = !open }, modifier = Modifier.padding(horizontal = 4.dp)) {
+        Text(stringResource(if (open) R.string.ui_limiter_fewer else R.string.ui_limiter_more))
+    }
+    if (!open) return
+    SliderSetting(
+        title = stringResource(R.string.ui_limiter_attack),
+        tip = Help.limiterAttack,
+        readout = String.format(Locale.US, "%.1f ms", current.attackMs),
+        value = current.attackMs.toFloat(),
+        range = 0.1f..50f,
+        default = 1f,
+        onChange = { v -> Repo.update { it.copy(limiterAttackMs = kotlin.math.round(v * 10.0) / 10.0) } },
+    )
+    SliderSetting(
+        title = stringResource(R.string.ui_limiter_release),
+        tip = Help.limiterRelease,
+        readout = String.format(Locale.US, "%.0f ms", current.releaseMs),
+        value = current.releaseMs.toFloat(),
+        range = 10f..1000f,
+        default = 60f,
+        onChange = { v -> Repo.update { it.copy(limiterReleaseMs = kotlin.math.round(v).toDouble()) } },
+    )
+    SliderSetting(
+        title = stringResource(R.string.ui_limiter_ratio),
+        tip = Help.limiterRatio,
+        readout = String.format(Locale.US, "%.0f : 1", current.ratio),
+        value = current.ratio.toFloat(),
+        range = 1f..50f,
+        default = 10f,
+        onChange = { v -> Repo.update { it.copy(limiterRatio = kotlin.math.round(v).toDouble()) } },
+    )
+    SliderSetting(
+        title = stringResource(R.string.ui_limiter_post_gain),
+        tip = Help.limiterPostGain,
+        readout = formatDb(current.postGainDb),
+        value = current.postGainDb.toFloat(),
+        range = 0f..12f,
+        default = 0f,
+        detail = if (state.limiterPostGainDb > current.postGainDb + 0.01) stringResource(R.string.ui_limiter_post_gain_capped) else null,
+        onChange = { v -> Repo.update { it.copy(limiterPostGainDb = snapTone(v)) } },
+    )
+}
+
 /** Opens a clock, which follows the phone's 12 or 24 hour setting. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1113,21 +1436,16 @@ private fun ClipWarning(state: AppState, attenuation: Double) {
 
 @Composable
 private fun LevelSection(state: AppState, attenuation: Double) {
-    val effective = Processing.effectiveFilters(state, attenuation)
+    val effective = Processing.effectiveFilters(state, attenuation, Repo.output.value.key)
     val input = Processing.inputOf(state.current, effective, state.autoHeadroom)
-    SettingsSection(stringResource(R.string.ui_level)) {
-        SliderSetting(
-            title = stringResource(R.string.ui_preamp),
-            tip = Help.preamp,
-            readout = formatDb(state.current.preampDb),
-            value = state.current.preampDb.toFloat(),
-            range = -24f..12f,
-            default = 0f,
-            origin = 0f,
-            onChange = { v -> Repo.edit { it.copy(preampDb = v.toDouble()) } },
-            onFinished = Repo::commit,
+    val levelParts = buildList {
+        if (!state.autoHeadroom) add(stringResource(R.string.ui_automatic_headroom) + " " + stringResource(R.string.ui_mode_off).lowercase())
+        add(
+            if (state.limiter) stringResource(R.string.ui_limiter) + " " + formatDb(state.limiterSettings().ceilingDb)
+            else stringResource(R.string.ui_limiter) + " " + stringResource(R.string.ui_mode_off).lowercase(),
         )
-        RowDivider()
+    }
+    SettingsSection(stringResource(R.string.ui_level), summary = foldSummary(levelParts)) {
         SwitchSetting(
             stringResource(R.string.ui_automatic_headroom),
             Help.headroom,
@@ -1148,6 +1466,7 @@ private fun LevelSection(state: AppState, attenuation: Double) {
                 origin = 0f,
                 onChange = { v -> Repo.update { it.copy(limiterThresholdDb = snapTone(v)) } },
             )
+            LimiterDetails(state)
         }
         RowDivider()
         SwitchSetting(stringResource(R.string.ui_level_matched_bypass), Help.matchBypass, state.matchBypass) { on ->
@@ -1294,6 +1613,7 @@ private fun PresetListSection(state: AppState) {
     val snackbar = LocalSnackbar.current
     val scope = rememberCoroutineScope()
     val connected = rememberConnectedOutputNames()
+    val editedIds by Repo.editedIds.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
     val allFolders = PresetOrganiser.folders(state.presets)
     fun shown(presets: List<Preset>) = presets.filter { PresetOrganiser.matches(it, query) }
@@ -1325,6 +1645,8 @@ private fun PresetListSection(state: AppState) {
                 PresetRow(
                     preset = preset,
                     selected = preset.id == state.current.id,
+                    // The list holds the saved version, so the one in use differs from it as soon as it's edited.
+                    edited = preset.id in editedIds || (preset.id == state.current.id && preset != state.current),
                     favorite = preset.id in state.favorites,
                     folders = allFolders,
                     onDelete = if (deletable) {
@@ -1364,7 +1686,7 @@ private fun PresetListSection(state: AppState) {
 }
 
 @Composable
-private fun PresetRow(preset: Preset, selected: Boolean, favorite: Boolean, folders: List<String>, onDelete: (() -> Unit)?) {
+private fun PresetRow(preset: Preset, selected: Boolean, edited: Boolean, favorite: Boolean, folders: List<String>, onDelete: (() -> Unit)?) {
     var renaming by remember { mutableStateOf(false) }
     if (renaming) {
         PresetDetailsDialog(preset, folders, onDismiss = { renaming = false })
@@ -1382,14 +1704,25 @@ private fun PresetRow(preset: Preset, selected: Boolean, favorite: Boolean, fold
                 Icon(Icons.Filled.Check, contentDescription = stringResource(R.string.ui_selected), tint = Palette.Lit, modifier = Modifier.size(20.dp))
             }
         }
-        Text(
-            preset.name,
-            Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (selected) Palette.Lit else Palette.Text,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
+        // Padded so a second line keeps clear of the row's edges rather than pushing the name to the top.
+        Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
+            Text(
+                preset.name,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (selected) Palette.Lit else Palette.Text,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            // Edits from earlier that come back when this preset is chosen again.
+            if (edited) {
+                Text(
+                    stringResource(R.string.ui_has_unsaved_edits),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Palette.TextDim,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
         IconButton(onClick = { Repo.toggleFavorite(preset.id) }) {
             Icon(
                 // Filled against outlined, so the state doesn't rely on colour alone.
@@ -1514,6 +1847,14 @@ private fun ManageSection(state: AppState) {
             ActionRow(stringResource(R.string.ui_update, saved.name), Help.update) {
                 Repo.overwriteCurrent()
                 scope.notify(snackbar, appText(R.string.ui_updated, saved.name))
+            }
+        }
+        val original = Repo.findPreset(state.current.id)
+        if (original != null && original != state.current) {
+            RowDivider()
+            ActionRow(stringResource(R.string.ui_discard_edits), Help.discardEdits) {
+                Repo.discardEdits()
+                scope.notify(snackbar, appText(R.string.ui_edits_discarded, original.name))
             }
         }
         ShareRows { message -> scope.notify(snackbar, message) }
@@ -1645,16 +1986,25 @@ private fun SaveDialog(
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,
 ) {
-    var name by remember { mutableStateOf(initial) }
+    val state by Repo.state.collectAsStateWithLifecycle()
+    var name by remember { mutableStateOf(com.phonons.app.data.PresetOrganiser.freeName(state, initial).takeIf { initial.isNotBlank() } ?: "") }
+    val taken = com.phonons.app.data.PresetOrganiser.nameTaken(state, name)
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Palette.Tooltip,
         title = { Text(title) },
         text = {
-            OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true, label = { Text(stringResource(R.string.ui_name)) })
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                singleLine = true,
+                label = { Text(stringResource(R.string.ui_name)) },
+                isError = taken,
+                supportingText = if (taken) ({ Text(stringResource(R.string.ui_name_taken, name.trim())) }) else null,
+            )
         },
         confirmButton = {
-            TextButton(enabled = name.isNotBlank(), onClick = { onSave(name.trim()) }) { Text(stringResource(R.string.ui_save)) }
+            TextButton(enabled = name.isNotBlank() && !taken, onClick = { onSave(name.trim()) }) { Text(stringResource(R.string.ui_save)) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.ui_cancel)) } },
     )
@@ -1671,6 +2021,8 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
         exempt = context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
         onPauseOrDispose { }
     }
+
+    EveryPresetSections(state)
 
     SettingsSection(stringResource(R.string.ui_appearance)) {
         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {

@@ -91,7 +91,7 @@
     <string name="help_gain_title" formatted="false">Gain</string>
     <string name="help_graphic_bands_body" formatted="false">More bands allow finer changes. 10 is quickest, and 31 is the most precise but harder to set by finger. Switching keeps your curve\'s overall shape.</string>
     <string name="help_graphic_bands_title" formatted="false">Bands</string>
-    <string name="help_graphic_body" formatted="false">Fixed faders from deep bass to high treble. The sound follows them directly, and it\'s saved with the preset.\n\nTOUCH: Precision (crosshair) only moves a fader when you grab its cap, then moves it from where it is, so a tap or a finger along the rails changes nothing. Smooth (wave) lets you sweep across to draw a curve.\n\nVIEW: Scroll (arrows) gives each fader a finger\'s width, with the whole curve above them. Swipe sideways in Precision, or in Smooth hold near an edge while drawing to slide along, and in either you can tap or drag the overview. Fit all keeps every fader in view.\n\nThe sideways phone button opens the faders across the whole screen in landscape.</string>
+    <string name="help_graphic_body" formatted="false">Fixed faders from deep bass to high treble. The sound follows them directly, and it\'s saved with the preset.\n\nTOUCH: Precision (crosshair) only moves a fader when you grab its cap, then moves it from where it is, so a tap or a finger along the rails changes nothing. Double tap a fader to return it to the preset\'s saved setting, in either mode. Smooth (wave) lets you sweep across to draw a curve.\n\nVIEW: Scroll (arrows) gives each fader a finger\'s width, with the whole curve above them. Swipe sideways in Precision, or in Smooth hold near an edge while drawing to slide along, and in either you can tap or drag the overview. Fit all keeps every fader in view.\n\nThe sideways phone button opens the faders across the whole screen in landscape.</string>
     <string name="help_graphic_shapes_body" formatted="false">Ready-made curves to start from. Tap one, then adjust it to taste. It replaces the current faders, and your preset\'s headphone correction stays underneath, so it adds to that.</string>
     <string name="help_graphic_shapes_title" formatted="false">Shapes</string>
     <string name="help_graphic_smooth_body" formatted="false">Softens sharp steps between neighbouring faders, which often sounds more natural. Tap it again for a stronger effect.</string>
@@ -111,8 +111,8 @@
     <string name="help_limiter_threshold_body" formatted="false">The level where the limiter starts working. Keep it near -1 dB. Much lower values make loud parts quieter and flatter.</string>
     <string name="help_limiter_threshold_title" formatted="false">Limiter threshold</string>
     <string name="help_limiter_title" formatted="false">Limiter</string>
-    <string name="help_loudness_body" formatted="false">Ears hear less bass and treble at low volume, so this adds more of both as you turn the volume down. It\'s a simplified curve, not a measured one.</string>
-    <string name="help_loudness_strength_body" formatted="false">How much bass and treble are added at low volume. Lower it if quiet listening sounds too boomy.</string>
+    <string name="help_loudness_body" formatted="false">Ears lose bass, and some treble, faster than midrange as music gets quieter. This keeps the balance you hear at your usual volume as you turn it down, using the ISO 226 equal-loudness contours. It follows the phone\'s volume, so it\'s an estimate of the level at your ears, and each pair of headphones keeps its own usual volume.</string>
+    <string name="help_loudness_strength_body" formatted="false">How much of the correction to use. 100% is the full amount from the contours. Lower it if quiet listening sounds too boomy. Each output keeps its own, so the phone speaker can use less than your headphones.</string>
     <string name="help_loudness_strength_title" formatted="false">Strength</string>
     <string name="help_loudness_title" formatted="false">Adapt to volume</string>
     <string name="help_low_latency_body" formatted="false">Reduces processing delay for games and video, but bass control gets less precise.</string>
@@ -412,7 +412,7 @@
     <string name="ui_tab_sound" formatted="false">Sound</string>
     <string name="ui_tab_presets" formatted="false">Presets</string>
     <string name="ui_tab_tune" formatted="false">Tune</string>
-    <string name="ui_tab_system" formatted="false">System</string>
+    <string name="ui_tab_system" formatted="false">Settings</string>
     <string name="ui_mode_cancelling" formatted="false">Cancelling</string>
     <string name="ui_mode_transparency" formatted="false">Transparency</string>
     <string name="ui_mode_off" formatted="false">Off</string>
@@ -458,7 +458,7 @@
     <string name="ui_this_phone_wouldn_t_play_the" formatted="false">This phone wouldn\'t play the tone. Try Play again.</string>
     <string name="ui_this_lifts_the_frequencies_you_heard" formatted="false">This lifts the frequencies you heard least well, by half the difference. These headphones\' own tuning is part of the result, so it suits them best.</string>
     <string name="ui_your_results_were_about_even_across" formatted="false">Your results were about even across frequencies, so there\'s no shared curve to add.</string>
-    <string name="ui_your_ears_differed_by_up_to" formatted="false">Your ears differed by up to %1$s dB at some frequencies, which can also come from fit. Eigentone can close half of that gap, frequency by frequency, with a separate EQ for each ear. It\'s saved for %2$s, and you can also do this later from the Sound tab, under Space.</string>
+    <string name="ui_your_ears_differed_by_up_to" formatted="false">Your ears differed by up to %1$s dB at some frequencies, which can also come from fit. Eigentone can close half of that gap, frequency by frequency, with a separate EQ for each ear. It\'s saved for %2$s, and you can also do this later in Settings, under Stereo and ears.</string>
     <string name="ui_each_ear_is_now_corrected" formatted="false">Each ear is now corrected</string>
     <string name="ui_correct_each_ear" formatted="false">Correct each ear</string>
     <string name="ui_correct_each_ear_anyway" formatted="false">Correct each ear anyway</string>
@@ -599,7 +599,7 @@
     <string name="ui_share" formatted="false">Share %1$s</string>
     <string name="ui_other_audio_effect_apps" formatted="false">Other audio effect apps: %1$s</string>
     <string name="ui_edited" formatted="false">%1$s (edited)</string>
-    <string name="ui_problem_see_the_system_tab" formatted="false">Problem. See the System tab</string>
+    <string name="ui_problem_see_the_system_tab" formatted="false">Problem. See Settings</string>
     <string name="ui_starting" formatted="false">Starting…</string>
     <string name="ui_another_audio_app_has_taken_control" formatted="false">Another audio app has taken control</string>
     <string name="ui_deleted" formatted="false">Deleted %1$s</string>
@@ -697,7 +697,7 @@
     <string name="help_fader_view_title" formatted="false">Fader view</string>
     <string name="help_fader_view_body" formatted="false">Scroll gives each fader a finger\'s width in Precision, and you swipe sideways to reach the rest, with the whole curve shown above them. Tap or drag on that overview to jump. Full screen keeps every fader in view, and adds an expand button that opens them across the whole screen in landscape.</string>
     <string name="help_fader_controls_title" formatted="false">Fader touch and view</string>
-    <string name="help_fader_controls_body" formatted="false">Precision only moves a fader when you grab its cap, then keeps your finger on it and moves it from where it is, so a tap or a finger along the rails changes nothing. Smooth lets you sweep across to draw a curve. Scroll gives each fader a finger\'s width, with the whole curve above them: swipe sideways in Precision, or in Smooth hold near an edge while drawing to slide along, and in either you can tap or drag the overview. Fit all keeps every fader in view. The landscape button at the top opens the faders across the whole screen, turned sideways.</string>
+    <string name="help_fader_controls_body" formatted="false">Precision only moves a fader when you grab its cap, then keeps your finger on it and moves it from where it is, so a tap or a finger along the rails changes nothing. Double tap a fader to return it to the preset\'s saved setting, in either mode. Smooth lets you sweep across to draw a curve. Scroll gives each fader a finger\'s width, with the whole curve above them: swipe sideways in Precision, or in Smooth hold near an edge while drawing to slide along, and in either you can tap or drag the overview. Fit all keeps every fader in view. The landscape button at the top opens the faders across the whole screen, turned sideways.</string>
     <string name="ui_pill_touch" formatted="false">Touch</string>
     <string name="ui_pill_view" formatted="false">View</string>
     <string name="ui_strip_show" formatted="false">Show effect details</string>
@@ -711,4 +711,70 @@
     <string name="ui_fx_ears" formatted="false">Ear correction</string>
     <string name="ui_fx_tame" formatted="false">Harshness and boom tamers</string>
     <string name="ui_fx_reverb" formatted="false">Reverb</string>
+    <string name="ui_loudness_none" formatted="false">At or above your usual volume, so nothing is added.</string>
+    <string name="ui_loudness_now" formatted="false">%1$s dB below your usual volume. Adding %2$s at 50 Hz and %3$s at 10 kHz.</string>
+    <string name="ui_loudness_graph" formatted="false">What equal loudness is adding right now, from 20 Hz to 20 kHz.</string>
+    <string name="ui_usual_volume" formatted="false">Usual volume</string>
+    <string name="ui_db_below_full" formatted="false">%1$s dB below full</string>
+    <string name="ui_usual_volume_for" formatted="false">For %1$s. The phone is %2$s dB below full now.</string>
+    <string name="ui_use_current_volume" formatted="false">Use the current volume</string>
+    <string name="help_usual_volume_title" formatted="false">Usual volume</string>
+    <string name="help_usual_volume_body" formatted="false">The volume you normally listen at, where the music sounds balanced. Nothing is added there or louder, and more is added the further below it you go. Set your usual volume, play music, and tap Use the current volume. Each pair of headphones keeps its own.</string>
+    <string name="ui_bass_character" formatted="false">Bass character</string>
+    <string name="ui_bass_natural" formatted="false">Natural</string>
+    <string name="ui_bass_punch" formatted="false">Punch</string>
+    <string name="ui_bass_sustain" formatted="false">Sustain</string>
+    <string name="help_bass_character_title" formatted="false">Bass character</string>
+    <string name="help_bass_character_body" formatted="false">How the added bass behaves over time. Natural is a plain lift. Punch lets each kick or bass hit through, then eases its tail, so hits stand out. Sustain catches each hit and brings its tail up, so bass sounds fuller and lasts longer. Punch and Sustain work on the deep bass below about 110 Hz, and need a phone that allows the extra compressor bands.</string>
+    <string name="ui_limiter_safe" formatted="false">Safe</string>
+    <string name="ui_limiter_transparent" formatted="false">Transparent</string>
+    <string name="ui_limiter_brickwall" formatted="false">Brickwall</string>
+    <string name="ui_limiter_loud" formatted="false">Loud</string>
+    <string name="ui_limiter_ceiling" formatted="false">Peaks stop at %1$s.</string>
+    <string name="ui_limiter_more" formatted="false">Timing and gain</string>
+    <string name="ui_limiter_fewer" formatted="false">Hide timing and gain</string>
+    <string name="ui_limiter_attack" formatted="false">Attack</string>
+    <string name="ui_limiter_release" formatted="false">Release</string>
+    <string name="ui_limiter_ratio" formatted="false">Ratio</string>
+    <string name="ui_limiter_post_gain" formatted="false">Post-gain</string>
+    <string name="ui_limiter_post_gain_capped" formatted="false">Capped so peaks can\'t go past full scale. Lower the threshold to allow more.</string>
+    <string name="help_limiter_attack_title" formatted="false">Attack</string>
+    <string name="help_limiter_attack_body" formatted="false">How fast the limiter catches a peak. Shorter catches more of it, and longer lets the very start of a hit through, which sounds more natural but can let a little over.</string>
+    <string name="help_limiter_release_title" formatted="false">Release</string>
+    <string name="help_limiter_release_body" formatted="false">How fast it lets go after a peak. Short release keeps the level up but can make the sound pump, and long release is smoother.</string>
+    <string name="help_limiter_ratio_title" formatted="false">Ratio</string>
+    <string name="help_limiter_ratio_body" formatted="false">How firmly peaks are held at the threshold. 50 : 1 is a hard wall, and lower values let peaks go a little over.</string>
+    <string name="help_limiter_post_gain_title" formatted="false">Post-gain</string>
+    <string name="help_limiter_post_gain_body" formatted="false">Turns the level back up after limiting, to make up for a lower threshold. It\'s capped so the loudest peaks stay at or below full scale, so it can\'t clip.</string>
+    <string name="ui_all_off" formatted="false">All off</string>
+    <string name="ui_fold_open" formatted="false">Show settings</string>
+    <string name="ui_fold_close" formatted="false">Hide settings</string>
+    <string name="ui_has_unsaved_edits" formatted="false">Unsaved edits, kept until the app closes</string>
+    <string name="ui_discard_edits" formatted="false">Discard edits</string>
+    <string name="ui_edits_discarded" formatted="false">%1$s is back as it was saved.</string>
+    <string name="help_discard_edits_title" formatted="false">Discard edits</string>
+    <string name="help_discard_edits_body" formatted="false">Puts this preset back as it was saved. Edits are kept when you switch to another preset and back, until the app closes, so this is how to drop them. To keep them for good, use Update, or Save as new for a built-in preset.</string>
+    <string name="ui_unsaved_changes" formatted="false">Unsaved changes to %1$s</string>
+    <string name="ui_saved_as" formatted="false">Saved as %1$s.</string>
+    <string name="ui_strip_at" formatted="false">At %1$s</string>
+    <string name="ui_strip_scheduled" formatted="false">At %1$s, from the night schedule</string>
+    <string name="ui_strip_comp_custom" formatted="false">Your own settings</string>
+    <string name="ui_strip_comp_off" formatted="false">Not compressing. Turn on the compressor in Sound, or night mode or the leveller in Settings</string>
+    <string name="ui_strip_width" formatted="false">%1$s wider</string>
+    <string name="ui_strip_width_off" formatted="false">Normal stereo. Set Space in Sound to widen it</string>
+    <string name="ui_strip_surround_off" formatted="false">Not in use. Set Space in Sound</string>
+    <string name="ui_strip_ears_on" formatted="false">A separate EQ for each ear on %1$s</string>
+    <string name="ui_strip_ears_saved" formatted="false">A hearing check is saved for these headphones, but not in use</string>
+    <string name="ui_strip_ears_none" formatted="false">No hearing check for these headphones yet</string>
+    <string name="ui_strip_reverb_on" formatted="false">%1$s at %2$s, reaching %3$s</string>
+    <string name="ui_strip_reverb_waiting" formatted="false">%1$s at %2$s, waiting for an app to announce its audio</string>
+    <string name="ui_strip_reverb_off" formatted="false">No reverb. Choose a room in Sound, under Space</string>
+    <string name="ui_strip_tame" formatted="false">Harshness %1$s, boom %2$s</string>
+    <string name="ui_strength_for" formatted="false">For %1$s</string>
+    <string name="ui_name_taken" formatted="false">A preset is already called %1$s. Choose another name.</string>
+    <string name="ui_sound_scope" formatted="false">These are saved with %1$s. Settings for every preset, such as the limiter and night mode, are in Settings.</string>
+    <string name="ui_settings_scope" formatted="false">These apply whichever preset is in use. The EQ and Sound tabs change the preset itself.</string>
+    <string name="ui_stereo_and_ears" formatted="false">Stereo and ears</string>
+    <string name="ui_virtual_surround_short" formatted="false">Virtual surround</string>
+    <string name="ui_surround_from_settings" formatted="false">Uses the phone\'s virtual surround, which is set in Settings</string>
 </resources>

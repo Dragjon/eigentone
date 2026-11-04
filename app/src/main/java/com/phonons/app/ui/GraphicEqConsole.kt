@@ -219,6 +219,7 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, o
         }
         Faders(
             gains = gains,
+            saved = savedFaders(appState, presetId, bands),
             smooth = appState.faderMode == FaderMode.SMOOTH,
             scrollable = appState.faderView == FaderView.SCROLL,
             shown = rememberMorphed(gains.toDoubleArray(), presetId to tone.shape?.name),
@@ -338,9 +339,20 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, o
     }
 }
 
+/** The faders as saved in the preset, where a double tap returns one. Flat when it was never saved. */
+@Composable
+private fun savedFaders(state: com.phonons.app.data.AppState, presetId: String, bands: Int): List<Double> =
+    remember(state.presets, presetId, bands) {
+        val saved = Repo.allPresets(state).firstOrNull { it.id == presetId }?.tone ?: return@remember List(bands) { 0.0 }
+        val gains = GraphicEq.normalized(saved.graphicDb, saved.graphicBands)
+        if (saved.graphicBands == bands) gains else GraphicEq.resample(gains, saved.graphicBands, bands)
+    }
+
 @Composable
 private fun Faders(
     gains: List<Double>,
+    /** What a double tap returns each fader to. */
+    saved: List<Double>,
     /** Draws a curve across the faders. Otherwise a touch stays on the fader it started on. */
     smooth: Boolean,
     /** Precision faders get a finger's width each and scroll when they don't fit. */
@@ -357,6 +369,7 @@ private fun Faders(
     onFinished: () -> Unit,
 ) {
     val latest by rememberUpdatedState(gains)
+    val savedGains by rememberUpdatedState(saved)
     val change by rememberUpdatedState(onChange)
     val select by rememberUpdatedState(onSelect)
     val finished by rememberUpdatedState(onFinished)
@@ -400,7 +413,7 @@ private fun Faders(
             }
         }
 
-        val bankHeight = if (fill) (maxHeight - if (scrolling) OVERVIEW_HEIGHT_DP.dp else 0.dp).coerceAtLeast(196.dp) else 196.dp
+        val bankHeight = if (fill) (maxHeight - if (scrolling) OVERVIEW_HEIGHT_DP.dp else 0.dp).coerceAtLeast(196.dp) else 212.dp
         Column {
             if (scrolling) FaderOverview(shown, selected, scroll, contentPx, viewPx)
             Box(Modifier.fillMaxWidth().then(if (scrolling) Modifier.horizontalScroll(scroll, enabled = !smooth) else Modifier)) {
@@ -417,8 +430,22 @@ private fun Faders(
                             val gutter = DB_GUTTER_DP.dp.toPx()
                             fun bandAt(x: Float) = (((x - gutter) / (size.width - gutter)) * bands).toInt().coerceIn(0, bands - 1)
                             fun dbAt(y: Float): Double {
-                                val height = size.height - bottomLabels
-                                return GraphicEq.snap(GraphicEq.MAX_DB * (1 - 2 * y.coerceIn(0f, height) / height))
+                                val top = RAIL_TOP_DP.dp.toPx()
+                                val height = size.height - bottomLabels - top
+                                return GraphicEq.snap(GraphicEq.MAX_DB * (1 - 2 * (y - top).coerceIn(0f, height) / height))
+                            }
+                            // A second tap on the same fader soon after the first returns it to the preset.
+                            var lastTapBand = -1
+                            var lastTapAt = 0L
+                            fun tapped(band: Int, at: Long): Boolean {
+                                val double = band == lastTapBand && at - lastTapAt < viewConfiguration.doubleTapTimeoutMillis
+                                lastTapBand = if (double) -1 else band
+                                lastTapAt = at
+                                if (double) {
+                                    val to = savedGains.getOrElse(band) { 0.0 }
+                                    change(latest.toMutableList().also { if (band in it.indices) it[band] = to })
+                                }
+                                return double
                             }
                             awaitEachGesture {
                                 val down = awaitFirstDown()
@@ -430,6 +457,7 @@ private fun Faders(
                                     var lastDb = dbAt(down.position.y)
                                     select(lastBand)
                                     change(GraphicEq.drawLine(latest, lastBand, lastDb, lastBand, lastDb))
+                                    var moved = false
                                     while (true) {
                                         val pointer = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
                                         if (scrolling) {
@@ -442,6 +470,7 @@ private fun Faders(
                                                 else -> 0f
                                             }
                                         }
+                                        if ((pointer.position - down.position).getDistance() > viewConfiguration.touchSlop) moved = true
                                         if (pointer.position != pointer.previousPosition) {
                                             val band = bandAt(pointer.position.x)
                                             val db = dbAt(pointer.position.y)
@@ -455,14 +484,15 @@ private fun Faders(
                                     }
                                     sweeping = false
                                     edgePush = 0f
+                                    if (!moved) tapped(lastBand, down.uptimeMillis) else lastTapBand = -1
                                     finished()
                                 } else {
                                     // Precision moves one fader from where it already is, so a tap never makes it
                                     // jump. A sideways swipe is left for scrolling, an upward or downward one moves it.
                                     val band = bandAt(down.position.x)
                                     val startDb = latest.getOrElse(band) { 0.0 }
-                                    val railHeight = size.height - bottomLabels
-                                    val capY = ((1 - startDb / GraphicEq.MAX_DB) / 2 * railHeight).toFloat()
+                                    val railHeight = size.height - bottomLabels - RAIL_TOP_DP.dp.toPx()
+                                    val capY = (RAIL_TOP_DP.dp.toPx() + (1 - startDb / GraphicEq.MAX_DB) / 2 * railHeight).toFloat()
                                     // Only a touch on the cap moves it, so a finger running along the rails does
                                     // nothing, and an up or down swipe there scrolls the page instead.
                                     val onCap = abs(down.position.y - capY) <= CAP_GRAB_DP.dp.toPx()
@@ -473,7 +503,10 @@ private fun Faders(
                                     while (true) {
                                         val pointer = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
                                         if (!pointer.pressed) {
-                                            if (!dragging && !pointer.isConsumed) select(band)
+                                            if (!dragging && !pointer.isConsumed) {
+                                                select(band)
+                                                if (tapped(band, down.uptimeMillis)) finished()
+                                            }
                                             break
                                         }
                                         if (!dragging) {
@@ -488,7 +521,7 @@ private fun Faders(
                                             }
                                         }
                                         if (dragging) {
-                                            val db = GraphicEq.snap(startDb - (pointer.position.y - startY) / (size.height - bottomLabels) * 2 * GraphicEq.MAX_DB)
+                                            val db = GraphicEq.snap(startDb - (pointer.position.y - startY) / railHeight * 2 * GraphicEq.MAX_DB)
                                             change(GraphicEq.drawLine(latest, band, db, band, db))
                                             pointer.consume()
                                         }
@@ -499,14 +532,16 @@ private fun Faders(
                         },
                 ) {
                     val bottomLabels = LABEL_SPACE_DP.dp.toPx()
-                    val height = size.height - bottomLabels
+                    // Room above the rails, so a fader at the top keeps clear of the overview above it.
+                    val railTop = RAIL_TOP_DP.dp.toPx()
+                    val height = size.height - bottomLabels - railTop
                     val gutter = DB_GUTTER_DP.dp.toPx()
                     val slot = (size.width - gutter) / bands
                     val rail = 2.dp.toPx()
                     // Caps are as wide as the layout allows, so they read as faders even with 31 bands.
                     val capWidth = (slot * 0.76f).coerceAtMost((if (scrolling) 30 else 22).dp.toPx())
                     val capHeight = (if (scrolling) 14 else 12).dp.toPx()
-                    val yOf = { db: Double -> ((1 - db / GraphicEq.MAX_DB) / 2 * height).toFloat() }
+                    val yOf = { db: Double -> (railTop + (1 - db / GraphicEq.MAX_DB) / 2 * height).toFloat() }
                     val zero = yOf(0.0)
 
                     listOf(-10.0, -5.0, 5.0, 10.0).forEach { db ->
@@ -521,7 +556,7 @@ private fun Faders(
                         val isSelected = i == selected
                         drawRect(
                             if (isSelected) Palette.Outline else Palette.Track,
-                            topLeft = Offset(centre - rail / 2, 0f),
+                            topLeft = Offset(centre - rail / 2, railTop),
                             size = Size(rail, height),
                         )
                         val top = minOf(zero, yOf(gain))
@@ -561,7 +596,7 @@ private fun Faders(
                             measured,
                             topLeft = Offset(
                                 (centre - measured.size.width / 2).coerceIn(0f, size.width - measured.size.width),
-                                height + 4.dp.toPx(),
+                                railTop + height + 4.dp.toPx(),
                             ),
                         )
                     }
@@ -591,7 +626,7 @@ private fun FaderOverview(shown: DoubleArray, selected: Int, scroll: ScrollState
         Modifier
             .fillMaxWidth()
             .height(OVERVIEW_HEIGHT_DP.dp)
-            .padding(bottom = 8.dp)
+            .padding(bottom = 4.dp)
             .clip(KeyShape)
             .background(Palette.SurfaceHigh)
             .semantics { contentDescription = appText(R.string.ui_fader_overview) }
@@ -650,7 +685,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSmoothCurve(
     val points = shown.mapIndexed { i, gain -> Offset(gutter + slot * i + slot / 2, yOf(gain)) }
     points.forEachIndexed { i, p ->
         val guide = 1.dp.toPx()
-        drawRect(if (i == selected) Palette.Outline else Palette.Line, topLeft = Offset(p.x - guide / 2, 0f), size = Size(guide, height))
+        drawRect(if (i == selected) Palette.Outline else Palette.Line, topLeft = Offset(p.x - guide / 2, yOf(GraphicEq.MAX_DB)), size = Size(guide, height))
     }
     val curve = Path().apply {
         moveTo(gutter, points.first().y)
@@ -661,7 +696,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSmoothCurve(
             val p1 = points[i]
             val p2 = points[i + 1]
             val p3 = points[minOf(i + 2, points.lastIndex)]
-            fun clampY(y: Float) = y.coerceIn(0f, height)
+            fun clampY(y: Float) = y.coerceIn(yOf(GraphicEq.MAX_DB), yOf(-GraphicEq.MAX_DB))
             cubicTo(
                 p1.x + (p2.x - p0.x) / 6, clampY(p1.y + (p2.y - p0.y) / 6),
                 p2.x - (p3.x - p1.x) / 6, clampY(p2.y - (p3.y - p1.y) / 6),
@@ -696,6 +731,8 @@ private const val PRECISION_SLOT_DP = 44
 private const val OVERVIEW_HEIGHT_DP = 44
 /** How far from the cap's centre a touch still grabs it, which makes the target 48dp tall. */
 private const val CAP_GRAB_DP = 24
+/** Clear space above the rails, a cap's grab reach, so a fader at the top never reaches the overview. */
+private const val RAIL_TOP_DP = 16
 /** How close to the edge a sweep has to get before the faders slide, and how fast they go at the very edge. */
 private const val EDGE_PAN_DP = 48
 private const val MAX_PAN_PX = 22f
@@ -759,6 +796,7 @@ fun ExpandedFaders(onClose: () -> Unit) {
         }
         Faders(
             gains = gains,
+            saved = savedFaders(state, state.current.id, gains.size),
             smooth = state.faderMode == FaderMode.SMOOTH,
             scrollable = false,
             area = Modifier

@@ -1,0 +1,13 @@
+- Adapt to volume now uses the ISO 226 equal-loudness contours, with a live graph and a usual volume for each pair of headphones
+- The limiter has attack, release, ratio and post-gain, with one-tap styles, and can never be set to clip
+- New Bass character: Natural, Punch or Sustain
+- The Sound tab is tidier: less-used sections fold away and show what's on while closed
+- Edits to a preset are kept when you switch to another one and back, until the app closes, with Discard edits to drop them
+- A bar on the EQ page offers Save and Discard as soon as a preset has changes
+- A fader at the top no longer clashes with the overview above it
+- The opened status strip says what each effect is doing, such as the reverb room and which apps it reaches
+- Adapt to volume keeps its strength per output, like its usual volume
+- Fixed the preset switcher sometimes leaving out presets, such as while Flat was in use
+- Double tap a fader or a preset setting to return it to the preset's saved value
+- Two presets can no longer share a name
+- Sound now only holds what's saved with the preset. Settings for every preset, such as the limiter, night mode, balance and ear correction, moved to Settings (formerly System)

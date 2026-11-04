@@ -69,6 +69,8 @@ data class Tone(
     val harshTamer: Double = 0.0,
     /** Only turns down deep bass when it gets loud, from 0 to 1. */
     val boomTamer: Double = 0.0,
+    /** How the added bass behaves over time. */
+    val bassCharacter: BassCharacter = BassCharacter.NATURAL,
     /** Only reaches apps that announce their audio, because Android offers no reverb for all audio. */
     val reverb: ReverbRoom = ReverbRoom.OFF,
     /** How loud the echo is, from 0 to 1. */
@@ -222,7 +224,12 @@ data class AppState(
     val outputProfiles: Map<String, String> = emptyMap(),
     val matchBypass: Boolean = true,
     val loudness: Boolean = false,
-    val loudnessStrength: Double = 0.5,
+    /** 100% is the full correction from the equal-loudness contours. */
+    val loudnessStrength: Double = 1.0,
+    /** Output key to its usual volume, in dB below full, where nothing is added. Each pair of headphones differs. */
+    val loudnessUsual: Map<String, Double> = emptyMap(),
+    /** Output key to its own strength, since a speaker and headphones can each want a different amount. */
+    val loudnessStrengths: Map<String, Double> = emptyMap(),
     val startOnBoot: Boolean = true,
     val favorites: Set<String> = emptySet(),
     val favoriteShapes: Set<String> = emptySet(),
@@ -250,6 +257,11 @@ data class AppState(
     val listeningMode: ListeningMode = ListeningMode.NOISE_CANCELLING,
     val analyser: Boolean = false,
     val limiterThresholdDb: Double = -1.0,
+    val limiterAttackMs: Double = 1.0,
+    val limiterReleaseMs: Double = 60.0,
+    val limiterRatio: Double = 10.0,
+    /** Lifts the level after limiting. It can't push peaks past full scale. */
+    val limiterPostGainDb: Double = 0.0,
     val guidedSetupSeen: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.DEVICE,
     val faderMode: FaderMode = FaderMode.PRECISION,
@@ -268,6 +280,16 @@ data class AppState(
         presets = presets.map { if (it.id == id) it.copy(name = name) else it },
         current = if (current.id == id) current.copy(name = name) else current,
     )
+
+    /** The limiter as it's really used, with every value kept in range. */
+    fun limiterSettings(): LimiterSettings =
+        LimiterSettings(limiterAttackMs, limiterReleaseMs, limiterRatio, limiterThresholdDb, limiterPostGainDb).clamped()
+
+    /** Where equal loudness starts for this output: its usual volume, in dB below full. */
+    fun usualVolumeDb(outputKey: String): Double = loudnessUsual[outputKey] ?: EqualLoudness.DEFAULT_USUAL_DB
+
+    /** How much equal loudness to use on this output, falling back to the setting from before it was per output. */
+    fun loudnessStrengthFor(outputKey: String): Double = (loudnessStrengths[outputKey] ?: loudnessStrength).coerceIn(0.0, 1.0)
 
     /** This output's correction. A phone speaker can't reach each ear separately, so it never has one. */
     fun earsFor(outputKey: String): EarCorrection? =
@@ -312,6 +334,10 @@ data class AppState(
             autoHeadroom = defaults.autoHeadroom,
             limiter = defaults.limiter,
             limiterThresholdDb = defaults.limiterThresholdDb,
+            limiterAttackMs = defaults.limiterAttackMs,
+            limiterReleaseMs = defaults.limiterReleaseMs,
+            limiterRatio = defaults.limiterRatio,
+            limiterPostGainDb = defaults.limiterPostGainDb,
             nightMode = defaults.nightMode,
             nightSchedule = defaults.nightSchedule,
             leveller = defaults.leveller,
@@ -322,6 +348,8 @@ data class AppState(
             useSystemSurround = defaults.useSystemSurround,
             loudness = defaults.loudness,
             loudnessStrength = defaults.loudnessStrength,
+            loudnessStrengths = defaults.loudnessStrengths,
+            loudnessUsual = defaults.loudnessUsual,
             matchBypass = defaults.matchBypass,
         )
     }

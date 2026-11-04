@@ -38,17 +38,13 @@ data class ProcessingTarget(
     /** What the compressor does, once night mode, the leveller and manual settings are resolved. */
     val dynamics: Compressor = Compressor(),
     val tamers: Tamers = Tamers(),
+    val limiterSettings: LimiterSettings = LimiterSettings(),
 )
 
 /** Turns the user's settings into the final processing. Pure, so it can be unit tested. */
 object Processing {
     const val MAX_TONE_DB = 12.0
 
-    // Compensation starts below this much volume attenuation, and is full at REFERENCE + RANGE.
-    private const val LOUDNESS_REFERENCE_DB = 10.0
-    private const val LOUDNESS_RANGE_DB = 40.0
-    private const val LOUDNESS_BASS_DB = 12.0
-    private const val LOUDNESS_TREBLE_DB = 4.0
     private const val SHELF_Q = 0.71
     private const val VOCALS_HZ = 2500.0
     private const val VOCALS_Q = 0.7
@@ -65,18 +61,11 @@ object Processing {
     )
 
     /**
-     * Ears lose sensitivity to bass and treble at low levels. This is a simplified shape inspired
-     * by equal-loudness contours, not an ISO 226 calculation.
+     * Equal-loudness compensation for this volume, as one curve, from the ISO 226 contours. [usualDb] is the
+     * volume, in dB below full, where nothing is added.
      */
-    fun loudnessFilters(attenuationDb: Double, strength: Double): List<Filter> {
-        val amount = ((attenuationDb - LOUDNESS_REFERENCE_DB) / LOUDNESS_RANGE_DB).coerceIn(0.0, 1.0) *
-            strength.coerceIn(0.0, 1.0)
-        if (amount <= 0.0) return emptyList()
-        return listOf(
-            Filter(-3, FilterType.LOW_SHELF, 120.0, LOUDNESS_BASS_DB * amount, SHELF_Q),
-            Filter(-4, FilterType.HIGH_SHELF, 9000.0, LOUDNESS_TREBLE_DB * amount, SHELF_Q),
-        )
-    }
+    fun loudnessFilters(attenuationDb: Double, strength: Double, usualDb: Double = EqualLoudness.DEFAULT_USUAL_DB): List<Filter> =
+        curveFilter(LOUDNESS_CURVE_ID, EqualLoudness.correction(EqualLoudness.quieter(attenuationDb, usualDb), strength))
 
     /** A shelf with an adjustable corner, for shaping the low end independently of the preset. */
     fun bassTunerFilters(gainDb: Double, freqHz: Double): List<Filter> =
@@ -113,10 +102,10 @@ object Processing {
     fun reverbFor(state: AppState, suspended: Boolean): ReverbRoom =
         if (!state.enabled || state.bypass || suspended) ReverbRoom.OFF else state.current.tone.reverb
 
-    /** The preset plus loudness compensation, which follows the volume rather than the preset. */
-    fun effectiveFilters(state: AppState, attenuationDb: Double): List<Filter> =
+    /** The preset plus loudness compensation, which follows the volume and the output rather than the preset. */
+    fun effectiveFilters(state: AppState, attenuationDb: Double, outputKey: String = ""): List<Filter> =
         presetFilters(state.current) +
-            if (state.loudness) loudnessFilters(attenuationDb, state.loudnessStrength) else emptyList()
+            if (state.loudness) loudnessFilters(attenuationDb, state.loudnessStrengthFor(outputKey), state.usualVolumeDb(outputKey)) else emptyList()
 
     /**
      * A preset's level belongs to its correction, so turning the correction down takes the matching
@@ -235,7 +224,7 @@ object Processing {
         scheduledNight: Boolean = false,
         outputKey: String = "",
     ): ProcessingTarget {
-        val filters = effectiveFilters(state, attenuationDb)
+        val filters = effectiveFilters(state, attenuationDb, outputKey)
         val input = inputOf(state.current, filters, state.autoHeadroom)
         val night = if (scheduledNight) maxOf(state.nightMode, state.nightSchedule.amount) else state.nightMode
         val dynamics = Dynamics.resolve(night, state.leveller, state.current.tone.compressor)
@@ -253,12 +242,18 @@ object Processing {
                 nightMode = night,
                 effectEnabled = true,
                 limiterThresholdDb = state.limiterThresholdDb,
+                limiterSettings = state.limiterSettings(),
                 // Only the phone's own effect needs this. Stereo width is already in the channels' filters.
                 surround = if (state.useSystemSurround) state.current.tone.surround else 0.0,
                 leveller = state.leveller,
                 rightFilters = right,
                 dynamics = dynamics,
-                tamers = Tamers(state.current.tone.harshTamer, state.current.tone.boomTamer),
+                tamers = Tamers(
+                    state.current.tone.harshTamer,
+                    state.current.tone.boomTamer,
+                    state.current.tone.bassCharacter,
+                    (state.current.tone.bassDb * state.current.tone.strength).coerceAtLeast(0.0),
+                ),
             )
         }
         if (!state.matchBypass) {
@@ -273,6 +268,7 @@ object Processing {
             nightMode = 0.0,
             effectEnabled = true,
             limiterThresholdDb = state.limiterThresholdDb,
+            limiterSettings = state.limiterSettings(),
         )
     }
 
@@ -305,6 +301,7 @@ object Processing {
     private const val PEAK_STEPS = 240
     private const val OVER_MARGIN_DB = 0.5
     private const val IMPORTED_CURVE_ID = -101
+    private const val LOUDNESS_CURVE_ID = -3
     private const val TARGET_CURVE_ID = -104
     private const val EAR_CURVE_ID = -102
     private const val WIDTH_CURVE_ID = -103

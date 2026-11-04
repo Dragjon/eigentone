@@ -33,6 +33,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         var virtualizer: Virtualizer? = null
         var lastSurround = Double.NaN
         var lastLimiterThreshold = Double.NaN
+        var lastLimiterSettings: com.phonons.app.data.LimiterSettings? = null
         val lastGains = FloatArray(bandCount) { Float.NaN }
         val lastRightGains = FloatArray(bandCount) { Float.NaN }
         var lastInput = Float.NaN
@@ -188,6 +189,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
             chain.lastLimiter = null
             chain.lastEnabled = null
             chain.lastLimiterThreshold = Double.NaN
+            chain.lastLimiterSettings = null
             chain.lastSurround = Double.NaN
         }
         latest?.let { apply(it) }
@@ -340,15 +342,18 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
                 verifyBands(chain, map, gains, rightGains)
             }
 
-            if (target.limiter != chain.lastLimiter || target.limiterThresholdDb != chain.lastLimiterThreshold) {
+            if (target.limiter != chain.lastLimiter || target.limiterSettings != chain.lastLimiterSettings) {
+                val limiter = target.limiterSettings
                 dp.setLimiterAllChannelsTo(
                     DynamicsProcessing.Limiter(
                         true, target.limiter, /* linkGroup = */ 0,
-                        LIMITER_ATTACK_MS, LIMITER_RELEASE_MS, LIMITER_RATIO, target.limiterThresholdDb.toFloat(), 0f,
+                        limiter.attackMs.toFloat(), limiter.releaseMs.toFloat(), limiter.ratio.toFloat(),
+                        limiter.thresholdDb.toFloat(), limiter.postGainDb.toFloat(),
                     ),
                 )
                 chain.lastLimiter = target.limiter
                 chain.lastLimiterThreshold = target.limiterThresholdDb
+                chain.lastLimiterSettings = limiter
             }
 
             if (dynamicsStep.compressor != chain.lastDynamics || target.tamers != chain.lastTamers) {
@@ -517,9 +522,6 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         private const val GAIN_EPSILON = 0.02f
         private const val FRAME_MS_PRECISE = 20f
         private const val FRAME_MS_LOW_LATENCY = 10f
-        private const val LIMITER_ATTACK_MS = 1f
-        private const val LIMITER_RELEASE_MS = 60f
-        private const val LIMITER_RATIO = 10f
         private const val MAX_EFFECT_STRENGTH = 1000
         private val BAND_COUNTS = listOf(128, 64, 32, 16)
         private const val LOG_SWITCH_MS = 5L

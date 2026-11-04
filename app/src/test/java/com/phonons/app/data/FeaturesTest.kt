@@ -30,29 +30,45 @@ class FeaturesTest {
         assertTrue(Processing.toneFilters(0.0, 0.0).isEmpty())
     }
 
+    private fun at(filters: List<Filter>, hz: Double) = Eq.curveDb(filters, hz)
+
     @Test
-    fun loudnessIsOnlyAddedBelowReferenceVolumeAndGrowsAsItGetsQuieter() {
+    fun loudnessFollowsTheIsoContoursBelowYourUsualVolume() {
+        // At or above the usual volume (10 dB below full by default), nothing is added.
         assertTrue(Processing.loudnessFilters(5.0, 1.0).isEmpty())
-        val mid = Processing.loudnessFilters(30.0, 1.0)
-        val quiet = Processing.loudnessFilters(50.0, 1.0)
-        assertEquals(6.0, mid[0].gainDb, 1e-9)
-        assertEquals(12.0, quiet[0].gainDb, 1e-9)
-        assertEquals(4.0, quiet[1].gainDb, 1e-9)
-        // Stops growing past the full-compensation point.
-        assertEquals(12.0, Processing.loudnessFilters(90.0, 1.0)[0].gainDb, 1e-9)
+        assertTrue(Processing.loudnessFilters(10.0, 1.0).isEmpty())
+        // 10 dB quieter is 70 phon instead of 80. ISO 226 gives about +3 dB at 125 Hz and nothing at 1 kHz.
+        val tenQuieter = Processing.loudnessFilters(20.0, 1.0)
+        assertEquals(3.0, at(tenQuieter, 125.0), 0.4)
+        assertEquals(0.0, at(tenQuieter, 1000.0), 0.05)
+        // 30 dB quieter needs much more bass.
+        assertEquals(8.1, at(Processing.loudnessFilters(40.0, 1.0), 125.0), 0.4)
+        // Very low volume stops at the safety limit.
+        assertTrue(at(Processing.loudnessFilters(90.0, 1.0), 20.0) <= EqualLoudness.MAX_BOOST_DB + 1e-9)
     }
 
     @Test
     fun loudnessStrengthScalesAndZeroDisables() {
-        assertEquals(3.0, Processing.loudnessFilters(30.0, 0.5)[0].gainDb, 1e-9)
+        val full = at(Processing.loudnessFilters(30.0, 1.0), 63.0)
+        assertEquals(full / 2, at(Processing.loudnessFilters(30.0, 0.5), 63.0), 0.1)
         assertTrue(Processing.loudnessFilters(30.0, 0.0).isEmpty())
+    }
+
+    @Test
+    fun eachOutputKeepsItsOwnUsualVolume() {
+        val state = AppState(loudness = true, loudnessUsual = mapOf("Bluetooth:Buds" to 25.0))
+        assertEquals(25.0, state.usualVolumeDb("Bluetooth:Buds"), 0.0)
+        assertEquals(EqualLoudness.DEFAULT_USUAL_DB, state.usualVolumeDb("speaker"), 0.0)
+        // At 20 dB below full, the buds are above their usual volume, and the speaker is 10 dB below its own.
+        assertEquals(1, Processing.effectiveFilters(state.copy(current = boost), 20.0, "Bluetooth:Buds").size)
+        assertEquals(2, Processing.effectiveFilters(state.copy(current = boost), 20.0, "speaker").size)
     }
 
     @Test
     fun loudnessIsIgnoredWhenSwitchedOff() {
         val off = AppState(current = boost, loudness = false, loudnessStrength = 1.0)
         assertEquals(1, Processing.effectiveFilters(off, 50.0).size)
-        assertEquals(3, Processing.effectiveFilters(off.copy(loudness = true), 50.0).size)
+        assertEquals(2, Processing.effectiveFilters(off.copy(loudness = true), 50.0).size)
     }
 
     @Test

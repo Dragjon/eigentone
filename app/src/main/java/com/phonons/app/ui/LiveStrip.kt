@@ -123,13 +123,16 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
         PlayingDot()
         if (showCurve) MiniCurve(state, output.key, working)
     }
-    if (expanded) StripDetails(effects, output.label, clipping)
+    if (expanded) StripDetails(effects, output, clipping, state, scheduledNight)
     }
 }
 
 /** Every effect by its full name, opened by tapping the strip. */
 @Composable
-private fun StripDetails(effects: List<EffectState>, outputLabel: String, clipping: Boolean) {
+private fun StripDetails(effects: List<EffectState>, output: OutputInfo, clipping: Boolean, state: AppState, scheduledNight: Boolean) {
+    val outputLabel = output.label
+    val status by Repo.status.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
     Column(
         Modifier
             .fillMaxWidth()
@@ -144,13 +147,65 @@ private fun StripDetails(effects: List<EffectState>, outputLabel: String, clippi
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(painterResource(effectIcon(effect.name)), contentDescription = null, tint = colour, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(12.dp))
-                Text(stringResource(effectLabel(effect.name)), style = MaterialTheme.typography.bodyMedium, color = Palette.StripText, modifier = Modifier.weight(1f))
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(effectLabel(effect.name)), style = MaterialTheme.typography.bodyMedium, color = Palette.StripText)
+                    val detail = effectDetail(effect, state, output, scheduledNight, status.reverbApps.map { appLabel(context, it) })
+                    if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall, color = Palette.StripDim)
+                }
                 Icon(if (effect.on) Icons.Filled.Check else Icons.Filled.Close, contentDescription = null, tint = colour, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(stringResource(if (effect.on) R.string.ui_state_on else R.string.ui_mode_off), style = Readout, color = colour)
             }
         }
     }
+}
+
+/** What an effect is doing right now, in a few words. */
+@Composable
+private fun effectDetail(effect: EffectState, state: AppState, output: OutputInfo, scheduledNight: Boolean, reverbApps: List<String>): String? {
+    val tone = state.current.tone
+    fun pct(value: Double) = "${kotlin.math.round(value * 100).toInt()}%"
+    return when (effect.name) {
+        "Night" -> {
+            val amount = if (scheduledNight) maxOf(state.nightMode, state.nightSchedule.amount) else state.nightMode
+            stringResource(if (scheduledNight && state.nightMode < state.nightSchedule.amount) R.string.ui_strip_scheduled else R.string.ui_strip_at, pct(amount))
+        }
+        "Level" -> stringResource(R.string.ui_strip_at, pct(state.leveller))
+        "Comp" -> if (effect.on) {
+            com.phonons.app.data.Dynamics.styles.firstOrNull { it.compressor == tone.compressor }?.name
+                ?: stringResource(R.string.ui_strip_comp_custom)
+        } else {
+            stringResource(R.string.ui_strip_comp_off)
+        }
+        "Width" -> if (effect.on) stringResource(R.string.ui_strip_width, pct(tone.surround)) else stringResource(R.string.ui_strip_width_off)
+        "Surround" -> if (effect.on) stringResource(R.string.ui_strip_at, pct(tone.surround)) else stringResource(R.string.ui_strip_surround_off)
+        "Ears" -> when {
+            effect.on -> stringResource(R.string.ui_strip_ears_on, output.label)
+            state.hearings.containsKey(output.key) -> stringResource(R.string.ui_strip_ears_saved)
+            else -> stringResource(R.string.ui_strip_ears_none)
+        }
+        "Reverb" -> when {
+            !effect.on -> stringResource(R.string.ui_strip_reverb_off)
+            reverbApps.isEmpty() -> stringResource(R.string.ui_strip_reverb_waiting, stringResource(reverbRoomName(tone.reverb)), pct(tone.reverbAmount))
+            else -> stringResource(R.string.ui_strip_reverb_on, stringResource(reverbRoomName(tone.reverb)), pct(tone.reverbAmount), reverbApps.joinToString())
+        }
+        "Tame" -> stringResource(
+            R.string.ui_strip_tame,
+            if (tone.harshTamer > 0.0) pct(tone.harshTamer) else stringResource(R.string.ui_mode_off).lowercase(),
+            if (tone.boomTamer > 0.0) pct(tone.boomTamer) else stringResource(R.string.ui_mode_off).lowercase(),
+        )
+        else -> null
+    }
+}
+
+private fun reverbRoomName(room: com.phonons.app.data.ReverbRoom): Int = when (room) {
+    com.phonons.app.data.ReverbRoom.OFF -> R.string.ui_mode_off
+    com.phonons.app.data.ReverbRoom.SMALL_ROOM -> R.string.ui_reverb_small_room
+    com.phonons.app.data.ReverbRoom.MEDIUM_ROOM -> R.string.ui_reverb_medium_room
+    com.phonons.app.data.ReverbRoom.LARGE_ROOM -> R.string.ui_reverb_large_room
+    com.phonons.app.data.ReverbRoom.MEDIUM_HALL -> R.string.ui_reverb_medium_hall
+    com.phonons.app.data.ReverbRoom.LARGE_HALL -> R.string.ui_reverb_large_hall
+    com.phonons.app.data.ReverbRoom.PLATE -> R.string.ui_reverb_plate
 }
 
 private fun effectLabel(name: String): Int = when (name) {
@@ -228,7 +283,7 @@ private fun PlayingDot() {
 private fun MiniCurve(state: AppState, outputKey: String, working: Boolean) {
     val attenuation by Repo.attenuationDb.collectAsStateWithLifecycle()
     val spectrum = Repo.spectrum.collectAsStateWithLifecycle()
-    val filters = remember(state, attenuation) { Processing.effectiveFilters(state, attenuation) }
+    val filters = remember(state, attenuation, outputKey) { Processing.effectiveFilters(state, attenuation, outputKey) }
     val channels = remember(filters, state.earCorrections, outputKey, state.useSystemSurround) {
         Processing.channelFilters(state, outputKey, filters)
     }

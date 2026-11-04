@@ -76,8 +76,50 @@ data class Compressor(
 
 data class CompressorStyle(val name: String, val compressor: Compressor)
 
-/** How strongly to hold back each range, from 0 for off to 1. */
-data class Tamers(val harsh: Double = 0.0, val boom: Double = 0.0)
+/**
+ * How added bass behaves over time. Natural is a plain lift. Punch lets each hit through and then eases
+ * the tail, so kicks stand out. Sustain catches each hit and brings up the tail, so bass is fuller and
+ * longer. Designed starting points, not measurements.
+ */
+@Serializable
+enum class BassCharacter { NATURAL, PUNCH, SUSTAIN }
+
+/** How strongly to hold back each range, from 0 for off to 1, and how the added bass behaves. */
+data class Tamers(
+    val harsh: Double = 0.0,
+    val boom: Double = 0.0,
+    val bass: BassCharacter = BassCharacter.NATURAL,
+    /** How much bass the tone adds, in dB. The character only shapes bass that's been added. */
+    val bassAmount: Double = 0.0,
+)
+
+/** The limiter's settings, as Android's limiter takes them. */
+@Serializable
+data class LimiterSettings(
+    val attackMs: Double = 1.0,
+    val releaseMs: Double = 60.0,
+    val ratio: Double = 10.0,
+    val thresholdDb: Double = -1.0,
+    val postGainDb: Double = 0.0,
+) {
+    /**
+     * Keeps every value in range. Post-gain can't lift the limited peaks past full scale, which is where
+     * it would start to clip, so the ceiling never goes above 0 dB.
+     */
+    fun clamped(): LimiterSettings {
+        val threshold = thresholdDb.takeIf { it.isFinite() }?.coerceIn(-12.0, 0.0) ?: -1.0
+        return LimiterSettings(
+            attackMs = attackMs.takeIf { it.isFinite() }?.coerceIn(0.1, 50.0) ?: 1.0,
+            releaseMs = releaseMs.takeIf { it.isFinite() }?.coerceIn(10.0, 1000.0) ?: 60.0,
+            ratio = ratio.takeIf { it.isFinite() }?.coerceIn(1.0, 50.0) ?: 10.0,
+            thresholdDb = threshold,
+            postGainDb = postGainDb.takeIf { it.isFinite() }?.coerceIn(0.0, -threshold) ?: 0.0,
+        )
+    }
+
+    /** The loudest a peak can come out. */
+    val ceilingDb: Double get() = thresholdDb + postGainDb
+}
 
 /** One band as the audio effect receives it. */
 data class PlannedBand(val cutoffHz: Double, val band: CompressorBand, val active: Boolean)
@@ -138,8 +180,9 @@ object Dynamics {
     fun plan(compressor: Compressor, tamers: Tamers, slots: Int = FULL_BANDS): List<PlannedBand> {
         val harsh = if (slots >= FULL_BANDS) tamers.harsh else 0.0
         val boom = if (slots >= FULL_BANDS) tamers.boom else 0.0
+        val character = if (slots >= FULL_BANDS) characterBand(tamers) else null
         val edges = sortedSetOf(compressor.lowCrossoverHz, compressor.highCrossoverHz)
-        if (boom > ACTIVE) edges += BOOM_TOP_HZ
+        if (boom > ACTIVE || character != null) edges += BOOM_TOP_HZ
         if (harsh > ACTIVE) {
             edges += HARSH_LOW_HZ
             edges += HARSH_HIGH_HZ
@@ -155,7 +198,7 @@ object Dynamics {
             val own = bandAt(compressor, kotlin.math.sqrt(bottom * top))
             val ownActive = compressor.enabled && own.enabled
             val tamer = when {
-                boom > ACTIVE && top <= BOOM_TOP_HZ -> boomBand(boom)
+                top <= BOOM_TOP_HZ && (boom > ACTIVE || character != null) -> lowBand(boom, character)
                 harsh > ACTIVE && bottom >= HARSH_LOW_HZ && top <= HARSH_HIGH_HZ -> harshBand(harsh)
                 else -> null
             }
@@ -175,6 +218,50 @@ object Dynamics {
     }
 
     private const val LOWEST_HZ = 20.0
+
+    /** How hard the bass character shapes the bass that's been added, in dB of added bass. */
+    private const val CHARACTER_FULL_DB = 6.0
+    private const val PUNCH_MAKEUP_PER_DB = 0.5
+    private const val SUSTAIN_MAKEUP_PER_DB = 0.6
+    private const val MAX_CHARACTER_MAKEUP_DB = 6.0
+
+    /**
+     * The band that gives added bass its character, or null for a plain lift. Punch has a slow attack, so a
+     * hit's start gets through before the tail is eased, then makeup brings the level back, which leaves
+     * the hit standing out. Sustain catches each hit at once and lets go slowly, then makeup lifts the
+     * tail, which fills the bass out.
+     */
+    fun characterBand(tamers: Tamers): CompressorBand? {
+        if (tamers.bass == BassCharacter.NATURAL || tamers.bassAmount <= ACTIVE) return null
+        val depth = (tamers.bassAmount / CHARACTER_FULL_DB).coerceIn(0.0, 1.0)
+        return when (tamers.bass) {
+            BassCharacter.PUNCH -> CompressorBand(
+                thresholdDb = -20.0 - 10.0 * depth,
+                ratio = 1.5 + 2.0 * depth,
+                attackMs = 30.0,
+                releaseMs = 90.0,
+                makeupDb = (tamers.bassAmount * PUNCH_MAKEUP_PER_DB).coerceAtMost(MAX_CHARACTER_MAKEUP_DB) * depth,
+            )
+            BassCharacter.SUSTAIN -> CompressorBand(
+                thresholdDb = -24.0 - 12.0 * depth,
+                ratio = 2.0 + 2.5 * depth,
+                attackMs = 3.0,
+                releaseMs = 350.0,
+                makeupDb = (tamers.bassAmount * SUSTAIN_MAKEUP_PER_DB).coerceAtMost(MAX_CHARACTER_MAKEUP_DB) * depth,
+            )
+            BassCharacter.NATURAL -> null
+        }
+    }
+
+    /** The deep bass band: the boom tamer, the bass character, or both, where the tamer's control wins. */
+    private fun lowBand(boom: Double, character: CompressorBand?): CompressorBand {
+        val tamer = if (boom > ACTIVE) boomBand(boom) else null
+        return when {
+            tamer == null -> character!!
+            character == null -> tamer
+            else -> character.copy(thresholdDb = minOf(character.thresholdDb, tamer.thresholdDb), ratio = maxOf(character.ratio, tamer.ratio))
+        }
+    }
 
     /** A typical level for music in a band, used to estimate what compression does to loudness. */
     private const val TYPICAL_LEVEL_DB = -18.0

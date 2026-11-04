@@ -52,7 +52,15 @@ fun PresetDetailsDialog(preset: Preset, folders: List<String>, onDismiss: () -> 
                 Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true, label = { Text(stringResource(R.string.ui_name)) })
+                val taken = com.phonons.app.data.PresetOrganiser.nameTaken(Repo.state.value, name, preset.id)
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.ui_name)) },
+                    isError = taken,
+                    supportingText = if (taken) ({ Text(stringResource(R.string.ui_name_taken, name.trim())) }) else null,
+                )
                 OutlinedTextField(value = folder, onValueChange = { folder = it }, singleLine = true, label = { Text(stringResource(R.string.ui_folder_optional)) })
                 if (folders.isNotEmpty()) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -74,7 +82,7 @@ fun PresetDetailsDialog(preset: Preset, folders: List<String>, onDismiss: () -> 
         },
         confirmButton = {
             TextButton(
-                enabled = name.isNotBlank(),
+                enabled = name.isNotBlank() && !com.phonons.app.data.PresetOrganiser.nameTaken(Repo.state.value, name, preset.id),
                 onClick = {
                     Repo.renamePreset(preset.id, name.trim())
                     Repo.moveToFolder(preset.id, folder)
