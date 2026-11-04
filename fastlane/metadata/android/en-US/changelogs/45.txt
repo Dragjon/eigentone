@@ -1,0 +1,2 @@
+- Fixed the harshness and boom tamers also compressing everything else, which changed the sound and made it quieter
+- Fixed compressor bands still compressing after being turned off

@@ -2,6 +2,7 @@ package com.phonons.app.engine
 
 import android.media.AudioFormat
 import android.media.audiofx.DynamicsProcessing
+import android.media.audiofx.EnvironmentalReverb
 import android.media.audiofx.Virtualizer
 import android.util.Log
 import com.phonons.app.data.AppState
@@ -12,6 +13,7 @@ import com.phonons.app.data.EngineStatus
 import com.phonons.app.data.GainRamp
 import com.phonons.app.data.Processing
 import com.phonons.app.data.ProcessingTarget
+import com.phonons.app.data.ReverbRoom
 import com.phonons.app.data.Tamers
 import com.phonons.app.dsp.CurveMapper
 import kotlin.math.abs
@@ -49,6 +51,16 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
     }
 
     private val chains = LinkedHashMap<Int, Chain>()
+
+    /**
+     * Reverbs on the sessions apps have announced. These run beside the EQ whichever route it uses, because
+     * Android only gives a working reverb on one app's session: on session 0 it gets one that hears nothing.
+     */
+    private val reverbs = HashMap<Int, EnvironmentalReverb>()
+    private val reverbSent = HashMap<Int, Pair<ReverbRoom, Short>>()
+    private val reverbRefused = HashSet<Int>()
+    private var reverbRoom = ReverbRoom.OFF
+    private var reverbLevel: Short = 0
     private val pendingSessions = LinkedHashMap<Int, String>()
     private var mapper: CurveMapper? = null
     private var mbcBands: Int? = null
@@ -87,20 +99,74 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         latest = state
         if (builtMode != state.engineMode || builtLowLatency != state.lowLatency) rebuild(state)
         chains.values.forEach { push(it, state) }
+        reverbRoom = Processing.reverbFor(state, suspended)
+        reverbLevel = ReverbRoom.reverbLevel(state.current.tone.reverbAmount)
+        syncReverbs()
         publish()
+    }
+
+    /**
+     * Matches the reverbs to the sessions and the chosen room. A session that refuses one isn't retried
+     * until it's announced again, because this runs many times a second during a change.
+     */
+    private fun syncReverbs() {
+        if (reverbRoom == ReverbRoom.OFF) {
+            reverbs.keys.toList().forEach(::releaseReverb)
+            return
+        }
+        for (session in pendingSessions.keys) {
+            if (session in reverbRefused) continue
+            try {
+                val reverb = reverbs[session] ?: EnvironmentalReverb(Int.MAX_VALUE, session).also {
+                    reverbs[session] = it
+                    Log.i(TAG, "Reverb on session $session for ${pendingSessions[session]}: ${it.descriptor.name}")
+                }
+                val wanted = reverbRoom to reverbLevel
+                if (reverbSent[session] != wanted) {
+                    reverb.roomLevel = 0
+                    reverb.roomHFLevel = reverbRoom.roomHfLevel
+                    reverb.decayTime = reverbRoom.decayMs
+                    reverb.decayHFRatio = reverbRoom.decayHfRatio
+                    reverb.diffusion = reverbRoom.diffusion
+                    reverb.density = reverbRoom.density
+                    reverb.reverbLevel = reverbLevel
+                    reverbSent[session] = wanted
+                    Log.i(TAG, "Reverb on session $session: $reverbRoom at level $reverbLevel, reads ${reverb.reverbLevel}")
+                }
+                if (!reverb.enabled) reverb.enabled = true
+            } catch (e: Exception) {
+                Log.w(TAG, "Session $session refused the reverb: ${e.message}")
+                releaseReverb(session)
+                reverbRefused += session
+            }
+        }
+    }
+
+    private fun releaseReverb(session: Int) {
+        reverbSent.remove(session)
+        reverbs.remove(session)?.let { reverb ->
+            runCatching {
+                reverb.enabled = false
+                reverb.release()
+            }
+        }
     }
 
     /** A music player opened a session. Remembered even in global mode, so switching works. */
     fun sessionOpened(session: Int, packageName: String) {
         if (session <= 0) return
         pendingSessions[session] = packageName
+        reverbRefused -= session
         if (activeMode == EngineMode.SESSIONS && session !in chains) attach(session, packageName)
         latest?.let { state -> chains[session]?.let { push(it, state) } }
+        syncReverbs()
         publish()
     }
 
     fun sessionClosed(session: Int) {
         pendingSessions.remove(session)
+        releaseReverb(session)
+        reverbRefused -= session
         if (activeMode == EngineMode.SESSIONS) {
             chains.remove(session)?.let { releaseChain(it) }
             // A failure for a session that has since gone is no longer worth showing.
@@ -146,6 +212,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
     }
 
     fun release() {
+        reverbs.keys.toList().forEach(::releaseReverb)
         releaseAll()
         mapper = null
         activeMode = null
@@ -437,6 +504,8 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
                 rebuilds = rebuilds,
                 readback = readback,
                 tamersUnavailable = mbcBands == Dynamics.BASIC_BANDS,
+                announcedApps = pendingSessions.values.distinct(),
+                reverbApps = reverbs.keys.mapNotNull { pendingSessions[it] }.distinct(),
             ),
         )
     }

@@ -222,7 +222,7 @@ fun ShareRows(snack: (String) -> Unit) {
     }
 }
 
-private fun appLabel(context: Context, packageName: String): String = runCatching {
+fun appLabel(context: Context, packageName: String): String = runCatching {
     val manager = context.packageManager
     manager.getApplicationLabel(manager.getApplicationInfo(packageName, 0)).toString()
 }.getOrDefault(packageName)

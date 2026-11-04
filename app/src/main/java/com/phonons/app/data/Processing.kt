@@ -109,6 +109,10 @@ object Processing {
             toneFilters(tone.bassDb * scale, tone.trebleDb * scale, tone.vocalsDb * scale, tone.bassHz)
     }
 
+    /** The room to use, which steps aside for Bypass and for tests that need the plain sound. */
+    fun reverbFor(state: AppState, suspended: Boolean): ReverbRoom =
+        if (!state.enabled || state.bypass || suspended) ReverbRoom.OFF else state.current.tone.reverb
+
     /** The preset plus loudness compensation, which follows the volume rather than the preset. */
     fun effectiveFilters(state: AppState, attenuationDb: Double): List<Filter> =
         presetFilters(state.current) +

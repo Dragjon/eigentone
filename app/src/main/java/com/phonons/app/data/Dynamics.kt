@@ -96,6 +96,13 @@ object Dynamics {
 
     private const val ACTIVE = 0.001
 
+    /**
+     * What a band that should do nothing receives. Android's effect keeps each band's on or off flag but
+     * never checks it, so once any band is active it compresses all of them with whatever they hold. At a
+     * ratio of 1:1 with no makeup, the result is the same as the input at every level.
+     */
+    private val UNTOUCHED = CompressorBand(enabled = false, thresholdDb = 0.0, ratio = 1.0, makeupDb = 0.0)
+
     /** The full set of bands, which leaves room for the tamers beside the compressor's three. */
     const val FULL_BANDS = 6
 
@@ -162,7 +169,8 @@ object Dynamics {
                     releaseMs = minOf(own.releaseMs, tamer.releaseMs),
                 )
             }
-            PlannedBand(top, band, ownActive || tamer != null)
+            val active = ownActive || tamer != null
+            PlannedBand(top, if (active) band else UNTOUCHED, active)
         }
     }
 

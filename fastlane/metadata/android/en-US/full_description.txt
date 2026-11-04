@@ -31,4 +31,5 @@ Made for daily use
 Good to know
 - EQ in a headphone app adds to Eigentone, so it's best set to flat
 - Android allows this effect on most apps, but it varies by phone
-- Reverb and head tracking aren't offered, because Android doesn't allow them to work reliably without root
+- Reverb only reaches apps that announce their audio to equaliser apps, such as Spotify, because Android doesn't allow it on all sound without root
+- Head tracking isn't offered, because Android doesn't allow it to work reliably without root

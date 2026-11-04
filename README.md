@@ -21,7 +21,7 @@ A free system-wide equaliser for Android 13 and newer. No ads, no account, and n
 - **Presets** that load automatically per output, per earbud noise mode and per app.
 - **Dynamic EQ**, with a harshness tamer and a boom tamer that only act while those ranges get loud.
 - **Multiband compressor**, free and fully adjustable and saved per preset, with three bands, adjustable crossovers, a live response curve and starting styles.
-- **Volume leveller**, night mode with a schedule, loudness compensation, limiter, balance, stereo width and virtual surround.
+- **Volume leveller**, night mode with a schedule, loudness compensation, limiter, balance, stereo width, virtual surround, and reverb on apps that announce their audio.
 - **Light and dark themes**, following your phone by default.
 - **Undo and redo**, a saved-curve overlay while editing and a warning when settings could clip.
 - **Preset search and folders**, app icon shortcuts to your favourites, and a tuner that adds bass or treble back to a correction.
@@ -45,7 +45,7 @@ Crash reports stay on the phone. You choose whether to share one from the System
 Download the APK from [Releases](https://github.com/Dragjon/eigentone/releases), and open it on the phone. Eigentone is a pre-release, and has only been tested on a Galaxy A54 running Android 16. Or use USB debugging:
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.28.0.apk
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.29.0.apk
 ```
 
 ## Build
@@ -109,7 +109,7 @@ The **hearing check** finds a threshold per frequency and ear with a "down 10, u
 - **EQ in the headphones adds to Eigentone**, because it runs on the headphones themselves. Eigentone reminds you to set it flat, and it can't read or change it.
 - **Stereo width** (`data/StereoWidth.kt`) leans frequency ranges left and right using a separate EQ per channel. It's subtle, because Android doesn't let an app mix one channel into the other, so it can't do crossfeed or real surround.
 - **Android has no full replacement for `Virtualizer`.** It's deprecated in favour of `Spatializer`, but that only describes an app's own playback, and turning it on requires a system permission. It remains as an opt-in, forced to binaural mode, and stereo width takes over if a phone refuses it. It's audibly stronger, but stereo width is the default because it sounded better in listening tests on a Galaxy A54. It has no head tracking, and on a Galaxy A54 it reads `mode=0` while audibly working.
-- **Reverb** was removed. On session 0 the public API only provides an auxiliary reverb, which receives no audio, and Android 16 blocks the method needed to control the insert version.
+- **Reverb only reaches apps that announce their audio.** On session 0 the public API only provides an auxiliary reverb, which receives no audio, so a reverb for all sound isn't possible without root. `PresetReverb` on an app's own announced session does give the working insert version, and that runs beside the global EQ. It uses `EnvironmentalReverb`, because `PresetReverb`'s fixed levels leave Large hall's echo about 38 dB below the music. The Space section names the apps it reaches.
 - **Noise-mode profiles** are chosen by hand, because Android can't read the earbuds' mode.
 - **Session 0 is deprecated** by Android and varies by phone. Eigentone falls back to per-app mode, and the System tab shows what the phone accepted.
 

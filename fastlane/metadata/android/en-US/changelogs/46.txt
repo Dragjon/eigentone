@@ -1,0 +1,3 @@
+- New reverb with six rooms and an amount control, for apps that announce their audio, such as Spotify. The Space section shows which apps it reaches
+- Fixed the harshness and boom tamers also compressing everything else
+- Fixed compressor bands still compressing after being turned off

@@ -91,6 +91,8 @@ import com.phonons.app.data.PresetOrganiser
 import com.phonons.app.engine.PresetShortcuts
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.graphics.Brush
@@ -120,6 +122,7 @@ import com.phonons.app.data.Preset
 import com.phonons.app.data.Processing
 import com.phonons.app.data.Profiles
 import com.phonons.app.data.Repo
+import com.phonons.app.data.ReverbRoom
 import com.phonons.app.data.ShapeText
 import com.phonons.app.data.ThemeMode
 import com.phonons.app.data.Tone
@@ -834,8 +837,75 @@ private fun SpaceSection(state: AppState) {
             origin = 0f,
             onChange = { v -> Repo.update { it.copy(balance = v.toDouble()) } },
         )
+        RowDivider()
+        ReverbRow(state, status)
         EarCorrectionRows(state)
     }
+}
+
+/** Says which apps it really reaches, because Android only allows a reverb on apps that announce their audio. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ReverbRow(state: AppState, status: EngineStatus) {
+    val context = LocalContext.current
+    val chosen = state.current.tone.reverb
+    Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.ui_reverb), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
+            InfoButton(Help.reverb)
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ReverbRoom.entries.forEach { room ->
+                FilterChip(
+                    selected = chosen == room,
+                    onClick = {
+                        Repo.editTone { it.copy(reverb = room) }
+                        Repo.commit()
+                    },
+                    label = { Text(stringResource(reverbName(room)), maxLines = 1) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Palette.Lit,
+                        selectedLabelColor = Palette.OnLit,
+                        labelColor = Palette.Text,
+                    ),
+                )
+            }
+        }
+        if (chosen != ReverbRoom.OFF) {
+            SliderSetting(
+                title = stringResource(R.string.ui_reverb_amount),
+                tip = Help.reverbAmount,
+                readout = formatPercent(state.current.tone.reverbAmount),
+                value = state.current.tone.reverbAmount.toFloat(),
+                range = 0f..1f,
+                default = 0.6f,
+                onChange = { v -> Repo.editTone { it.copy(reverbAmount = v.toDouble()) } },
+                onFinished = Repo::commit,
+            )
+        }
+        fun names(packages: List<String>) = packages.joinToString { appLabel(context, it) }
+        Text(
+            when {
+                !state.enabled -> stringResource(R.string.ui_reverb_detail_off)
+                status.reverbApps.isNotEmpty() -> stringResource(R.string.ui_reverb_reaching, names(status.reverbApps))
+                chosen != ReverbRoom.OFF -> stringResource(R.string.ui_reverb_waiting)
+                status.announcedApps.isNotEmpty() -> stringResource(R.string.ui_reverb_can_reach, names(status.announcedApps))
+                else -> stringResource(R.string.ui_reverb_detail_off)
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = Palette.TextDim,
+        )
+    }
+}
+
+private fun reverbName(room: ReverbRoom): Int = when (room) {
+    ReverbRoom.OFF -> R.string.ui_mode_off
+    ReverbRoom.SMALL_ROOM -> R.string.ui_reverb_small_room
+    ReverbRoom.MEDIUM_ROOM -> R.string.ui_reverb_medium_room
+    ReverbRoom.LARGE_ROOM -> R.string.ui_reverb_large_room
+    ReverbRoom.MEDIUM_HALL -> R.string.ui_reverb_medium_hall
+    ReverbRoom.LARGE_HALL -> R.string.ui_reverb_large_hall
+    ReverbRoom.PLATE -> R.string.ui_reverb_plate
 }
 
 /** This output's correction, or the offer to make one from its latest hearing check. */

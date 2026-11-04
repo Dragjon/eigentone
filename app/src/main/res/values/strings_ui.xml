@@ -668,4 +668,20 @@
     <string name="ui_theme_dark" formatted="false">Dark</string>
     <string name="help_theme_title" formatted="false">Theme</string>
     <string name="help_theme_body" formatted="false">Device follows your phone\'s light or dark setting, including any schedule. Light suits bright places, and Dark suits low light. The sound isn\'t affected.</string>
+    <string name="ui_reverb" formatted="false">Reverb</string>
+    <string name="ui_reverb_small_room" formatted="false">Small room</string>
+    <string name="ui_reverb_medium_room" formatted="false">Medium room</string>
+    <string name="ui_reverb_large_room" formatted="false">Large room</string>
+    <string name="ui_reverb_medium_hall" formatted="false">Medium hall</string>
+    <string name="ui_reverb_large_hall" formatted="false">Large hall</string>
+    <string name="ui_reverb_plate" formatted="false">Plate</string>
+    <string name="ui_reverb_detail_off" formatted="false">Only reaches apps that announce their audio to equaliser apps.</string>
+    <string name="ui_reverb_reaching" formatted="false">Reaching %1$s. Apps that don\'t announce their audio won\'t get it.</string>
+    <string name="ui_reverb_waiting" formatted="false">No app has announced its audio yet. Start playing, or restart the music if it was already playing. Some apps never announce, so they won\'t get reverb.</string>
+    <string name="ui_reverb_can_reach" formatted="false">Can reach %1$s, and any other app that announces its audio.</string>
+    <string name="help_reverb_title" formatted="false">Reverb</string>
+    <string name="help_reverb_body" formatted="false">Adds the echo of a room. Android only allows this on apps that announce their audio to equaliser apps, not on all sound, so this shows which apps it reaches. The EQ still applies to everything. It\'s saved with each preset, and Bypass turns it off.</string>
+    <string name="ui_reverb_amount" formatted="false">Reverb amount</string>
+    <string name="help_reverb_amount_title" formatted="false">Reverb amount</string>
+    <string name="help_reverb_amount_body" formatted="false">How loud the room\'s echo is against the music, up to as loud as the music itself at 100%. Too much can sound distant or muddy, and it needs the Limiter on to keep peaks under control, so use as little as you enjoy.</string>
 </resources>

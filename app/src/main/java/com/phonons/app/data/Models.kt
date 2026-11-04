@@ -6,6 +6,39 @@ import com.phonons.app.dsp.GraphicEq
 import com.phonons.app.dsp.GraphicShape
 import kotlinx.serialization.Serializable
 
+/**
+ * A room for the reverb, based on Android's own presets. Their mix levels aren't used, because those leave
+ * Large hall's echo about 38 dB below the music, which can't be heard. Decays are longer than theirs too,
+ * because a measured 1.8 second tail stayed hidden under loud modern masters, which have few gaps.
+ */
+@Serializable
+enum class ReverbRoom(val roomHfLevel: Short, val decayMs: Int, val decayHfRatio: Short, val diffusion: Short, val density: Short) {
+    OFF(0, 1000, 1000, 1000, 1000),
+    SMALL_ROOM(-600, 1000, 830, 1000, 1000),
+    MEDIUM_ROOM(-600, 1500, 830, 1000, 1000),
+    LARGE_ROOM(-600, 2000, 830, 1000, 1000),
+    MEDIUM_HALL(-600, 2800, 700, 1000, 1000),
+    LARGE_HALL(-600, 4000, 700, 1000, 1000),
+    PLATE(-200, 2200, 900, 1000, 750),
+    ;
+
+    companion object {
+        /** The quietest and loudest the echo can be against the music, in hundredths of a dB. */
+        private const val QUIETEST_MB = -3000.0
+        private const val LOUDEST_MB = 0.0
+
+        /** Android subtracts this from the level it's given, so it's added back here. */
+        private const val ANDROID_OFFSET_MB = 2000.0
+
+        /**
+         * The reverb level to send for an amount from 0 to 1, with the room level left at 0. Rooms differ by
+         * a little at the same amount, as a small room leaves less echo than a large hall.
+         */
+        fun reverbLevel(amount: Double): Short =
+            (ANDROID_OFFSET_MB + QUIETEST_MB + (LOUDEST_MB - QUIETEST_MB) * amount.coerceIn(0.0, 1.0)).toInt().toShort()
+    }
+}
+
 /** The adjustments layered over a preset's filters. They're saved with it, so a preset is a whole sound. */
 @Serializable
 data class Tone(
@@ -36,6 +69,10 @@ data class Tone(
     val harshTamer: Double = 0.0,
     /** Only turns down deep bass when it gets loud, from 0 to 1. */
     val boomTamer: Double = 0.0,
+    /** Only reaches apps that announce their audio, because Android offers no reverb for all audio. */
+    val reverb: ReverbRoom = ReverbRoom.OFF,
+    /** How loud the echo is, from 0 to 1. */
+    val reverbAmount: Double = 0.6,
     /** A sound signature for a measured correction to aim for, from [HeadphoneTarget]. Null keeps the published one. */
     val targetId: String? = null,
     /** What a measured correction was published to aim for, which [targetId] works from. */
@@ -401,6 +438,10 @@ data class EngineStatus(
     val readback: String? = null,
     /** This phone refused the extra bands the harshness and boom tamers need. */
     val tamersUnavailable: Boolean = false,
+    /** Package names of the apps that have announced their audio since the EQ started. */
+    val announcedApps: List<String> = emptyList(),
+    /** Package names of the apps the reverb is really attached to right now. */
+    val reverbApps: List<String> = emptyList(),
 )
 
 object BuiltIns {

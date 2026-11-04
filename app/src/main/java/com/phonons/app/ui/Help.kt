@@ -24,6 +24,8 @@ object Help {
     val guide = Tip(R.string.help_guide_title, R.string.help_guide_body)
     val reset = Tip(R.string.help_reset_title, R.string.help_reset_body)
     val finder = Tip(R.string.help_finder_title, R.string.help_finder_body)
+    val reverbAmount = Tip(R.string.help_reverb_amount_title, R.string.help_reverb_amount_body)
+    val reverb = Tip(R.string.help_reverb_title, R.string.help_reverb_body)
     val theme = Tip(R.string.help_theme_title, R.string.help_theme_body)
     val target = Tip(R.string.help_target_title, R.string.help_target_body)
     val bassFrequency = Tip(R.string.help_bass_frequency_title, R.string.help_bass_frequency_body)

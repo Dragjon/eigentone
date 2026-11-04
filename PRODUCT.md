@@ -28,7 +28,7 @@ Used on a phone with headphones on, usually while music plays in another app, of
 - AutoEq corrections with measurement comparison and a tuner, GraphicEQ and ParametricEQ files.
 - Hearing check with per-ear correction, guided peak finder, frequency sweep, Find my sound, and blind A/B comparison.
 - Presets per output, noise mode and app, with search, folders, share codes, backups, a Quick Settings tile, a widget and app icon shortcuts.
-- Compressor, harshness and boom tamers, volume leveller, scheduled night mode, loudness compensation, limiter, balance, stereo width and optional virtual surround.
+- Compressor, harshness and boom tamers, volume leveller, scheduled night mode, loudness compensation, limiter, balance, stereo width, optional virtual surround, and reverb on apps that announce their audio.
 - Android doesn't allow channel mixing, crossfeed or head tracking here. Nothing may be drawn as a live measurement unless it really is one.
 - Internal app ID and class names still say Phonons until the first public release.
 

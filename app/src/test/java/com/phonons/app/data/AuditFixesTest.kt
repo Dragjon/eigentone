@@ -189,6 +189,121 @@ class AuditFixesTest {
         assertEquals(HeadphoneForm.IN_EAR, CatalogEntry("A", "s", "Regan/earbud/A").form)
     }
 
+    /**
+     * What Android's effect does to one band, from DPFrequency.cpp. It ignores the band's on or off flag,
+     * so this does too, which is what the real sound depends on.
+     */
+    private fun androidGainDb(band: CompressorBand, levelDb: Double): Double {
+        val halfKnee = band.kneeDb / 2
+        val over = levelDb - band.thresholdDb
+        val change = when {
+            levelDb > band.thresholdDb + halfKnee -> (1 / band.ratio - 1) * over
+            levelDb > band.thresholdDb - halfKnee -> (1 / band.ratio - 1) * (over + halfKnee) * (over + halfKnee) / (halfKnee * 4)
+            else -> 0.0
+        }
+        return change + band.makeupDb
+    }
+
+    private val loudLevels = listOf(-60.0, -40.0, -24.0, -12.0, -6.0, 0.0)
+
+    @Test
+    fun theHarshnessTamerLeavesEveryOtherRangeAlone() {
+        for (amount in listOf(0.02, 0.5, 1.0)) {
+            for (planned in Dynamics.plan(Compressor(), Tamers(harsh = amount))) {
+                val isTamerBand = planned.cutoffHz == Dynamics.HARSH_HIGH_HZ
+                assertEquals(isTamerBand, planned.active)
+                if (!isTamerBand) for (level in loudLevels) assertEquals(0.0, androidGainDb(planned.band, level), 0.0)
+            }
+        }
+    }
+
+    @Test
+    fun theBoomTamerLeavesEveryOtherRangeAlone() {
+        for (planned in Dynamics.plan(Compressor(), Tamers(boom = 0.02))) {
+            if (planned.cutoffHz != Dynamics.BOOM_TOP_HZ) {
+                for (level in loudLevels) assertEquals(0.0, androidGainDb(planned.band, level), 0.0)
+            }
+        }
+    }
+
+    @Test
+    fun theTamerStillTurnsDownLoudTreble() {
+        val tamed = Dynamics.plan(Compressor(), Tamers(harsh = 0.5)).first { it.cutoffHz == Dynamics.HARSH_HIGH_HZ }
+        org.junit.Assert.assertTrue(androidGainDb(tamed.band, -6.0) < -1.0)
+        assertEquals(0.0, androidGainDb(tamed.band, -60.0), 0.0)
+    }
+
+    @Test
+    fun aCompressorBandThatsOffReallyIsOff() {
+        val punchy = Dynamics.styles.first { it.name == "Punchy" }.compressor
+        val bassOff = punchy.copy(low = punchy.low.copy(enabled = false))
+        val bass = Dynamics.plan(bassOff, Tamers()).first()
+        org.junit.Assert.assertFalse(bass.active)
+        for (level in loudLevels) assertEquals(0.0, androidGainDb(bass.band, level), 0.0)
+        // The active ones keep working.
+        org.junit.Assert.assertTrue(Dynamics.plan(bassOff, Tamers()).any { it.active && androidGainDb(it.band, -6.0) != 0.0 })
+    }
+
+    /** Android's formula, from EffectReverb.cpp, for how loud the echo ends up in dB. */
+    private fun echoDb(roomLevel: Int, reverbLevel: Int) = (reverbLevel + roomLevel - 2000) / 100.0
+
+    @Test
+    fun androidsOwnLargeHallWouldBeTooQuietToHear() {
+        assertEquals(-38.0, echoDb(-400, -1400), 0.0)
+    }
+
+    @Test
+    fun theReverbAmountSetsAnEchoYouCanHear() {
+        assertEquals(-30.0, echoDb(0, ReverbRoom.reverbLevel(0.0).toInt()), 0.0)
+        assertEquals(0.0, echoDb(0, ReverbRoom.reverbLevel(1.0).toInt()), 0.0)
+        val byDefault = echoDb(0, ReverbRoom.reverbLevel(Tone().reverbAmount).toInt())
+        org.junit.Assert.assertTrue("$byDefault dB", byDefault in -18.0..-12.0)
+    }
+
+    @Test
+    fun biggerRoomsRingForLonger() {
+        val rooms = listOf(ReverbRoom.SMALL_ROOM, ReverbRoom.MEDIUM_ROOM, ReverbRoom.LARGE_ROOM, ReverbRoom.MEDIUM_HALL, ReverbRoom.LARGE_HALL)
+        assertEquals(rooms, rooms.sortedBy { it.decayMs })
+        org.junit.Assert.assertTrue(ReverbRoom.LARGE_HALL.decayMs in 3000..7000)
+    }
+
+    @Test
+    fun reverbSettingsStayWithinWhatAndroidAccepts() {
+        for (amount in listOf(-1.0, 0.0, 0.5, 1.0, 2.0)) {
+            org.junit.Assert.assertTrue(ReverbRoom.reverbLevel(amount) in -9000..2000)
+        }
+        for (room in ReverbRoom.entries) {
+            org.junit.Assert.assertTrue(room.name, room.roomHfLevel in -9000..0)
+            org.junit.Assert.assertTrue(room.name, room.decayMs in 100..20000)
+            org.junit.Assert.assertTrue(room.name, room.decayHfRatio in 100..2000)
+            org.junit.Assert.assertTrue(room.name, room.diffusion in 0..1000)
+            org.junit.Assert.assertTrue(room.name, room.density in 0..1000)
+        }
+    }
+
+    @Test
+    fun reverbStepsAsideForBypassAndTests() {
+        val hall = Preset("user:r", "R", tone = Tone(reverb = ReverbRoom.LARGE_HALL))
+        val on = AppState(enabled = true, current = hall)
+        assertEquals(ReverbRoom.LARGE_HALL, Processing.reverbFor(on, suspended = false))
+        assertEquals(ReverbRoom.OFF, Processing.reverbFor(on.copy(bypass = true), suspended = false))
+        assertEquals(ReverbRoom.OFF, Processing.reverbFor(on, suspended = true))
+        assertEquals(ReverbRoom.OFF, Processing.reverbFor(on.copy(enabled = false), suspended = false))
+    }
+
+    @Test
+    fun reverbIsSavedAndSharedWithThePreset() {
+        val hall = Preset("user:r", "R", tone = Tone(reverb = ReverbRoom.PLATE))
+        assertEquals(ReverbRoom.PLATE, BackupCodec.sanitise(hall).tone.reverb)
+        assertEquals(ReverbRoom.PLATE, ShareCode.decode(ShareCode.encode(hall))!!.tone.reverb)
+    }
+
+    @Test
+    fun presetsSavedBeforeReverbStillLoad() {
+        val old = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }.decodeFromString(Tone.serializer(), "{\"bassDb\":2.0}")
+        assertEquals(ReverbRoom.OFF, old.reverb)
+    }
+
     @Test
     fun anImportedPreampStaysInASafeRange() {
         assertEquals(30.0, AutoEqParser.parse("Preamp: 9999 dB\nFilter 1: ON PK Fc 1000 Hz Gain 1 dB Q 1")!!.preampDb, 0.0)
