@@ -78,6 +78,8 @@ Eigentone is free software under the [GNU General Public License v3.0](LICENSE).
 
 ## Credits
 
+Thanks to [Natcuber](https://github.com/Natcuber) for suggesting many of the improvements in Eigentone.
+
 Barlow and JetBrains Mono are used under the SIL Open Font License 1.1.
 
 The Liberty 4 NC presets, headphone corrections and target curves use [AutoEq](https://github.com/jaakkopasanen/AutoEq) results and targets (MIT License). The Liberty presets only appear while those earbuds are connected.
