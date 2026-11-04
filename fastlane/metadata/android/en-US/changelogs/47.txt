@@ -1,0 +1,7 @@
+- New Fader touch setting: Precision only moves a fader when you grab its cap, keeps your finger on it and moves it from where it is, so a tap never makes it jump, with wider faders that scroll sideways under an overview of the whole curve, Smooth draws a curve across them and shows it as a continuous line
+- The whole width of the screen now scrolls, including beside the page in landscape
+- New Fader view setting: Scroll, or Fit all. An expand button opens the faders across the whole screen in landscape
+- Scroll view works in Smooth too: hold near an edge while drawing to slide along, or use the overview
+- The status strip shows reverb too, and every effect is now a small icon with a tick or cross
+- More colour: active controls and curves now glow amber, with warmer panels
+- Tap the status strip to see every effect by name

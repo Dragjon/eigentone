@@ -1,5 +1,14 @@
 package com.phonons.app.ui
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.clickable
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -76,10 +85,20 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
         state.enabled && Processing.peakEstimate(state, attenuationNow, output.key, scheduledNight).risk == ClipRisk.CLIPPING
     }
 
-    Row(
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Column(
         Modifier
             .fillMaxWidth()
             .background(Palette.Strip)
+            .clickable(
+                role = Role.Button,
+                onClickLabel = stringResource(if (expanded) R.string.ui_strip_hide else R.string.ui_strip_show),
+            ) { expanded = !expanded }
+            .animateContentSize(),
+    ) {
+    Row(
+        Modifier
+            .fillMaxWidth()
             .heightIn(min = STRIP_HEIGHT_DP.dp)
             .padding(horizontal = 16.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -104,9 +123,48 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
         PlayingDot()
         if (showCurve) MiniCurve(state, output.key, working)
     }
+    if (expanded) StripDetails(effects, output.label, clipping)
+    }
 }
 
-/** A tick or a cross as well as the colour, so the state doesn't rely on colour alone. */
+/** Every effect by its full name, opened by tapping the strip. */
+@Composable
+private fun StripDetails(effects: List<EffectState>, outputLabel: String, clipping: Boolean) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(Palette.StripPanel)
+            .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(outputLabel, style = MaterialTheme.typography.bodyMedium, color = Palette.StripText)
+        if (clipping) Text(stringResource(R.string.ui_clip_risk), style = MaterialTheme.typography.bodySmall, color = Palette.StripDanger)
+        effects.forEach { effect ->
+            val colour = if (effect.on) Palette.StripOn else Palette.StripDim
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(painterResource(effectIcon(effect.name)), contentDescription = null, tint = colour, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(12.dp))
+                Text(stringResource(effectLabel(effect.name)), style = MaterialTheme.typography.bodyMedium, color = Palette.StripText, modifier = Modifier.weight(1f))
+                Icon(if (effect.on) Icons.Filled.Check else Icons.Filled.Close, contentDescription = null, tint = colour, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(stringResource(if (effect.on) R.string.ui_state_on else R.string.ui_mode_off), style = Readout, color = colour)
+            }
+        }
+    }
+}
+
+private fun effectLabel(name: String): Int = when (name) {
+    "Night" -> R.string.ui_fx_night
+    "Level" -> R.string.ui_fx_level
+    "Width" -> R.string.ui_fx_width
+    "Surround" -> R.string.ui_fx_surround
+    "Ears" -> R.string.ui_fx_ears
+    "Tame" -> R.string.ui_fx_tame
+    "Reverb" -> R.string.ui_fx_reverb
+    else -> R.string.ui_fx_comp
+}
+
+/** An icon for the effect, then a tick or a cross, so the state doesn't rely on colour alone. */
 @Composable
 private fun EffectTag(effect: EffectState) {
     val colour = if (effect.on) Palette.StripOn else Palette.StripDim
@@ -115,14 +173,25 @@ private fun EffectTag(effect: EffectState) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = description },
     ) {
+        Icon(painterResource(effectIcon(effect.name)), contentDescription = null, tint = colour, modifier = Modifier.size(16.dp))
         Icon(
             if (effect.on) Icons.Filled.Check else Icons.Filled.Close,
             contentDescription = null,
             tint = colour,
-            modifier = Modifier.size(12.dp),
+            modifier = Modifier.size(10.dp),
         )
-        Text(effect.name, fontSize = 11.sp, lineHeight = 14.sp, color = colour, maxLines = 1)
     }
+}
+
+private fun effectIcon(name: String): Int = when (name) {
+    "Night" -> R.drawable.ic_fx_night
+    "Level" -> R.drawable.ic_fx_level
+    "Width" -> R.drawable.ic_fx_width
+    "Surround" -> R.drawable.ic_fx_surround
+    "Ears" -> R.drawable.ic_fx_ears
+    "Tame" -> R.drawable.ic_fx_tame
+    "Reverb" -> R.drawable.ic_fx_reverb
+    else -> R.drawable.ic_fx_comp
 }
 
 @Composable

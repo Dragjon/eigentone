@@ -719,7 +719,7 @@ class NewFeaturesTest {
     @Test
     fun theMainEffectsAlwaysShowWhetherTheyreOn() {
         assertEquals(
-            listOf(EffectState("Comp", false), EffectState("Width", false), EffectState("Ears", false)),
+            listOf(EffectState("Comp", false), EffectState("Width", false), EffectState("Ears", false), EffectState("Reverb", false)),
             Processing.effectStates(AppState(enabled = true), BUDS),
         )
         val comp = Dynamics.styles.first().compressor
@@ -729,7 +729,7 @@ class NewFeaturesTest {
             earCorrections = mapOf(BUDS to ears),
         )
         assertEquals(
-            listOf(EffectState("Comp", true), EffectState("Width", true), EffectState("Ears", true)),
+            listOf(EffectState("Comp", true), EffectState("Width", true), EffectState("Ears", true), EffectState("Reverb", false)),
             Processing.effectStates(full, BUDS),
         )
         // Night mode takes the compressor's place while it's the one running.

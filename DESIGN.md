@@ -186,6 +186,8 @@ components:
 
 **Creative North Star: "The Audiometer"**
 
+**Colour update (user decision):** the lit colour is now Amber (#FFC24A dark, burnt amber #8A4F00 light, with On Lit #2A1C00 and cream #FFF4DC), and the graphite carries a faint warm tint. Where this file says ivory, read amber. The ear colours, Danger Orange and the green strip are unchanged.
+
 Eigentone is a precision instrument the listener owns: a graphite enamel faceplate, ivory that lights up, engraved condensed legends, a fine graph grid and readouts that hold still. Screens are dense because their users know Q and dB, and because a visit is short and happens with music playing.
 
 Colour always carries meaning. Blue and red belong to the left and right ear, as on an audiogram, and every per-ear graph marks the left with X and the right with O. The system refuses the category's glossy dark app with coloured pill sliders and rounded cards.
@@ -298,7 +300,7 @@ One vertical column, capped at 640dp and centred, with 16dp side padding, 12dp a
 
 The frame is fixed: top bar (name, preset dropdown, Bypass while the engine is on, info, power), status strip, scrolling page, five-tab bottom bar (EQ, Sound, Presets, Tune, System). Minimum heights: setting rows 56dp, value tracks and the preset switcher 48dp, section headers 40dp.
 
-**The No Sideways Rule.** Nothing scrolls horizontally, anywhere. Short sets wrap with `FlowRow` (8dp gaps), and long lists use dropdowns (user decision).
+**The No Sideways Rule.** Nothing scrolls horizontally, except the precision fader bank, which the user asked for, under an overview of the whole curve. Short sets wrap with `FlowRow` (8dp gaps), and long lists use dropdowns (user decision).
 
 ## Elevation & Depth
 
@@ -341,7 +343,8 @@ Built to feel like hardware controls: rectangular, labelled and precise.
 ### Status Strip
 A full-width green band, at least 38dp tall, with 6dp gaps: output icon, output name (truncates), clip risk if present, effects, playing dot, and a 52 × 26dp mini curve on every tab except EQ.
 
-- **Effects:** dynamics (Comp, Night or Level), space (Width or Surround) and Ears always appear, with a drawn 12dp tick in ivory when on or cross in Green Dim when off (user decision). Tame appears only while active.
+- **Expanding:** tapping the strip opens a drawer in a softer green (#1F4B3F, `Palette.StripPanel`) listing every effect by its full name with a tick or cross and On or Off, and tapping again closes it.
+- **Effects:** dynamics (Comp, Night or Level), space (Width or Surround), Ears and Reverb always appear as a 16dp icon followed by a 10dp tick when on or cross when off, ivory when on and Green Dim when off (user decision). Tame appears only while active. Each is announced by name with its state.
 - **Playing dot:** 8dp ivory, present only while Android reports music. Its alpha pulses 0.35 to 1 over 900ms, linear, reversing. This is the only authored motion.
 
 **The Drawn State Rule.** On and off are shown by a drawn mark as well as a colour, and each tag is announced with its state.
@@ -357,7 +360,7 @@ A log-frequency plot inside an Enamel panel, ±18 dB by default and zoomed for e
 - **Filter points:** 6dp radius ivory rings with a page-coloured centre; 9dp solid with a 25% halo when selected; Dim Text when disabled or dimmed.
 
 ### Fader Bank
-10, 15 or 31 vertical faders in a 196dp canvas. Sweeping a finger across draws a curve; band arrows, readout and − / + keys beside it give the same control to screen readers. Rails are 2dp, ivory between zero and the value. Caps are up to 22 × 12dp with a 1dp On Lit centre line. The selected cap is at least 14 × 18dp, Text colour, with a 2dp Enamel surround.
+10, 15 or 31 vertical faders in a 196dp canvas. Two 44 × 32dp icon pills right-aligned above the bank, each after a dim 11sp engraved label (TOUCH, VIEW) (crosshair or wave for **Fader touch**, two-way arrow or fit for **Fader view**, ivory when chosen) choose Precision (the default, where a finger stays on the fader it pressed and drags it relative to its current level, so a tap never jumps it; faders are 44dp wide and scroll sideways when they don't fit, under a 44dp overview strip of the whole curve with the visible window outlined, and the dB scale stays pinned, unless **Fader view** is Fit all; a Smooth sweep held within 48dp of an edge slides the bank; a sideways-phone key beside the pills always opens `ExpandedFaders`, the bank full-screen in landscape) or Smooth (sweeping across draws a curve, drawn as a continuous Catmull-Rom line through every band with a 16% ivory fill to zero, 1dp Hairline band guides, 3dp ivory handles and a 6dp Text handle on the selected band); band arrows, readout and − / + keys beside it give the same control to screen readers. Rails are 2dp, ivory between zero and the value. Caps are up to 22 × 12dp with a 1dp On Lit centre line. The selected cap is at least 14 × 18dp, Text colour, with a 2dp Enamel surround.
 
 ### Value Track
 Replaces Material's slider: a 2dp rail with 20 engraved ticks, a long tick at the default, and a 12 × 24dp ivory cap with an On Lit grip line. It fills from its origin, with a notch when that origin is centred. Only a sideways drag changes it, and a double tap resets it. It keeps slider semantics for screen readers.

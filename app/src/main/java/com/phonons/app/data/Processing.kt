@@ -171,6 +171,7 @@ object Processing {
             add(EffectState(dynamics ?: "Comp", dynamics != null))
             add(EffectState(space ?: if (state.useSystemSurround) "Surround" else "Width", space != null))
             add(EffectState("Ears", "Ears" in active))
+            add(EffectState("Reverb", "Reverb" in active))
             if ("Tame" in active) add(EffectState("Tame", true))
         }
     }
@@ -191,6 +192,7 @@ object Processing {
             if (tone.harshTamer > 0.0 || tone.boomTamer > 0.0) add("Tame")
             if (tone.surround > 0.0) add(if (state.useSystemSurround) "Surround" else "Width")
             if (state.earsFor(outputKey)?.enabled == true) add("Ears")
+            if (tone.reverb != ReverbRoom.OFF) add("Reverb")
         }
     }
 

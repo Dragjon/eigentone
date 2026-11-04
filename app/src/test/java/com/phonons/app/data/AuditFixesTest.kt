@@ -305,6 +305,22 @@ class AuditFixesTest {
     }
 
     @Test
+    fun fadersStartInPrecisionModeAndOlderStatesStillLoad() {
+        assertEquals(FaderMode.PRECISION, AppState().faderMode)
+        assertEquals(FaderView.SCROLL, AppState().faderView)
+        val old = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }.decodeFromString(AppState.serializer(), "{\"enabled\":true}")
+        assertEquals(FaderMode.PRECISION, old.faderMode)
+    }
+
+    @Test
+    fun theStripShowsReverbOnlyWhileItsRunning() {
+        val hall = Preset("user:r", "R", tone = Tone(reverb = ReverbRoom.LARGE_HALL))
+        assertEquals(EffectState("Reverb", true), Processing.effectStates(AppState(enabled = true, current = hall), buds).last())
+        assertEquals(EffectState("Reverb", false), Processing.effectStates(AppState(enabled = true, current = hall, bypass = true), buds).last())
+        assertEquals(EffectState("Reverb", false), Processing.effectStates(AppState(enabled = true), buds).last())
+    }
+
+    @Test
     fun anImportedPreampStaysInASafeRange() {
         assertEquals(30.0, AutoEqParser.parse("Preamp: 9999 dB\nFilter 1: ON PK Fc 1000 Hz Gain 1 dB Q 1")!!.preampDb, 0.0)
         assertEquals(-30.0, AutoEqParser.parse("Preamp: -9999 dB\nFilter 1: ON PK Fc 1000 Hz Gain 1 dB Q 1")!!.preampDb, 0.0)

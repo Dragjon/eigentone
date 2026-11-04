@@ -45,7 +45,10 @@ class ThemeColorsTest {
         }
         check("key legend", t.onLit, t.lit, 4.5)
         check("pressed key legend", t.onLit, t.litPressed, 4.5)
-        for (item in listOf(t.stripText, t.stripOn, t.stripDim, t.stripDanger)) check("strip", item, t.strip, 4.5)
+        for (item in listOf(t.stripText, t.stripOn, t.stripDim, t.stripDanger)) {
+            check("strip", item, t.strip, 4.5)
+            check("opened strip", item, t.stripPanel, 4.5)
+        }
     }
 
     @Test
@@ -71,12 +74,11 @@ class ThemeColorsTest {
     }
 
     @Test
-    fun theDarkThemeKeepsItsOriginalColours() {
-        val t = DarkColors
-        assertEquals(
-            listOf(0xFF141516, 0xFF0B0C0D, 0xFF1E1F20, 0xFF2B2D2E, 0xFF333536, 0xFF323435, 0xFF8A8C8E, 0xFF6C6F71, 0xFFEEEEEA, 0xFFB0B2B2, 0xFFF2E8CF, 0xFFD6CCB4, 0xFF1E1A10, 0xFFFF9A5C, 0xFF62B2F2, 0xFFF06B5C).map { Color(it) },
-            listOf(t.background, t.bar, t.surface, t.surfaceHigh, t.tooltip, t.line, t.outline, t.track, t.text, t.textDim, t.lit, t.litPressed, t.onLit, t.danger, t.leftEar, t.rightEar),
-        )
+    fun amberIsTheLitColourAndTheEarsKeepTheirs() {
+        assertEquals(Color(0xFFFFC24A), DarkColors.lit)
+        assertEquals(Color(0xFF62B2F2), DarkColors.leftEar)
+        assertEquals(Color(0xFFF06B5C), DarkColors.rightEar)
+        assertEquals(Color(0xFFFF9A5C), DarkColors.danger)
     }
 
     @Test

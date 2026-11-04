@@ -185,6 +185,14 @@ data class Preset(
     val folder: String? = null,
 )
 
+/** How a finger moves the faders: one fader at a time, or a curve drawn across them. */
+@Serializable
+enum class FaderMode { PRECISION, SMOOTH }
+
+/** How precision faders fit: wide ones that scroll sideways, or all on screen with a full-screen view to open. */
+@Serializable
+enum class FaderView { SCROLL, FULL_SCREEN }
+
 /** Which colours the app uses. Device follows the phone's own light or dark setting. */
 @Serializable
 enum class ThemeMode { DEVICE, LIGHT, DARK }
@@ -244,6 +252,8 @@ data class AppState(
     val limiterThresholdDb: Double = -1.0,
     val guidedSetupSeen: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.DEVICE,
+    val faderMode: FaderMode = FaderMode.PRECISION,
+    val faderView: FaderView = FaderView.SCROLL,
     /** The output last acted on, so restarting the EQ on the same output leaves the chosen preset alone. */
     val lastOutputKey: String? = null,
     // Older versions kept these outside the preset. They're only read once, by migrated().

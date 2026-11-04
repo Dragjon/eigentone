@@ -1,5 +1,40 @@
 package com.phonons.app.ui
 
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.runtime.mutableStateOf
+import com.phonons.app.data.FaderView
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.DisposableEffect
+import androidx.activity.compose.BackHandler
+import android.content.pm.ActivityInfo
+import android.app.Activity
+import kotlinx.coroutines.launch
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
+import kotlin.math.abs
+import com.phonons.app.data.FaderMode
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -41,6 +76,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -60,13 +96,52 @@ import java.util.Locale
 
 private const val STEP_DB = 0.5
 
+/** A small two-way switch shown as icons, each named for screen readers. */
+@Composable
+private fun IconPill(options: List<Pair<Int, String>>, selected: Int, onSelect: (Int) -> Unit) {
+    Row(
+        Modifier
+            .clip(KeyShape)
+            .background(Palette.SurfaceHigh)
+            .selectableGroup(),
+    ) {
+        options.forEachIndexed { i, (icon, name) ->
+            val on = i == selected
+            Box(
+                Modifier
+                    .size(width = PILL_WIDTH_DP.dp, height = PILL_HEIGHT_DP.dp)
+                    .background(if (on) Palette.Lit else Palette.SurfaceHigh)
+                    .selectable(selected = on, role = Role.RadioButton, onClick = { onSelect(i) })
+                    .semantics { contentDescription = name },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(painterResource(icon), contentDescription = null, tint = if (on) Palette.OnLit else Palette.TextDim, modifier = Modifier.size(18.dp))
+            }
+        }
+    }
+}
+
+/** Names a pill, so its icons have something to explain them. Screen readers already hear each option's name. */
+@Composable
+private fun PillLabel(label: String) {
+    Text(
+        label.uppercase(),
+        style = PanelLegend.copy(fontSize = 11.sp),
+        color = Palette.TextDim,
+        modifier = Modifier.clearAndSetSemantics { },
+    )
+}
+
+private const val PILL_WIDTH_DP = 44
+private const val PILL_HEIGHT_DP = 32
+
 /**
  * Vertical faders you can set one at a time, or sweep a finger across to draw a whole curve. The
  * band readout and buttons below offer the same control for precise changes and screen readers.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit) {
+fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, onExpand: () -> Unit) {
     val bands = tone.graphicBands
     val gains = GraphicEq.normalized(tone.graphicDb, bands)
     var selected by rememberSaveable(bands) { mutableIntStateOf(bands / 2) }
@@ -111,8 +186,41 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit) {
                 }) { Text(stringResource(R.string.ui_reset)) }
             }
         }
+        // Small and right above the faders, so how they behave can be changed without leaving them.
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(start = 12.dp, end = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End),
+        ) {
+            PillLabel(stringResource(R.string.ui_pill_touch))
+            IconPill(
+                options = listOf(
+                    R.drawable.ic_touch_precise to stringResource(R.string.ui_fader_precision),
+                    R.drawable.ic_touch_smooth to stringResource(R.string.ui_fader_smooth),
+                ),
+                selected = FaderMode.entries.indexOf(appState.faderMode),
+                onSelect = { i -> Repo.update { it.copy(faderMode = FaderMode.entries[i]) } },
+            )
+            Spacer(Modifier.width(6.dp))
+            PillLabel(stringResource(R.string.ui_pill_view))
+            IconPill(
+                options = listOf(
+                    R.drawable.ic_view_scroll to stringResource(R.string.ui_fader_view_scroll),
+                    R.drawable.ic_view_fit to stringResource(R.string.ui_fader_view_full),
+                ),
+                selected = FaderView.entries.indexOf(appState.faderView),
+                onSelect = { i -> Repo.update { it.copy(faderView = FaderView.entries[i]) } },
+            )
+            IconButton(onClick = onExpand) {
+                Icon(painterResource(R.drawable.ic_landscape), contentDescription = stringResource(R.string.ui_expand_faders), tint = Palette.TextDim)
+            }
+        }
         Faders(
             gains = gains,
+            smooth = appState.faderMode == FaderMode.SMOOTH,
+            scrollable = appState.faderView == FaderView.SCROLL,
             shown = rememberMorphed(gains.toDoubleArray(), presetId to tone.shape?.name),
             selected = band,
             onSelect = { selected = it },
@@ -233,6 +341,14 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit) {
 @Composable
 private fun Faders(
     gains: List<Double>,
+    /** Draws a curve across the faders. Otherwise a touch stays on the fader it started on. */
+    smooth: Boolean,
+    /** Precision faders get a finger's width each and scroll when they don't fit. */
+    scrollable: Boolean,
+    /** Where the bank sits. The full-screen view gives it all the room left. */
+    area: Modifier = Modifier,
+    /** Fills the height it's given rather than the usual 196dp. */
+    fill: Boolean = false,
     /** What to draw, which glides while the sound changes. Touches always work from [gains]. */
     shown: DoubleArray,
     selected: Int,
@@ -248,129 +364,416 @@ private fun Faders(
     val labelStyle = TextStyle(color = Palette.TextDim, fontSize = 10.sp, fontFamily = ReadoutFamily)
     val bands = gains.size
     val freqs = GraphicEq.frequencies(bands)
-    val labelledBands = freqs.indices.filter { freqs[it] in LABEL_FREQS }
+    val density = LocalDensity.current
 
-    Canvas(
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = 196.dp)
-            .height(196.dp)
-            .padding(horizontal = 12.dp)
-            .semantics {
-                contentDescription =
-                    appText(R.string.ui_band_faders_use_the_band_controls, bands)
+    BoxWithConstraints(area.fillMaxWidth().padding(horizontal = 12.dp)) {
+        // Precision gives every fader a finger's width and scrolls sideways when they don't all fit.
+        val wide = DB_GUTTER_DP.dp + PRECISION_SLOT_DP.dp * bands
+        val scrolling = scrollable && wide > maxWidth
+        val scroll = rememberScrollState()
+        // Set while a smooth sweep is drawing, so the view doesn't chase the band under the finger.
+        var sweeping by remember { mutableStateOf(false) }
+        // How fast to slide while a sweep holds near an edge, in pixels a frame. Negative goes left.
+        var edgePush by remember { mutableFloatStateOf(0f) }
+        val pushing = edgePush != 0f
+        LaunchedEffect(pushing) {
+            while (edgePush != 0f) {
+                withFrameNanos { }
+                scroll.dispatchRawDelta(edgePush)
             }
-            .pointerInput(bands) {
-                val bottomLabels = LABEL_SPACE_DP.dp.toPx()
-                val gutter = DB_GUTTER_DP.dp.toPx()
-                fun bandAt(x: Float) = (((x - gutter) / (size.width - gutter)) * bands).toInt().coerceIn(0, bands - 1)
-                fun dbAt(y: Float): Double {
-                    val height = size.height - bottomLabels
-                    return GraphicEq.snap(GraphicEq.MAX_DB * (1 - 2 * y.coerceIn(0f, height) / height))
-                }
-                awaitEachGesture {
-                    val down = awaitFirstDown()
-                    down.consume()
-                    var lastBand = bandAt(down.position.x)
-                    var lastDb = dbAt(down.position.y)
-                    select(lastBand)
-                    change(GraphicEq.drawLine(latest, lastBand, lastDb, lastBand, lastDb))
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val pointer = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if (pointer.position != pointer.previousPosition) {
-                            val band = bandAt(pointer.position.x)
-                            val db = dbAt(pointer.position.y)
-                            select(band)
-                            change(GraphicEq.drawLine(latest, lastBand, lastDb, band, db))
-                            lastBand = band
-                            lastDb = db
+        }
+        val contentWidth = if (scrolling) wide else maxWidth
+        val contentPx = with(density) { contentWidth.toPx() }
+        val viewPx = with(density) { maxWidth.toPx() }
+        val labelledBands = if (scrolling || (fill && bands <= FULL_LABEL_BANDS)) freqs.indices.toList() else freqs.indices.filter { freqs[it] in LABEL_FREQS }
+
+        // A band chosen with the arrows below comes into view.
+        LaunchedEffect(selected, scrolling, bands) {
+            if (!scrolling || sweeping) return@LaunchedEffect
+            val gutter = with(density) { DB_GUTTER_DP.dp.toPx() }
+            val slot = (contentPx - gutter) / bands
+            val left = gutter + slot * selected
+            val right = left + slot
+            when {
+                left - gutter < scroll.value -> scroll.animateScrollTo((left - gutter).toInt())
+                right > scroll.value + viewPx -> scroll.animateScrollTo((right - viewPx).toInt())
+            }
+        }
+
+        val bankHeight = if (fill) (maxHeight - if (scrolling) OVERVIEW_HEIGHT_DP.dp else 0.dp).coerceAtLeast(196.dp) else 196.dp
+        Column {
+            if (scrolling) FaderOverview(shown, selected, scroll, contentPx, viewPx)
+            Box(Modifier.fillMaxWidth().then(if (scrolling) Modifier.horizontalScroll(scroll, enabled = !smooth) else Modifier)) {
+                Canvas(
+                    Modifier
+                        .width(contentWidth)
+                        .height(bankHeight)
+                        .semantics {
+                            contentDescription =
+                                appText(R.string.ui_band_faders_use_the_band_controls, bands)
                         }
-                        pointer.consume()
-                        if (!pointer.pressed) break
+                        .pointerInput(bands, smooth, scrolling, viewPx) {
+                            val bottomLabels = LABEL_SPACE_DP.dp.toPx()
+                            val gutter = DB_GUTTER_DP.dp.toPx()
+                            fun bandAt(x: Float) = (((x - gutter) / (size.width - gutter)) * bands).toInt().coerceIn(0, bands - 1)
+                            fun dbAt(y: Float): Double {
+                                val height = size.height - bottomLabels
+                                return GraphicEq.snap(GraphicEq.MAX_DB * (1 - 2 * y.coerceIn(0f, height) / height))
+                            }
+                            awaitEachGesture {
+                                val down = awaitFirstDown()
+                                if (smooth) {
+                                    // Smooth sets each fader to wherever the finger is, across all of them.
+                                    down.consume()
+                                    sweeping = true
+                                    var lastBand = bandAt(down.position.x)
+                                    var lastDb = dbAt(down.position.y)
+                                    select(lastBand)
+                                    change(GraphicEq.drawLine(latest, lastBand, lastDb, lastBand, lastDb))
+                                    while (true) {
+                                        val pointer = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                                        if (scrolling) {
+                                            // Near an edge of the view, slide that way, so a sweep can carry on past it.
+                                            val edge = EDGE_PAN_DP.dp.toPx()
+                                            val inView = pointer.position.x - scroll.value
+                                            edgePush = when {
+                                                inView < edge && scroll.value > 0 -> -(edge - inView) / edge * MAX_PAN_PX
+                                                inView > viewPx - edge && scroll.value < scroll.maxValue -> (inView - (viewPx - edge)) / edge * MAX_PAN_PX
+                                                else -> 0f
+                                            }
+                                        }
+                                        if (pointer.position != pointer.previousPosition) {
+                                            val band = bandAt(pointer.position.x)
+                                            val db = dbAt(pointer.position.y)
+                                            select(band)
+                                            change(GraphicEq.drawLine(latest, lastBand, lastDb, band, db))
+                                            lastBand = band
+                                            lastDb = db
+                                        }
+                                        pointer.consume()
+                                        if (!pointer.pressed) break
+                                    }
+                                    sweeping = false
+                                    edgePush = 0f
+                                    finished()
+                                } else {
+                                    // Precision moves one fader from where it already is, so a tap never makes it
+                                    // jump. A sideways swipe is left for scrolling, an upward or downward one moves it.
+                                    val band = bandAt(down.position.x)
+                                    val startDb = latest.getOrElse(band) { 0.0 }
+                                    val railHeight = size.height - bottomLabels
+                                    val capY = ((1 - startDb / GraphicEq.MAX_DB) / 2 * railHeight).toFloat()
+                                    // Only a touch on the cap moves it, so a finger running along the rails does
+                                    // nothing, and an up or down swipe there scrolls the page instead.
+                                    val onCap = abs(down.position.y - capY) <= CAP_GRAB_DP.dp.toPx()
+                                    val startX = down.position.x
+                                    var startY = down.position.y
+                                    var dragging = false
+                                    val slop = viewConfiguration.touchSlop
+                                    while (true) {
+                                        val pointer = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                                        if (!pointer.pressed) {
+                                            if (!dragging && !pointer.isConsumed) select(band)
+                                            break
+                                        }
+                                        if (!dragging) {
+                                            val dx = abs(pointer.position.x - startX)
+                                            val dy = abs(pointer.position.y - startY)
+                                            if (onCap && dy >= slop && dy > dx) {
+                                                dragging = true
+                                                startY = pointer.position.y
+                                                select(band)
+                                            } else if (dx >= slop || dy >= slop || pointer.isConsumed) {
+                                                break
+                                            }
+                                        }
+                                        if (dragging) {
+                                            val db = GraphicEq.snap(startDb - (pointer.position.y - startY) / (size.height - bottomLabels) * 2 * GraphicEq.MAX_DB)
+                                            change(GraphicEq.drawLine(latest, band, db, band, db))
+                                            pointer.consume()
+                                        }
+                                    }
+                                    if (dragging) finished()
+                                }
+                            }
+                        },
+                ) {
+                    val bottomLabels = LABEL_SPACE_DP.dp.toPx()
+                    val height = size.height - bottomLabels
+                    val gutter = DB_GUTTER_DP.dp.toPx()
+                    val slot = (size.width - gutter) / bands
+                    val rail = 2.dp.toPx()
+                    // Caps are as wide as the layout allows, so they read as faders even with 31 bands.
+                    val capWidth = (slot * 0.76f).coerceAtMost((if (scrolling) 30 else 22).dp.toPx())
+                    val capHeight = (if (scrolling) 14 else 12).dp.toPx()
+                    val yOf = { db: Double -> ((1 - db / GraphicEq.MAX_DB) / 2 * height).toFloat() }
+                    val zero = yOf(0.0)
+
+                    listOf(-10.0, -5.0, 5.0, 10.0).forEach { db ->
+                        drawLine(Palette.Line, Offset(gutter, yOf(db)), Offset(size.width, yOf(db)), strokeWidth = 1f)
                     }
-                    finished()
+                    drawLine(Palette.Outline, Offset(gutter, zero), Offset(size.width, zero), strokeWidth = 1f)
+
+                    if (smooth) {
+                        drawSmoothCurve(shown, selected, gutter, slot, height, zero, yOf)
+                    } else shown.forEachIndexed { i, gain ->
+                        val centre = gutter + slot * i + slot / 2
+                        val isSelected = i == selected
+                        drawRect(
+                            if (isSelected) Palette.Outline else Palette.Track,
+                            topLeft = Offset(centre - rail / 2, 0f),
+                            size = Size(rail, height),
+                        )
+                        val top = minOf(zero, yOf(gain))
+                        val bottom = maxOf(zero, yOf(gain))
+                        if (bottom - top > 0.5f) {
+                            drawRect(Palette.Lit, topLeft = Offset(centre - rail / 2, top), size = Size(rail, bottom - top))
+                        }
+                        val width = if (isSelected) capWidth.coerceAtLeast(14.dp.toPx()) else capWidth
+                        val tall = if (isSelected) capHeight + 6.dp.toPx() else capHeight
+                        val y = yOf(gain)
+                        if (isSelected) {
+                            drawRoundRect(
+                                Palette.Surface,
+                                topLeft = Offset(centre - width / 2 - 2.dp.toPx(), y - tall / 2 - 2.dp.toPx()),
+                                size = Size(width + 4.dp.toPx(), tall + 4.dp.toPx()),
+                                cornerRadius = CornerRadius(3.dp.toPx()),
+                            )
+                        }
+                        drawRoundRect(
+                            if (isSelected) Palette.Text else Palette.Lit,
+                            topLeft = Offset(centre - width / 2, y - tall / 2),
+                            size = Size(width, tall),
+                            cornerRadius = CornerRadius(2.dp.toPx()),
+                        )
+                        drawRect(
+                            Palette.OnLit,
+                            topLeft = Offset(centre - width / 2 + 1.dp.toPx(), y - 0.5.dp.toPx()),
+                            size = Size(width - 2.dp.toPx(), 1.dp.toPx()),
+                        )
+                    }
+
+                    labelledBands.forEach { i ->
+                        val label = GraphicEq.formatFrequency(freqs[i]).replace(" kHz", "k").replace(" Hz", "")
+                        val measured = measurer.measure(label, labelStyle)
+                        val centre = gutter + slot * i + slot / 2
+                        drawText(
+                            measured,
+                            topLeft = Offset(
+                                (centre - measured.size.width / 2).coerceIn(0f, size.width - measured.size.width),
+                                height + 4.dp.toPx(),
+                            ),
+                        )
+                    }
+
+                    // The dB scale stays put while the faders scroll beneath it.
+                    val pinned = if (scrolling) scroll.value.toFloat() else 0f
+                    if (scrolling) drawRect(Palette.Surface, topLeft = Offset(pinned, 0f), size = Size(gutter, size.height))
+                    listOf(10.0, 0.0, -10.0).forEach { db ->
+                        val label = if (db > 0) "+${db.toInt()}" else "${db.toInt()}"
+                        val measured = measurer.measure(label, labelStyle)
+                        drawText(measured, topLeft = Offset(pinned, yOf(db) - measured.size.height / 2))
+                    }
                 }
-            },
-    ) {
-        val bottomLabels = LABEL_SPACE_DP.dp.toPx()
-        val height = size.height - bottomLabels
-        val gutter = DB_GUTTER_DP.dp.toPx()
-        val slot = (size.width - gutter) / bands
-        val rail = 2.dp.toPx()
-        // Caps are as wide as the layout allows, so they read as faders even with 31 bands.
-        val capWidth = (slot * 0.76f).coerceAtMost(22.dp.toPx())
-        val capHeight = 12.dp.toPx()
-        val yOf = { db: Double -> ((1 - db / GraphicEq.MAX_DB) / 2 * height).toFloat() }
-        val zero = yOf(0.0)
-
-        listOf(-10.0, -5.0, 5.0, 10.0).forEach { db ->
-            drawLine(Palette.Line, Offset(gutter, yOf(db)), Offset(size.width, yOf(db)), strokeWidth = 1f)
-        }
-        drawLine(Palette.Outline, Offset(gutter, zero), Offset(size.width, zero), strokeWidth = 1f)
-
-        shown.forEachIndexed { i, gain ->
-            val centre = gutter + slot * i + slot / 2
-            val isSelected = i == selected
-            drawRect(
-                if (isSelected) Palette.Outline else Palette.Track,
-                topLeft = Offset(centre - rail / 2, 0f),
-                size = Size(rail, height),
-            )
-            val top = minOf(zero, yOf(gain))
-            val bottom = maxOf(zero, yOf(gain))
-            if (bottom - top > 0.5f) {
-                drawRect(
-                    Palette.Lit,
-                    topLeft = Offset(centre - rail / 2, top),
-                    size = Size(rail, bottom - top),
-                )
             }
-            val width = if (isSelected) capWidth.coerceAtLeast(14.dp.toPx()) else capWidth
-            val tall = if (isSelected) capHeight + 6.dp.toPx() else capHeight
-            val y = yOf(gain)
-            if (isSelected) {
-                drawRoundRect(
-                    Palette.Surface,
-                    topLeft = Offset(centre - width / 2 - 2.dp.toPx(), y - tall / 2 - 2.dp.toPx()),
-                    size = Size(width + 4.dp.toPx(), tall + 4.dp.toPx()),
-                    cornerRadius = CornerRadius(3.dp.toPx()),
-                )
-            }
-            drawRoundRect(
-                if (isSelected) Palette.Text else Palette.Lit,
-                topLeft = Offset(centre - width / 2, y - tall / 2),
-                size = Size(width, tall),
-                cornerRadius = CornerRadius(2.dp.toPx()),
-            )
-            drawRect(
-                Palette.OnLit,
-                topLeft = Offset(centre - width / 2 + 1.dp.toPx(), y - 0.5.dp.toPx()),
-                size = Size(width - 2.dp.toPx(), 1.dp.toPx()),
-            )
-        }
-
-        listOf(10.0, 0.0, -10.0).forEach { db ->
-            val text = if (db > 0) "+${db.toInt()}" else "${db.toInt()}"
-            val measured = measurer.measure(text, labelStyle)
-            drawText(measured, topLeft = Offset(0f, yOf(db) - measured.size.height / 2))
-        }
-
-        labelledBands.forEach { i ->
-            val text = GraphicEq.formatFrequency(freqs[i]).replace(" kHz", "k").replace(" Hz", "")
-            val measured = measurer.measure(text, labelStyle)
-            val centre = gutter + slot * i + slot / 2
-            drawText(
-                measured,
-                topLeft = Offset(
-                    (centre - measured.size.width / 2).coerceIn(0f, size.width - measured.size.width),
-                    height + 4.dp.toPx(),
-                ),
-            )
         }
     }
 }
 
+/**
+ * The whole fader curve at a glance while the faders scroll, with the part in view outlined. Tapping or
+ * dragging on it scrolls there.
+ */
+@Composable
+private fun FaderOverview(shown: DoubleArray, selected: Int, scroll: ScrollState, contentPx: Float, viewPx: Float) {
+    val scope = rememberCoroutineScope()
+    Canvas(
+        Modifier
+            .fillMaxWidth()
+            .height(OVERVIEW_HEIGHT_DP.dp)
+            .padding(bottom = 8.dp)
+            .clip(KeyShape)
+            .background(Palette.SurfaceHigh)
+            .semantics { contentDescription = appText(R.string.ui_fader_overview) }
+            .pointerInput(contentPx, viewPx) {
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+                    fun go(x: Float) {
+                        val target = (x / size.width * contentPx - viewPx / 2).toInt().coerceIn(0, scroll.maxValue)
+                        scope.launch { scroll.scrollTo(target) }
+                    }
+                    down.consume()
+                    go(down.position.x)
+                    while (true) {
+                        val pointer = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                        if (!pointer.pressed) break
+                        pointer.consume()
+                        go(pointer.position.x)
+                    }
+                }
+            },
+    ) {
+        val inset = 4.dp.toPx()
+        val h = size.height - inset * 2
+        fun yOf(db: Double) = (inset + (1 - db / GraphicEq.MAX_DB) / 2 * h).toFloat()
+        drawLine(Palette.Outline, Offset(0f, yOf(0.0)), Offset(size.width, yOf(0.0)), strokeWidth = 1f)
+        val step = size.width / shown.size
+        val curve = Path()
+        shown.forEachIndexed { i, db ->
+            val x = step * i + step / 2
+            if (i == 0) curve.moveTo(0f, yOf(db))
+            curve.lineTo(x, yOf(db))
+            if (i == shown.lastIndex) curve.lineTo(size.width, yOf(db))
+        }
+        drawPath(curve, Palette.Lit, style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round))
+        drawCircle(Palette.Text, 3.dp.toPx(), Offset(step * selected + step / 2, yOf(shown.getOrElse(selected) { 0.0 })))
+        // The window in view, read here so it follows the scroll as it moves.
+        val left = scroll.value / contentPx * size.width
+        val width = viewPx / contentPx * size.width
+        drawRect(Palette.Text, topLeft = Offset(left, 1f), size = Size(width, size.height - 2f), style = Stroke(width = 1.5.dp.toPx()))
+    }
+}
+
+/**
+ * Smooth mode shows the faders as one continuous curve, since that's what a sweep draws: thin band guides,
+ * a filled curve through every band, and small handles on it.
+ */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSmoothCurve(
+    shown: DoubleArray,
+    selected: Int,
+    gutter: Float,
+    slot: Float,
+    height: Float,
+    zero: Float,
+    yOf: (Double) -> Float,
+) {
+    val points = shown.mapIndexed { i, gain -> Offset(gutter + slot * i + slot / 2, yOf(gain)) }
+    points.forEachIndexed { i, p ->
+        val guide = 1.dp.toPx()
+        drawRect(if (i == selected) Palette.Outline else Palette.Line, topLeft = Offset(p.x - guide / 2, 0f), size = Size(guide, height))
+    }
+    val curve = Path().apply {
+        moveTo(gutter, points.first().y)
+        lineTo(points.first().x, points.first().y)
+        for (i in 0 until points.size - 1) {
+            // Catmull-Rom through each fader, so the line passes exactly through every value.
+            val p0 = points[maxOf(i - 1, 0)]
+            val p1 = points[i]
+            val p2 = points[i + 1]
+            val p3 = points[minOf(i + 2, points.lastIndex)]
+            fun clampY(y: Float) = y.coerceIn(0f, height)
+            cubicTo(
+                p1.x + (p2.x - p0.x) / 6, clampY(p1.y + (p2.y - p0.y) / 6),
+                p2.x - (p3.x - p1.x) / 6, clampY(p2.y - (p3.y - p1.y) / 6),
+                p2.x, p2.y,
+            )
+        }
+        lineTo(size.width, points.last().y)
+    }
+    val fill = Path().apply {
+        addPath(curve)
+        lineTo(size.width, zero)
+        lineTo(gutter, zero)
+        close()
+    }
+    drawPath(fill, Palette.Lit.copy(alpha = SMOOTH_FILL_ALPHA))
+    drawPath(curve, Palette.Lit, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+    points.forEachIndexed { i, p ->
+        if (i == selected) {
+            drawCircle(Palette.Surface, 8.dp.toPx(), p)
+            drawCircle(Palette.Text, 6.dp.toPx(), p)
+        } else {
+            drawCircle(Palette.Lit, 3.dp.toPx(), p)
+        }
+    }
+}
+
+private const val SMOOTH_FILL_ALPHA = 0.16f
+
 private const val LABEL_SPACE_DP = 22
+/** How wide each fader is in precision mode, so a finger lands on the right one. */
+private const val PRECISION_SLOT_DP = 44
+private const val OVERVIEW_HEIGHT_DP = 44
+/** How far from the cap's centre a touch still grabs it, which makes the target 48dp tall. */
+private const val CAP_GRAB_DP = 24
+/** How close to the edge a sweep has to get before the faders slide, and how fast they go at the very edge. */
+private const val EDGE_PAN_DP = 48
+private const val MAX_PAN_PX = 22f
+private const val FULL_LABEL_BANDS = 15
+
+/**
+ * The faders across the whole screen, turned sideways, so each one is wide and tall enough to set exactly.
+ * It changes the same sound as the console, and undo works the same way.
+ */
+@Composable
+fun ExpandedFaders(onClose: () -> Unit) {
+    val state by Repo.state.collectAsStateWithLifecycle()
+    val tone = state.current.tone
+    val bands = tone.graphicBands
+    val gains = GraphicEq.normalized(tone.graphicDb, bands)
+    val freqs = GraphicEq.frequencies(bands)
+    var selected by rememberSaveable(bands) { mutableIntStateOf(bands / 2) }
+    val band = selected.coerceIn(0, bands - 1)
+    val activity = LocalContext.current as? Activity
+
+    DisposableEffect(activity) {
+        val before = activity?.requestedOrientation
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        onDispose { if (activity != null && before != null) activity.requestedOrientation = before }
+    }
+    BackHandler { onClose() }
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(Palette.Background)
+            .windowInsetsPadding(WindowInsets.safeDrawing),
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .background(Palette.Bar)
+                .heightIn(min = 48.dp)
+                .padding(start = 4.dp, end = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onClose) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.ui_back), tint = Palette.Text)
+            }
+            Text(GraphicEq.formatFrequency(freqs[band]), style = MaterialTheme.typography.titleMedium, color = Palette.Text)
+            Spacer(Modifier.width(12.dp))
+            Text(
+                String.format(Locale.US, "%+.1f dB", gains[band]),
+                style = Readout,
+                color = if (gains[band] != 0.0) Palette.Lit else Palette.TextDim,
+                modifier = Modifier.weight(1f),
+            )
+            UndoRedoButtons()
+            Spacer(Modifier.width(8.dp))
+            WordSegments(
+                labels = listOf(stringResource(R.string.ui_fader_precision), stringResource(R.string.ui_fader_smooth)),
+                selected = FaderMode.entries.indexOf(state.faderMode),
+                onSelect = { i -> Repo.update { it.copy(faderMode = FaderMode.entries[i]) } },
+                modifier = Modifier.width(240.dp),
+            )
+        }
+        Faders(
+            gains = gains,
+            smooth = state.faderMode == FaderMode.SMOOTH,
+            scrollable = false,
+            area = Modifier
+                .weight(1f)
+                .padding(top = 12.dp, bottom = 8.dp),
+            fill = true,
+            shown = rememberMorphed(gains.toDoubleArray(), state.current.id to tone.shape?.name),
+            selected = band,
+            onSelect = { selected = it },
+            onChange = { new ->
+                Repo.editTone { it.copy(graphicDb = new, graphicBands = new.size, shape = it.shape.takeUnless { GraphicEq.isFlat(new) }) }
+            },
+            onFinished = Repo::commit,
+        )
+    }
+}
 private const val DB_GUTTER_DP = 24
 private val LABEL_FREQS = setOf(62.5, 63.0, 250.0, 1000.0, 4000.0, 16000.0)

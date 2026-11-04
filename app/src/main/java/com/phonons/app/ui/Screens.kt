@@ -188,6 +188,9 @@ private val LocalOpenSweep = compositionLocalOf<() -> Unit> { error("No sweep") 
 
 private val LocalOpenCompare = compositionLocalOf<() -> Unit> { error("No comparison") }
 
+/** Opens the faders across the whole screen. */
+private val LocalOpenFaders = compositionLocalOf<() -> Unit> { error("No expanded faders") }
+
 /** Opens the shape library from the graphic EQ. */
 private val LocalOpenShapes = compositionLocalOf<() -> Unit> { error("No shape library") }
 
@@ -212,6 +215,12 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
     var comparing by rememberSaveable { mutableStateOf(false) }
     var sweeping by rememberSaveable { mutableStateOf(false) }
     var findingPeaks by rememberSaveable { mutableStateOf(false) }
+    var expandingFaders by rememberSaveable { mutableStateOf(false) }
+
+    if (expandingFaders) {
+        ExpandedFaders(onClose = { expandingFaders = false })
+        return
+    }
 
     if (findingPeaks) {
         PeakFinderScreen(onClose = { findingPeaks = false })
@@ -250,6 +259,7 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
         LocalOpenCompare provides { comparing = true },
         LocalOpenSweep provides { sweeping = true },
         LocalOpenPeaks provides { findingPeaks = true },
+        LocalOpenFaders provides { expandingFaders = true },
         LocalOpenPresets provides { tab = Tab.PRESETS },
     ) {
         Scaffold(
@@ -284,12 +294,17 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
                 contentAlignment = Alignment.TopCenter,
             ) {
                 Crossfade(targetState = tab, animationSpec = tween(TAB_FADE_MS), label = "tab") { shownTab ->
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                    // The whole width scrolls, so the space beside the page works too, as on a tablet or in landscape.
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .verticalScroll(scrolls.getValue(shownTab)),
+                        contentAlignment = Alignment.TopCenter,
+                    ) {
                         Column(
                             Modifier
                                 .widthIn(max = 640.dp)
-                                .fillMaxSize()
-                                .verticalScroll(scrolls.getValue(shownTab))
+                                .fillMaxWidth()
                                 .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
                             verticalArrangement = SectionSpacing,
                         ) {
@@ -480,7 +495,7 @@ private fun EqTab(state: AppState) {
     }
 
     if (graphicMode) {
-        GraphicEqConsole(state.current.tone, state.current.id, onBrowseShapes = LocalOpenShapes.current)
+        GraphicEqConsole(state.current.tone, state.current.id, onBrowseShapes = LocalOpenShapes.current, onExpand = LocalOpenFaders.current)
         SettingsSection(stringResource(R.string.ui_display)) { AnalyserSetting(state) }
         return
     }

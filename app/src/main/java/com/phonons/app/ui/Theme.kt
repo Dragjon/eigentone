@@ -36,6 +36,8 @@ data class ThemeColors(
     val stripOn: Color,
     /** A warning on the strip's green. */
     val stripDanger: Color,
+    /** A softer green under the strip when it's opened, so the details read as a drawer pulled out of it. */
+    val stripPanel: Color,
     val surface: Color,
     val surfaceHigh: Color,
     val tooltip: Color,
@@ -56,55 +58,57 @@ data class ThemeColors(
     val rightEar: Color,
 )
 
-/** Graphite enamel, where ivory means one thing: lit or active. */
+/** Warm graphite, where amber means one thing: lit or active, like a glowing meter. */
 val DarkColors = ThemeColors(
-    background = Color(0xFF141516),
-    bar = Color(0xFF0B0C0D),
+    background = Color(0xFF16140F),
+    bar = Color(0xFF0D0C09),
     strip = Color(0xFF174035),
     stripDim = Color(0xFFBFD3C9),
     stripText = Color(0xFFEEEEEA),
-    stripOn = Color(0xFFF2E8CF),
+    stripOn = Color(0xFFFFC24A),
     stripDanger = Color(0xFFFF9A5C),
-    surface = Color(0xFF1E1F20),
-    surfaceHigh = Color(0xFF2B2D2E),
-    tooltip = Color(0xFF333536),
-    line = Color(0xFF323435),
-    outline = Color(0xFF8A8C8E),
-    track = Color(0xFF6C6F71),
-    text = Color(0xFFEEEEEA),
-    textDim = Color(0xFFB0B2B2),
-    lit = Color(0xFFF2E8CF),
-    litPressed = Color(0xFFD6CCB4),
-    onLit = Color(0xFF1E1A10),
+    stripPanel = Color(0xFF1F4B3F),
+    surface = Color(0xFF211E18),
+    surfaceHigh = Color(0xFF2F2B23),
+    tooltip = Color(0xFF38332A),
+    line = Color(0xFF36322A),
+    outline = Color(0xFF958D7E),
+    track = Color(0xFF7A7363),
+    text = Color(0xFFF3EFE6),
+    textDim = Color(0xFFBBB3A5),
+    lit = Color(0xFFFFC24A),
+    litPressed = Color(0xFFE0A53A),
+    onLit = Color(0xFF2A1C00),
     danger = Color(0xFFFF9A5C),
     leftEar = Color(0xFF62B2F2),
     rightEar = Color(0xFFF06B5C),
 )
 
 /**
- * The same instrument in daylight: a warm putty faceplate. A lit control can't glow here, so it becomes a
- * dark inked key carrying the same ivory as its legend. The strip's green stays, and the ear colours deepen
- * so they read as ink on a chart, as an audiogram does on paper.
+ * The same instrument in daylight: a warm putty faceplate. Amber can't be read on a light page, so lit
+ * controls are a deep burnt amber carrying cream legends. The strip's green stays, and the ear colours
+ * deepen so they read as ink on a chart, as an audiogram does on paper.
  */
 val LightColors = ThemeColors(
-    background = Color(0xFFE9E6DC),
-    bar = Color(0xFFD9D5C8),
+    background = Color(0xFFEDE7DA),
+    bar = Color(0xFFDED6C5),
     strip = DarkColors.strip,
     stripDim = DarkColors.stripDim,
     stripText = DarkColors.stripText,
     stripOn = DarkColors.stripOn,
     stripDanger = DarkColors.stripDanger,
-    surface = Color(0xFFF5F3EC),
-    surfaceHigh = Color(0xFFDFDBCF),
-    tooltip = Color(0xFFFFFEFA),
-    line = Color(0xFFD3CFC3),
-    outline = Color(0xFF77746A),
-    track = Color(0xFF838075),
-    text = Color(0xFF1B1A17),
-    textDim = Color(0xFF55534B),
-    lit = Color(0xFF2C2718),
-    litPressed = Color(0xFF4A4331),
-    onLit = Color(0xFFF2E8CF),
+    stripPanel = DarkColors.stripPanel,
+    surface = Color(0xFFF8F3E8),
+    surfaceHigh = Color(0xFFE6DDCB),
+    tooltip = Color(0xFFFFFDF7),
+    line = Color(0xFFDAD1BF),
+    outline = Color(0xFF7A7160),
+    track = Color(0xFF857B67),
+    text = Color(0xFF1D1A14),
+    textDim = Color(0xFF574F42),
+    lit = Color(0xFF8A4F00),
+    litPressed = Color(0xFF6E3F00),
+    onLit = Color(0xFFFFF4DC),
     danger = Color(0xFF8F3F00),
     leftEar = Color(0xFF0A5FAD),
     rightEar = Color(0xFFC4231A),
@@ -124,6 +128,7 @@ object Palette {
     val StripText get() = colors.stripText
     val StripOn get() = colors.stripOn
     val StripDanger get() = colors.stripDanger
+    val StripPanel get() = colors.stripPanel
     val Surface get() = colors.surface
     val SurfaceHigh get() = colors.surfaceHigh
     val Tooltip get() = colors.tooltip
@@ -157,7 +162,7 @@ private val DarkScheme = darkColorScheme(
     surfaceContainerHighest = DarkColors.surfaceHigh,
     inverseSurface = DarkColors.text,
     inverseOnSurface = DarkColors.background,
-    inversePrimary = Color(0xFF6B6147),
+    inversePrimary = Color(0xFF7A5A1C),
     outline = DarkColors.outline,
     outlineVariant = DarkColors.line,
     error = DarkColors.danger,
@@ -180,7 +185,7 @@ private val LightScheme = lightColorScheme(
     surfaceContainerHighest = LightColors.surfaceHigh,
     inverseSurface = LightColors.text,
     inverseOnSurface = LightColors.background,
-    inversePrimary = Color(0xFFD6CCB4),
+    inversePrimary = Color(0xFFFFC24A),
     outline = LightColors.outline,
     outlineVariant = LightColors.line,
     error = LightColors.danger,
