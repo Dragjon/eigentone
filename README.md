@@ -1,10 +1,65 @@
-# Eigentone
+<p align="center">
+  <img src="docs/logo.svg" width="112" alt="Eigentone logo: a strand of DNA in amber on black">
+</p>
+
+<h1 align="center">Eigentone</h1>
+
+<p align="center">
+  <b>A free, open-source equaliser for Android that tunes every app to your headphones and your ears.</b><br>
+  No root. No ads. No account. No tracking.
+</p>
+
+<p align="center">
+  <a href="https://github.com/Dragjon/eigentone/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/Dragjon/eigentone?include_prereleases&label=release&color=FFC24A"></a>
+  <a href="LICENSE"><img alt="Licence: GPL v3" src="https://img.shields.io/badge/licence-GPL--3.0-0D0C09"></a>
+  <img alt="Android 13 and newer" src="https://img.shields.io/badge/Android-13%2B-3DDC84">
+  <img alt="No root needed" src="https://img.shields.io/badge/root-not%20needed-EEEEEA">
+</p>
+
+<p align="center">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/01-equaliser.png" width="19%" alt="Equaliser tab: a corrected curve for each ear over the live spectrum, with the graphic EQ faders">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/02-effects.png" width="19%" alt="Effects tab: preset strength, preamp and tone controls">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/03-presets.png" width="19%" alt="Presets tab: your presets and the corrections for the connected earbuds">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/04-headphones.png" width="19%" alt="Headphones tab: headphone correction and the preset that loads automatically">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/05-settings.png" width="19%" alt="Settings: volume, level, stereo, theme and Advanced controls">
+</p>
 
 *Eigentones are the natural resonant tones of an enclosed space. "Eigen" is German for "own", so the name reads as "your own tone".*
 
-A free system-wide equaliser for Android 13 and newer. No ads, no account, and no tracking. It runs in the background using Android's `DynamicsProcessing` effect, so it works with Spotify, YouTube and most other apps without root.
+Eigentone sits behind Spotify, YouTube and most other apps, and shapes their sound system-wide using Android's `DynamicsProcessing` effect. Connect your headphones and it offers a correction measured for them. Take the short hearing check and it fits the sound to each of your ears. Everything else, from a 31-band graphic EQ to a multiband compressor, is there when you want it and out of the way when you don't: **simple by default, powerful when needed**.
 
-## What it does
+## Why Eigentone
+
+- **Everything is free.** There's no paid tier and nothing locked. Reverb, surround and the compressor are free like the rest.
+- **It's open source.** The code is GPL v3, so anyone can check what it does with their audio, build it themselves, or improve it.
+- **It fits you, not just your headphones.** AutoEq corrections fix the headphones. The hearing check, a separate EQ for each ear, and *Find my sound*, a level-matched A/B listening test, fit the sound to you.
+- **It's honest about what it changes.** Comparisons and Bypass are loudness-matched, so louder never wins by accident, and it warns when a setting could clip.
+
+## Eigentone and Wavelet
+
+[Wavelet](https://play.google.com/store/apps/details?id=com.pittvandewitt.wavelet) is the best-known system-wide EQ for Android, and it's good. Both work system-wide without root and both use AutoEq's measurements. Eigentone goes further on control, on fitting the sound to you, and on openness.
+
+| | Eigentone | Wavelet |
+|---|---|---|
+| Price | Free, everything included | Free, with reverb, virtualizer and bass tuner as a paid upgrade<sup>[1]</sup> |
+| Source code | Open, GPL v3 | Not published |
+| Graphic EQ | 10, 15 or 31 bands, drawn freely or by fader | 9 bands<sup>[2]</sup> |
+| Parametric EQ | Up to 20 filters | Not in its feature list |
+| Headphone correction | AutoEq, with a strength control, a tuner to add bass or treble back, and reviewer measurements compared by ear | AutoEq, 5,000+ profiles bundled<sup>[3]</sup> |
+| Fit to your ears | Hearing check, a separate EQ for each ear, and a guided A/B test that finds your preferred sound | Not in its feature list |
+| Dynamics | Multiband compressor, dynamic EQ (Clarity), leveller, night mode on a schedule, limiter | Limiter with automatic preamp<sup>[3]</sup> |
+| Loudness compensation | ISO 226 equal-loudness, with a usual volume per pair of headphones | ISO 226 equal-loudness<sup>[3]</sup> |
+| Automatic presets | Per output, per earbud noise mode and per app | A profile for the connected headphones |
+| Finding problems by ear | Peak finder, frequency sweep and a blind A/B comparison | Not in its feature list |
+| Curves and files | 350-shape library, ParametricEQ and GraphicEQ import, GraphicEQ export, share codes | Not in its feature list |
+| Ads and tracking | None. No analytics, no account | No ads<sup>[4]</sup> |
+| Availability | GitHub releases, Android 13 and newer, tested on one phone so far | Google Play, 5.5 million+ installs<sup>[4]</sup> |
+
+Where Wavelet is ahead: it's on Google Play, it has years of testing across millions of phones, and its AutoEq database works offline, where Eigentone downloads a profile when you ask for one. If you want the simplest one-tap correction on a phone Eigentone hasn't been tested on, Wavelet is a safe choice. If you want to shape the sound in detail, fit it to your own ears, or know exactly what the app does, that's what Eigentone is for.
+
+<sub>Wavelet details as of November 2026, from its listings and coverage, and they may have changed since. [1] [XDA Developers](https://www.xda-developers.com/make-your-headphones-sound-better-automatic-eq-wavelet/) lists reverberation, virtualizer and bass tuner as an in-app purchase. [2] XDA Developers and [Softpedia](https://mobile.softpedia.com/apk/wavelet/) describe a 9-band graphic EQ. [3] Its [Google Play listing](https://play.google.com/store/apps/details?id=com.pittvandewitt.wavelet) and [SourceForge listing](https://sourceforge.net/app/wavelet-headphone-specific-eq/). [4] [AppGoblin](https://appgoblin.info/apps/com.pittvandewitt.wavelet). "Not in its feature list" means we couldn't find it described, not that it's certainly missing. Corrections are welcome as an issue.</sub>
+
+## Features
 
 - **Graphic EQ** with 10, 15 or 31 faders. Drag them or draw a curve with one sweep.
 - **Parametric EQ** with up to 20 filters.
@@ -43,10 +98,10 @@ Crash reports stay on the phone. You choose whether to share one from the Settin
 
 ## Install
 
-Download the APK from [Releases](https://github.com/Dragjon/eigentone/releases), and open it on the phone. Eigentone is a pre-release, and has only been tested on a Galaxy A54 running Android 16. Or use USB debugging:
+Download the APK from [Releases](https://github.com/Dragjon/eigentone/releases), and open it on the phone. Eigentone is a pre-release, and has only been tested on a Galaxy A54 running Android 16. If something goes wrong on your phone, Settings, Troubleshooting has a debug console whose log you can attach to an [issue](https://github.com/Dragjon/eigentone/issues). Or install with USB debugging:
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.31.0.apk
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.33.0.apk
 ```
 
 ## Build
@@ -110,7 +165,7 @@ The **hearing check** finds a threshold per frequency and ear with a "down 10, u
 ## Known limits
 
 - **EQ in the headphones adds to Eigentone**, because it runs on the headphones themselves. Eigentone reminds you to set it flat, and it can't read or change it.
-- **Stereo width** (`data/StereoWidth.kt`) leans frequency ranges left and right using a separate EQ per channel. It's subtle, because Android doesn't let an app mix one channel into the other, so it can't do crossfeed or real surround.
+- **Stereo width** (`data/StereoWidth.kt`) leans frequency ranges left and right using a separate EQ per channel, cutting the side a range leans away from rather than boosting the other, so it never lowers the overall volume. It's subtle, because Android doesn't let an app mix one channel into the other, so it can't do crossfeed or real surround.
 - **Android has no full replacement for `Virtualizer`.** It's deprecated in favour of `Spatializer`, but that only describes an app's own playback, and turning it on requires a system permission. It remains as an opt-in, forced to binaural mode, and stereo width takes over if a phone refuses it. It's audibly stronger, but stereo width is the default because it sounded better in listening tests on a Galaxy A54. It has no head tracking, and on a Galaxy A54 it reads `mode=0` while audibly working.
 - **Reverb only reaches apps that announce their audio.** On session 0 the public API only provides an auxiliary reverb, which receives no audio, so a reverb for all sound isn't possible without root. `PresetReverb` on an app's own announced session does give the working insert version, and that runs beside the global EQ. It uses `EnvironmentalReverb`, because `PresetReverb`'s fixed levels leave Large hall's echo about 38 dB below the music. The Space section on the Effects tab names the apps it reaches.
 - **Noise-mode profiles** are chosen by hand, because Android can't read the earbuds' mode.

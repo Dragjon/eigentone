@@ -874,8 +874,8 @@
     <string name="ui_open_source" formatted="false">Open source</string>
     <string name="ui_open_source_body" formatted="false">Eigentone %1$s is free and open source under the GNU GPL v3. Anyone can read, change and share the code.</string>
     <string name="ui_view_source" formatted="false">View the source on GitHub</string>
-    <string name="ui_report_problem" formatted="false">Report a problem or suggest an idea</string>
-    <string name="ui_report_problem_detail" formatted="false">Opens the issues page on GitHub.</string>
+    <string name="ui_report_problem" formatted="false">Report a problem</string>
+    <string name="ui_report_problem_detail" formatted="false">Or suggest an idea, on GitHub.</string>
     <string name="help_open_source_title" formatted="false">Open source</string>
     <string name="help_open_source_body" formatted="false">Eigentone\'s code is public on GitHub, under the GNU General Public License version 3. You can check exactly what it does, build it yourself, or suggest changes.</string>
 </resources>
