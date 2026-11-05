@@ -91,7 +91,12 @@ data class Tamers(
     val bass: BassCharacter = BassCharacter.NATURAL,
     /** How much bass the tone adds, in dB. The character only shapes bass that's been added. */
     val bassAmount: Double = 0.0,
+    /** Ranges that dynamic filters turn down when loud, in the order they get a band. */
+    val dynamic: List<DynamicRange> = emptyList(),
 )
+
+/** A range a dynamic filter watches, with how it reacts. [id] is the filter's, for showing whether it got a band. */
+data class DynamicRange(val id: Int, val lowHz: Double, val highHz: Double, val band: CompressorBand)
 
 /** The limiter's settings, as Android's limiter takes them. */
 @Serializable
@@ -181,11 +186,17 @@ object Dynamics {
         val harsh = if (slots >= FULL_BANDS) tamers.harsh else 0.0
         val boom = if (slots >= FULL_BANDS) tamers.boom else 0.0
         val character = if (slots >= FULL_BANDS) characterBand(tamers) else null
-        val edges = sortedSetOf(compressor.lowCrossoverHz, compressor.highCrossoverHz)
+        // The compressor's crossovers only matter while it runs, which leaves their room to dynamic filters otherwise.
+        val edges = if (compressor.enabled) sortedSetOf(compressor.lowCrossoverHz, compressor.highCrossoverHz) else sortedSetOf()
         if (boom > ACTIVE || character != null) edges += BOOM_TOP_HZ
         if (harsh > ACTIVE) {
             edges += HARSH_LOW_HZ
             edges += HARSH_HIGH_HZ
+        }
+        val placed = placedDynamics(edges, tamers.dynamic, slots)
+        placed.forEach { range ->
+            if (range.lowHz > LOWEST_HZ) edges += range.lowHz
+            if (range.highHz < SPARE_FROM_HZ) edges += range.highHz
         }
         // Spare slots go above hearing. Splitting an audible band would change how it compresses, because
         // a narrower band carries less level and so crosses the threshold less often.
@@ -197,11 +208,15 @@ object Dynamics {
             val bottom = if (i == 0) LOWEST_HZ else cutoffs[i - 1]
             val own = bandAt(compressor, kotlin.math.sqrt(bottom * top))
             val ownActive = compressor.enabled && own.enabled
-            val tamer = when {
+            val fixedTamer = when {
                 top <= BOOM_TOP_HZ && (boom > ACTIVE || character != null) -> lowBand(boom, character)
                 harsh > ACTIVE && bottom >= HARSH_LOW_HZ && top <= HARSH_HIGH_HZ -> harshBand(harsh)
                 else -> null
             }
+            // A dynamic filter shapes every band inside its range. Where it overlaps something else, the stronger wins.
+            val tamer = placed.filter { covers(it, bottom, top) }
+                .map { it.band }
+                .fold(fixedTamer) { acc, b -> if (acc == null) b else stronger(acc, b) }
             val band = when {
                 tamer == null -> own
                 !ownActive -> tamer
@@ -218,6 +233,52 @@ object Dynamics {
     }
 
     private const val LOWEST_HZ = 20.0
+    private const val EDGE_SLACK_HZ = 0.01
+
+    /** Whether a band lies inside a dynamic range. Ranges reaching the ends of hearing take the outermost bands too. */
+    private fun covers(range: DynamicRange, bottom: Double, top: Double): Boolean {
+        val low = if (range.lowHz <= LOWEST_HZ) LOWEST_HZ else range.lowHz
+        val high = if (range.highHz >= SPARE_FROM_HZ) TOP_HZ else range.highHz
+        return bottom >= low - EDGE_SLACK_HZ && top <= high + EDGE_SLACK_HZ
+    }
+
+    /** The harder-working of two bands: lower threshold, higher ratio and faster timing. */
+    private fun stronger(a: CompressorBand, b: CompressorBand) = a.copy(
+        thresholdDb = minOf(a.thresholdDb, b.thresholdDb),
+        ratio = maxOf(a.ratio, b.ratio),
+        attackMs = minOf(a.attackMs, b.attackMs),
+        releaseMs = minOf(a.releaseMs, b.releaseMs),
+    )
+
+    /**
+     * The dynamic filters that get bands, in order, while each one's edges still fit beside what's already
+     * there. A phone with only the basic bands has no room for any.
+     */
+    fun placedDynamics(taken: Set<Double>, dynamic: List<DynamicRange>, slots: Int = FULL_BANDS): List<DynamicRange> {
+        if (slots < FULL_BANDS) return emptyList()
+        val edges = taken.toSortedSet()
+        return dynamic.filter { range ->
+            val needed = listOfNotNull(range.lowHz.takeIf { it > LOWEST_HZ }, range.highHz.takeIf { it < SPARE_FROM_HZ }).filterNot { it in edges }
+            // One band always sits above the last edge, so there's room for slots - 1 edges in all.
+            if (edges.size + needed.size <= slots - 1) {
+                edges += needed
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    /** Which dynamic filters get a band with these settings, for saying so beside one that doesn't. */
+    fun placedIds(compressor: Compressor, tamers: Tamers, slots: Int = FULL_BANDS): Set<Int> {
+        val edges = if (compressor.enabled) mutableSetOf(compressor.lowCrossoverHz, compressor.highCrossoverHz) else mutableSetOf()
+        if (tamers.boom > ACTIVE || characterBand(tamers) != null) edges += BOOM_TOP_HZ
+        if (tamers.harsh > ACTIVE) {
+            edges += HARSH_LOW_HZ
+            edges += HARSH_HIGH_HZ
+        }
+        return placedDynamics(edges, tamers.dynamic, slots).map { it.id }.toSet()
+    }
 
     /** How hard the bass character shapes the bass that's been added, in dB of added bass. */
     private const val CHARACTER_FULL_DB = 6.0

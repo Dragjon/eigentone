@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import io.github.dragjon.eigentone.data.OutputInfo
+import io.github.dragjon.eigentone.data.OutputKind
 
 /** Works out which output the sound is going to. The app needs this even while the EQ is off. */
 object OutputDetector {
@@ -33,6 +34,12 @@ object OutputDetector {
             else -> "Wired"
         }
         val name = best.productName?.toString().orEmpty().ifBlank { family }
-        return Detected(OutputInfo("$family:$name", if (name == family) "$family headphones" else name), best.type)
+        val key = "$family:$name"
+        val kind = OutputKind.guess(key, name, speakerType = best.type == AudioDeviceInfo.TYPE_BLE_SPEAKER)
+        val label = if (name != family) name else when (kind) {
+            OutputKind.SPEAKER -> "$family speaker"
+            else -> "$family headphones"
+        }
+        return Detected(OutputInfo(key, label, kind), best.type)
     }
 }

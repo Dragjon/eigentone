@@ -10,7 +10,7 @@ object AutoEqParser {
 
     private val preampRegex = Regex("""^\s*Preamp:\s*([-+]?[\d.]+)\s*dB""", RegexOption.IGNORE_CASE)
     private val filterRegex = Regex(
-        """^\s*Filter(?:\s+\d+)?:\s*(ON|OFF)\s+(PK|PEQ|LSC|LS|HSC|HS|LPQ|LP|HPQ|HP)\s+Fc\s+([\d.,]+)\s*Hz""" +
+        """^\s*Filter(?:\s+\d+)?:\s*(ON|OFF)\s+(PK|PEQ|LSC|LS|HSC|HS|LPQ|LP|HPQ|HP|NO|BP)\s+Fc\s+([\d.,]+)\s*Hz""" +
             """(?:\s+Gain\s+([-+]?[\d.]+)\s*dB)?(?:\s+Q\s+([\d.]+))?""",
         RegexOption.IGNORE_CASE,
     )
@@ -18,14 +18,16 @@ object AutoEqParser {
     /** Writes filters in the same format, which AutoEq-compatible apps and Equalizer APO can read. */
     fun format(preampDb: Double, filters: List<Filter>): String = buildString {
         appendLine(String.format(Locale.US, "Preamp: %.1f dB", preampDb))
-        filters.forEachIndexed { i, f ->
+        filters.flatMap(::lines).forEachIndexed { i, f ->
             val type = when (f.type) {
                 FilterType.BELL -> "PK"
                 FilterType.LOW_SHELF -> "LSC"
                 FilterType.HIGH_SHELF -> "HSC"
                 FilterType.LOW_PASS -> "LPQ"
                 FilterType.HIGH_PASS -> "HPQ"
-                FilterType.CURVE -> error("A curve can't be written as a filter")
+                FilterType.NOTCH -> "NO"
+                FilterType.BAND_PASS -> "BP"
+                FilterType.CURVE, FilterType.TILT -> error("Written as other filters by lines()")
             }
             val gain = if (f.type.hasGain) String.format(Locale.US, " Gain %.2f dB", f.gainDb) else ""
             appendLine(
@@ -35,6 +37,25 @@ object AutoEqParser {
                 ),
             )
         }
+    }
+
+    /**
+     * The file lines a filter becomes. The format has no tilt or steep slopes, so a tilt is written as its
+     * two shelves and a steep pass as its 12 dB sections, which sound the same.
+     */
+    private fun lines(f: Filter): List<Filter> = when {
+        f.type == FilterType.CURVE -> error("A curve can't be written as a filter")
+        f.type == FilterType.TILT -> listOf(
+            f.copy(type = FilterType.LOW_SHELF, gainDb = -f.gainDb),
+            f.copy(type = FilterType.HIGH_SHELF, gainDb = f.gainDb),
+        )
+        f.type.hasSlope -> {
+            require(Eq.canExport(f)) { "Odd slopes have a first-order section the format can't hold" }
+            val qs = Eq.butterworthQs(Eq.slopeOf(f) / 6)
+            val sharpest = qs.indices.maxBy { qs[it] }
+            qs.mapIndexed { i, q -> f.copy(q = if (i == sharpest) q * f.q / Eq.BUTTERWORTH_Q else q, slope = Eq.DEFAULT_SLOPE) }
+        }
+        else -> listOf(f)
     }
 
     /** Returns null when the text holds no recognisable filters. */
@@ -50,6 +71,8 @@ object AutoEqParser {
                 "LSC", "LS" -> FilterType.LOW_SHELF
                 "HSC", "HS" -> FilterType.HIGH_SHELF
                 "LPQ", "LP" -> FilterType.LOW_PASS
+                "NO" -> FilterType.NOTCH
+                "BP" -> FilterType.BAND_PASS
                 else -> FilterType.HIGH_PASS
             }
             val freq = m.groupValues[3].replace(",", "").toDoubleOrNull() ?: continue

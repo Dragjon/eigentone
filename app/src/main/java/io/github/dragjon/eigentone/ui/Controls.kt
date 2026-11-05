@@ -185,6 +185,38 @@ fun InfoButton(tip: Tip) {
     }
 }
 
+/**
+ * Something too small or too plain for an info button beside it, such as a meter, which explains itself
+ * when tapped instead. The touch area is [modifier]'s, so it can be wider than what it draws.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TipOnTap(tip: Tip, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val state = rememberTooltipState(isPersistent = true)
+    val scope = rememberCoroutineScope()
+    val about = stringResource(R.string.ui_about_setting, stringResource(tip.title))
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberRichTooltipPositionProvider(),
+        tooltip = {
+            RichTooltip(
+                title = { Text(stringResource(tip.title), style = MaterialTheme.typography.titleSmall) },
+                colors = TooltipDefaults.richTooltipColors(
+                    containerColor = Palette.Tooltip,
+                    contentColor = Palette.Text,
+                    titleContentColor = Palette.Text,
+                ),
+            ) { Text(stringResource(tip.body), style = MaterialTheme.typography.bodyMedium) }
+        },
+        state = state,
+        enableUserInput = false,
+    ) {
+        androidx.compose.foundation.layout.Box(
+            modifier.clickable(onClickLabel = about, role = Role.Button) { scope.launch { state.show() } },
+            contentAlignment = Alignment.Center,
+        ) { content() }
+    }
+}
+
 /** Label, info button and an optional current value. Shared by every setting. */
 @Composable
 private fun SettingLabel(title: String, tip: Tip?, modifier: Modifier = Modifier) {

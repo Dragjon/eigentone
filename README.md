@@ -51,7 +51,7 @@ Eigentone sits behind Spotify, YouTube and most other apps, and shapes their sou
 | Price | Free, everything included | Free, with reverb, virtualizer and bass tuner as a paid upgrade<sup>[1]</sup> |
 | Source code | Open, GPL v3 | Not published |
 | Graphic EQ | 10, 15 or 31 bands, drawn freely or by fader | 9 bands<sup>[2]</sup> |
-| Parametric EQ | Up to 20 filters | Not in its feature list |
+| Parametric EQ | Up to 20 filters: bell, shelf, tilt, notch, band pass, and high and low pass from 6 to 48 dB per octave, each on both channels or one, and optionally dynamic | Not in its feature list |
 | Headphone correction | AutoEq, with a strength control, a tuner to add bass or treble back, and reviewer measurements compared by ear | AutoEq, 5,000+ profiles bundled<sup>[3]</sup> |
 | Fit to your ears | Hearing check, a separate EQ for each ear, and a guided A/B test that finds your preferred sound | Not in its feature list |
 | Dynamics | Multiband compressor, dynamic EQ (Clarity), leveller, night mode on a schedule, limiter | Limiter with automatic preamp<sup>[3]</sup> |
@@ -69,7 +69,7 @@ Where Wavelet is ahead: it's on Google Play, it has years of testing across mill
 ## Features
 
 - **Graphic EQ** with 10, 15 or 31 faders. Drag them or draw a curve with one sweep. The faders show the whole sound, the preset's own curve plus your change, so each one reads the real dB at its band.
-- **Parametric EQ** with up to 20 filters.
+- **Parametric EQ** with up to 20 filters: bell, low and high shelf, tilt, notch, band pass, and high and low pass with a slope from 6 to 48 dB per octave. Each filter can shape both channels or just the left or right, and bells and shelves can be dynamic, turning their range down only while it gets loud.
 - **Shape library** of 350 curves, searchable by genre, instrument, situation or problem. Some are worked out from published research, and say so. Hear each on your music before keeping it, and layer them.
 - **Headphone targets**: move a measured correction to Harman, more or less bass, no bass lift, or the diffuse-field reference, worked out from what that correction actually aims for.
 - **Your own shapes**, typed in from any other app's EQ.
@@ -85,6 +85,8 @@ Where Wavelet is ahead: it's on Google Play, it has years of testing across mill
 - **Multiband compressor**, free and fully adjustable and saved per preset, with three bands, adjustable crossovers, a live response curve and starting styles.
 - **Volume leveller**, night mode with a schedule, equal-loudness compensation from the ISO 226 contours, with a usual volume per pair of headphones, limiter, balance, stereo width, virtual surround, and reverb on apps that announce their audio.
 - **Simple by default, powerful when needed**: a short welcome and a tour of the main screen for new users, and an Advanced controls switch that shows every setting. With it off, anything you've changed still stays in view.
+- **A tab for what's playing**, named and drawn for it: Phone, Headphones, Earbuds, Speaker or Car, with an animation when the device changes. Its page offers what suits that device.
+- **Output level meter** beside the spectrum, which turns red when peaks reach full scale.
 - **Light and dark themes**, following your phone by default.
 - **Undo and redo**, a saved-curve overlay while editing and a warning when settings could clip.
 - **Preset search and folders**, app icon shortcuts to your favourites, and a tuner that adds bass or treble back to a correction.
@@ -108,7 +110,7 @@ Crash reports stay on the phone. You choose whether to share one from the Settin
 Download the APK from [Releases](https://github.com/Dragjon/eigentone/releases), and open it on the phone. Eigentone is a pre-release, and has only been tested on a Galaxy A54 running Android 16. If something goes wrong on your phone, Settings, Troubleshooting has a debug console whose log you can attach to an [issue](https://github.com/Dragjon/eigentone/issues). Or install with USB debugging:
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.35.0.apk
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.36.0.apk
 ```
 
 ## Build

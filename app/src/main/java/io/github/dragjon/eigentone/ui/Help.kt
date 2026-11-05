@@ -16,6 +16,10 @@ object Help {
     val frequency = Tip(R.string.help_frequency_title, R.string.help_frequency_body)
     val gain = Tip(R.string.help_gain_title, R.string.help_gain_body)
     val q = Tip(R.string.help_q_title, R.string.help_q_body)
+    val slope = Tip(R.string.help_slope_title, R.string.help_slope_body)
+    val channel = Tip(R.string.help_channel_title, R.string.help_channel_body)
+    val meter = Tip(R.string.help_meter_title, R.string.help_meter_body)
+    val dynamicFilter = Tip(R.string.help_dynamic_filter_title, R.string.help_dynamic_filter_body)
 
     val bass = Tip(R.string.help_bass_title, R.string.help_bass_body)
     val treble = Tip(R.string.help_treble_title, R.string.help_treble_body)

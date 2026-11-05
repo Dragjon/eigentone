@@ -25,7 +25,7 @@
     <string name="help_boom_tamer_body" formatted="false">Holds back deep bass below about 110 Hz when it surges, so heavy tracks stay under control without thinning out the rest.</string>
     <string name="help_add_shared_body" formatted="false">Paste a code someone shared with you. It\'s added as a new preset, and your others are kept.</string>
     <string name="help_add_shared_title" formatted="false">Add a shared sound</string>
-    <string name="help_analyser_body" formatted="false">Shows the level of each frequency behind the curve, only while this screen is open. Android requires microphone permission for this, but only levels of playing audio are read. The lowest bands look coarse.</string>
+    <string name="help_analyser_body" formatted="false">Shows the level of each frequency behind the curve, only while this screen is open. Android requires microphone permission for this, but only levels of playing audio are read. The lowest bands look coarse.\n\nThe slim bar beside the graph shows the output level. Tap it to read about it.</string>
     <string name="help_analyser_title" formatted="false">Spectrum analyser</string>
     <string name="help_auto_switch_body" formatted="false">Loads the assigned preset whenever this output connects. If a per-app preset also applies, the latest change wins: connecting headphones loads the output\'s preset, and a different app starting to play loads that app\'s.</string>
     <string name="help_auto_switch_title" formatted="false">Switch automatically</string>
@@ -79,7 +79,7 @@
     <string name="help_favorites_title" formatted="false">Favourites</string>
     <string name="help_filter_enabled_body" formatted="false">Turns this one filter off without deleting it, so you can hear what it was doing.</string>
     <string name="help_filter_enabled_title" formatted="false">Filter on or off</string>
-    <string name="help_filter_type_body" formatted="false">Bell changes a range around one frequency. Shelves change everything below or above it. High pass removes what\'s below it, and low pass removes what\'s above it.</string>
+    <string name="help_filter_type_body" formatted="false">Bell changes a range around one frequency. Shelves change everything below or above it. High pass removes what\'s below it, and low pass removes what\'s above it, as steeply as the slope says. Tilt makes the sound brighter or warmer as a whole, turning the top end up and the bass down by the gain, or the reverse, with no change at the frequency itself. Notch removes a narrow range completely, such as a whine or hum. Band pass keeps only a range around the frequency, like a telephone or radio.</string>
     <string name="help_filter_type_title" formatted="false">Filter type</string>
     <string name="help_find_body" formatted="false">Searches AutoEq\'s published correction profiles and adds the one you pick. It needs internet access. Measurements are a starting point, and your ears and fit still matter.</string>
     <string name="help_find_title" formatted="false">Find headphones</string>
@@ -458,7 +458,7 @@
     <string name="ui_this_phone_wouldn_t_play_the" formatted="false">This phone wouldn\'t play the tone. Try Play again.</string>
     <string name="ui_this_lifts_the_frequencies_you_heard" formatted="false">This lifts the frequencies you heard least well, by half the difference. These headphones\' own tuning is part of the result, so it suits them best.</string>
     <string name="ui_your_results_were_about_even_across" formatted="false">Your results were about even across frequencies, so there\'s no shared curve to add.</string>
-    <string name="ui_your_ears_differed_by_up_to" formatted="false">Your ears differed by up to %1$s dB at some frequencies, which can also come from fit. Eigentone can close half of that gap, frequency by frequency, with a separate EQ for each ear. It\'s saved for %2$s, and you can also do this later on the Headphones tab, under Your ears.</string>
+    <string name="ui_your_ears_differed_by_up_to" formatted="false">Your ears differed by up to %1$s dB at some frequencies, which can also come from fit. Eigentone can close half of that gap, frequency by frequency, with a separate EQ for each ear. It\'s saved for %2$s, and you can also do this later on the device tab, under Your ears.</string>
     <string name="ui_each_ear_is_now_corrected" formatted="false">Each ear is now corrected</string>
     <string name="ui_correct_each_ear" formatted="false">Correct each ear</string>
     <string name="ui_correct_each_ear_anyway" formatted="false">Correct each ear anyway</string>
@@ -501,6 +501,32 @@
     <string name="ui_high_shelf" formatted="false">High shelf</string>
     <string name="ui_high_pass" formatted="false">High pass</string>
     <string name="ui_low_pass" formatted="false">Low pass</string>
+    <string name="ui_tilt" formatted="false">Tilt</string>
+    <string name="ui_notch" formatted="false">Notch</string>
+    <string name="ui_band_pass" formatted="false">Band pass</string>
+    <string name="ui_slope" formatted="false">Slope</string>
+    <string name="ui_channel" formatted="false">Channel</string>
+    <string name="ui_output_level" formatted="false">Output level</string>
+    <string name="ui_dynamic" formatted="false">Dynamic</string>
+    <string name="ui_dynamic_detail" formatted="false">Also turn this range down when it gets loud</string>
+    <string name="ui_dynamic_no_room" formatted="false">Waiting for a free band. The compressor, Clarity and Bass character are using the ones it needs.</string>
+    <string name="help_dynamic_filter_title" formatted="false">Dynamic filter</string>
+    <string name="help_dynamic_filter_body" formatted="false">A dynamic filter does its usual job, and also turns its range down while that range is louder than the threshold, like a compressor for just that part of the sound. It suits a range that only bothers you when it\'s loud, such as sharp cymbals or boomy bass notes.\n\nThreshold is where it starts, and ratio is how hard it works: at 3:1, every 3 dB louder comes out 1 dB louder. A bell watches the range around its frequency, at least two thirds of an octave wide. A low shelf watches everything below, and a high shelf everything above.\n\nIt uses one of the six bands of Android\'s multiband compressor, which the compressor, Clarity and Bass character share. Filters higher in the list get a band first, and one that has to wait says so. Some phones have fewer bands, and then dynamic filters don\'t run. It works on both channels at once, so a filter on one side can\'t be dynamic.</string>
+    <string name="ui_output_peak" formatted="false">Peak %1$s</string>
+    <string name="ui_output_meter_description" formatted="false">Output level: average %1$s, peak %2$s</string>
+    <string name="help_meter_title" formatted="false">Output level</string>
+    <string name="help_meter_body" formatted="false">The slim bar beside the graph shows how loud everything playing is, read by Android alongside the spectrum. The fill is the average level and the line is the peak, held for a moment so short peaks can be read. The top is full scale.\n\nIt turns red when peaks reach full scale, where sound can distort. If it does, turn the preamp down, or turn on automatic headroom or the limiter in Settings.\n\nAndroid reads the level before the phone\'s volume on some phones and after it on others, so treat it as a guide to headroom rather than to how loud it is in your ears.</string>
+    <string name="ui_channel_both" formatted="false">Both</string>
+    <string name="ui_channel_left" formatted="false">Left</string>
+    <string name="ui_channel_right" formatted="false">Right</string>
+    <string name="ui_channel_left_short" formatted="false">L</string>
+    <string name="ui_channel_right_short" formatted="false">R</string>
+    <string name="help_channel_title" formatted="false">Channel</string>
+    <string name="help_channel_body" formatted="false">Which side the filter shapes. Both is usual. Left or Right shapes one side only, for evening out headphones whose sides differ, or one ear that hears a range differently. The graph then shows each side\'s curve, and the filter\'s dot is marked L or R.\n\nA filter on one side isn\'t written to exported files, because they hold one curve for both sides. For a separate EQ for each ear from a test, use the hearing check on the device tab.</string>
+    <string name="ui_db_per_octave" formatted="false">dB per octave</string>
+    <string name="ui_slope_option" formatted="false">%1$d dB per octave</string>
+    <string name="help_slope_title" formatted="false">Slope</string>
+    <string name="help_slope_body" formatted="false">How steeply a high or low pass cuts beyond its frequency, in dB per octave. 6 is a gentle roll-off with no Q to set. 12 is the usual. 24 to 48 cut sharply, for removing rumble or hiss while leaving the rest untouched.\n\nQ sets the shape at the corner: 0.71 is smooth, and higher values add a small peak just before the cut.\n\nExported files can hold 12, 24, 36 and 48. For a preset with a 6 or 18 slope, use Export EQ file, which saves it as a curve.</string>
     <string name="ui_android_s_own_spatial_audio_is" formatted="false">Android\'s own spatial audio is on, and adds to this. Try one at a time.</string>
     <string name="ui_centre" formatted="false">Centre</string>
     <string name="ui_a_separate_eq_for_each_ear" formatted="false">A separate EQ for each ear, for %1$s</string>
@@ -525,7 +551,7 @@
     <string name="ui_edit" formatted="false">Edit %1$s</string>
     <string name="ui_delete" formatted="false">Delete %1$s</string>
     <string name="ui_update" formatted="false">Update %1$s</string>
-    <string name="ui_this_preset_uses_faders_or_a" formatted="false">This preset uses faders or a curve, so use Export EQ file instead.</string>
+    <string name="ui_this_preset_uses_faders_or_a" formatted="false">This preset uses faders, a curve, a 6 or 18 dB slope, or a filter on one side. Export EQ file saves it as one curve instead, leaving out filters on one side.</string>
     <string name="ui_save_preset" formatted="false">Save preset</string>
     <string name="ui_yes" formatted="false">Yes</string>
     <string name="ui_not_checked_yet" formatted="false">Not checked yet</string>
@@ -778,6 +804,15 @@
     <string name="ui_virtual_surround_short" formatted="false">Virtual surround</string>
     <string name="ui_surround_from_settings" formatted="false">Uses the phone\'s virtual surround, which is set in Settings</string>
     <string name="ui_tab_headphones" formatted="false">Headphones</string>
+    <string name="ui_tab_phone" formatted="false">Phone</string>
+    <string name="ui_tab_earbuds" formatted="false">Earbuds</string>
+    <string name="ui_tab_speaker" formatted="false">Speaker</string>
+    <string name="ui_tab_car" formatted="false">Car</string>
+    <string name="ui_find_earbuds" formatted="false">Find earbuds</string>
+    <string name="ui_device_scope_phone" formatted="false">The phone\'s own speaker. Kept for it, and used again whenever nothing else is connected.</string>
+    <string name="ui_device_scope_speaker" formatted="false">Kept for this speaker, and used again whenever it\'s connected.</string>
+    <string name="ui_device_scope_car" formatted="false">Kept for this car, and used again whenever it\'s connected.</string>
+    <string name="ui_ears_need_headphones" formatted="false">The hearing check and a separate EQ for each ear need headphones or earbuds. %1$s reaches both ears at once, and the room changes what each one hears.</string>
     <string name="ui_stereo" formatted="false">Stereo</string>
     <string name="ui_your_ears" formatted="false">Your ears</string>
     <string name="ui_quiet_listening" formatted="false">Quiet listening</string>
@@ -785,7 +820,7 @@
     <string name="ui_hp_preset" formatted="false">Automatic preset</string>
     <string name="ui_hp_scope" formatted="false">Kept for this output, and used again whenever it\'s connected.</string>
     <string name="ui_saved_with" formatted="false">Saved with %1$s</string>
-    <string name="ui_loudness_tuned_per_output" formatted="false">Each pair of headphones has its own usual volume and strength, on the Headphones tab</string>
+    <string name="ui_loudness_tuned_per_output" formatted="false">Each pair of headphones has its own usual volume and strength, on the device tab</string>
     <string name="ui_quiet_off" formatted="false">Adapt to volume is off. Turn it on in Settings, under Volume, to tune it for %1$s.</string>
     <string name="ui_advanced_controls" formatted="false">Advanced controls</string>
     <string name="ui_advanced_on" formatted="false">Every control is shown</string>
@@ -809,16 +844,16 @@
     <string name="welcome_on_done" formatted="false">Eigentone is on and shaping the sound.</string>
     <string name="welcome_headphones_title" formatted="false">Your headphones</string>
     <string name="welcome_headphones_body" formatted="false">A correction evens out your headphones\' own peaks and dips, from published measurements. Most people then like a little more bass than that.</string>
-    <string name="welcome_headphones_none" formatted="false">%1$s is playing now. Connect your headphones to set them up, or do it later on the Headphones tab.</string>
+    <string name="welcome_headphones_none" formatted="false">%1$s is playing now. Connect your headphones to set them up, or do it later on the device tab, named after what\'s playing.</string>
     <string name="welcome_headphones_using" formatted="false">Using %1$s.</string>
     <string name="welcome_headphones_tune" formatted="false">Adjust bass and treble</string>
     <string name="welcome_headphones_tune_note" formatted="false">Try the bass lift most people prefer, and hear it against the correction alone.</string>
     <string name="welcome_headphones_find" formatted="false">Find a correction</string>
-    <string name="welcome_headphones_later" formatted="false">Everything for your headphones is on the Headphones tab.</string>
+    <string name="welcome_headphones_later" formatted="false">Everything for your headphones is on the device tab, named after what\'s playing.</string>
     <string name="welcome_sound_title" formatted="false">Find your sound</string>
     <string name="welcome_sound_note" formatted="false">Takes about two minutes. Play a song you know well before you start.</string>
     <string name="welcome_sound_start" formatted="false">Start</string>
-    <string name="welcome_sound_later" formatted="false">Optional. It\'s also on the Headphones tab, under Listening tools.</string>
+    <string name="welcome_sound_later" formatted="false">Optional. It\'s also on the device tab, under Listening tools.</string>
     <string name="welcome_hands_title" formatted="false">How hands-on?</string>
     <string name="welcome_hands_body" formatted="false">Choose whether to turn on Advanced controls, which show every setting. Simple suits most people, and anything you change always stays in view.</string>
     <string name="welcome_simple" formatted="false">Simple (recommended)</string>
@@ -845,7 +880,7 @@
     <string name="tour_save_title" formatted="false">Keep or drop changes</string>
     <string name="tour_save_body" formatted="false">Once you change a preset, a bar at the bottom offers Save and Discard. Your edits are kept until then, even if you switch to another preset and back.</string>
     <string name="tour_tabs_title" formatted="false">Four tabs</string>
-    <string name="tour_tabs_body" formatted="false">Equaliser shapes the curve. Effects adds tone, space and more. Presets holds your sounds. Headphones fits them to what you\'re wearing.</string>
+    <string name="tour_tabs_body" formatted="false">Equaliser shapes the curve. Effects adds tone, space and more. Presets holds your sounds. The last tab is named after what\'s playing, such as Headphones or Phone, and fits your sound to it.</string>
     <string name="tour_settings_title" formatted="false">Settings</string>
     <string name="tour_settings_body" formatted="false">Volume, the limiter and anything else that applies to every preset, plus Advanced controls. This tour is there too, under Help.</string>
     <string name="tour_offer_title" formatted="false">Find your way around</string>

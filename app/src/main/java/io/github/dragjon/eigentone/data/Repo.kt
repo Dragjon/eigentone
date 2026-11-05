@@ -38,6 +38,24 @@ object Repo {
     val attenuationDb = MutableStateFlow(0.0)
     val spectrum = MutableStateFlow<FloatArray?>(null)
 
+    /** What's playing, measured while the analyser runs. Null when it isn't. */
+    val level = MutableStateFlow<OutputLevel?>(null)
+    private var peakHeldSince = 0L
+
+    /** Takes a new reading from the analyser, holding the highest recent peak. */
+    fun updateLevel(peakDb: Float, rmsDb: Float) {
+        val now = android.os.SystemClock.uptimeMillis()
+        val before = level.value
+        if (before == null) {
+            level.value = OutputLevel(peakDb, rmsDb)
+            peakHeldSince = now
+            return
+        }
+        val (next, renewed) = before.next(peakDb, rmsDb, now - peakHeldSince)
+        if (renewed) peakHeldSince = now
+        level.value = next
+    }
+
     /** The hearing check is running, so the EQ steps aside. Never saved, so it can't get stuck on. */
     val hearingCheckRunning = MutableStateFlow(false)
 

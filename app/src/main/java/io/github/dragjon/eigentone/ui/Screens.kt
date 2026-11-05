@@ -153,6 +153,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
+import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import io.github.dragjon.eigentone.data.OutputKind
+import io.github.dragjon.eigentone.data.OutputLevel
+import androidx.compose.animation.togetherWith
 import kotlin.math.log10
 import kotlin.math.pow
 
@@ -444,8 +451,9 @@ fun EigentoneApp(onSetEnabled: (Boolean) -> Unit) {
                         .tourTarget(TourStop.TABS)
                         .selectableGroup(),
                 ) {
+                    val navOutput by Repo.output.collectAsStateWithLifecycle()
                     Tab.entries.filter { it != Tab.SYSTEM }.forEach { t ->
-                        NavItem(t, selected = tab == t, modifier = Modifier.weight(1f)) {
+                        NavItem(t, selected = tab == t, device = navOutput.kind.takeIf { t == Tab.HEADPHONES }, modifier = Modifier.weight(1f)) {
                             // Moving to a tab starts it at the top, and tapping the one already open scrolls it back up.
                             if (tab == t) {
                                 tabScope.launch { scrolls.getValue(t).animateScrollTo(0) }
@@ -513,7 +521,7 @@ fun EigentoneApp(onSetEnabled: (Boolean) -> Unit) {
 
 /** One bottom tab: a lit pill behind the icon when chosen, and the name below. */
 @Composable
-private fun NavItem(tab: Tab, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun NavItem(tab: Tab, selected: Boolean, device: OutputKind? = null, modifier: Modifier = Modifier, onClick: () -> Unit) {
     // The whole tab takes the touch, but the press ripples inside the rounded pill, as Android's own tabs do,
     // rather than as a tight box around the narrow tab.
     val presses = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
@@ -523,25 +531,40 @@ private fun NavItem(tab: Tab, selected: Boolean, modifier: Modifier = Modifier, 
             .padding(vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(
-            Modifier
-                .size(width = 64.dp, height = 32.dp)
-                .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-                .background(if (selected) Palette.Lit else Color.Transparent)
-                .indication(presses, androidx.compose.material3.ripple()),
-            contentAlignment = Alignment.Center,
-        ) {
-            // The label below already names the tab for screen readers.
-            Icon(painterResource(tab.icon), contentDescription = null, tint = if (selected) Palette.OnLit else Palette.TextDim)
+        val tint = if (selected) Palette.OnLit else Palette.TextDim
+        // The device tab's icon sits over the pill rather than in it, so its change animation isn't clipped.
+        Box(contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .size(width = 64.dp, height = 32.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                    .background(if (selected) Palette.Lit else Color.Transparent)
+                    .indication(presses, androidx.compose.material3.ripple()),
+                contentAlignment = Alignment.Center,
+            ) {
+                // The label below already names the tab for screen readers.
+                if (device == null) Icon(painterResource(tab.icon), contentDescription = null, tint = tint)
+            }
+            if (device != null) DeviceTabIcon(device, tint = tint, ring = Palette.Lit)
         }
+        val label = stringResource(device?.tabLabel() ?: tab.label)
+        androidx.compose.animation.AnimatedContent(
+            targetState = label,
+            transitionSpec = {
+                (androidx.compose.animation.fadeIn(tween(220, delayMillis = 200)) + androidx.compose.animation.slideInVertically(tween(260, delayMillis = 200)) { it / 2 })
+                    .togetherWith(androidx.compose.animation.fadeOut(tween(180)) + androidx.compose.animation.slideOutVertically(tween(200)) { -it / 2 })
+            },
+            label = "deviceLabel",
+        ) { text ->
         Text(
-            stringResource(tab.label),
+            text,
             style = MaterialTheme.typography.labelMedium,
             color = if (selected) Palette.Text else Palette.TextDim,
             maxLines = 1,
             softWrap = false,
             modifier = Modifier.padding(top = 4.dp),
         )
+        }
     }
 }
 
@@ -639,13 +662,16 @@ private fun EqTab(state: AppState) {
     var selectedId by rememberSaveable { mutableStateOf<Int?>(filters.firstOrNull()?.id) }
     var graphicMode by rememberSaveable { mutableStateOf(true) }
     val openFinder = LocalOpenFinder.current
-    val selected = filters.firstOrNull { it.id == selectedId }
+    // The chosen filter can stop existing without a tap here, as when Discard, undo or switching preset
+    // removes it. Falling back to the first filter keeps the editor open rather than leaving nothing chosen.
+    val selected = filters.firstOrNull { it.id == selectedId } ?: filters.firstOrNull()
+    LaunchedEffect(selected?.id) { if (selected?.id != selectedId) selectedId = selected?.id }
     val showParametric = Disclosure.parametric(state)
     val inGraphic = graphicMode || !showParametric
     val attenuation by Repo.attenuationDb.collectAsStateWithLifecycle()
     val curveFilters = remember(state, attenuation, Repo.output.value.key) { Processing.effectiveFilters(state, attenuation, Repo.output.value.key) }
     val graphOutput by Repo.output.collectAsStateWithLifecycle()
-    val earCurves = remember(curveFilters, state.earCorrections, graphOutput.key, state.useSystemSurround, state.bypass) {
+    val earCurves = remember(curveFilters, state.current.filters, state.earCorrections, graphOutput.key, state.useSystemSurround, state.bypass) {
         if (state.bypass) null else Processing.channelFilters(state, graphOutput.key, curveFilters)
     }
     // The measured points of the ear correction, sitting on each ear's own curve.
@@ -693,13 +719,16 @@ private fun EqTab(state: AppState) {
         OutputPrompts(state)
     }
 
-    Box(
+    Row(
         Modifier
             .fillMaxWidth()
             .clip(PanelShape)
-            .background(Palette.Surface),
+            .background(Palette.Surface)
+            .height(androidx.compose.foundation.layout.IntrinsicSize.Min),
     ) {
+        Box(Modifier.weight(1f)) {
         EqGraph(
+            legendInsetDp = if (state.analyser) SPECTRUM_INFO_INSET_DP else 0,
             // Graphic mode has its own faders, so the parametric nodes would only get in the way.
             filters = if (inGraphic) emptyList() else filters,
             heightDp = if (inGraphic) 170 else 260,
@@ -717,6 +746,21 @@ private fun EqTab(state: AppState) {
             },
             onDragEnd = Repo::commit,
         )
+            // Explains the spectrum while it shows, faint so it doesn't compete with the curve.
+            if (state.analyser) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .offset(x = (-4).dp, y = (-6).dp)
+                        .alpha(SPECTRUM_INFO_ALPHA),
+                ) { InfoButton(Help.analyser) }
+            }
+        }
+        // The output level beside the spectrum it comes from, at the graph's right edge.
+        // Tapping it explains it. The touch area is wider than the bar, so it's easy to hit.
+        if (state.analyser) TipOnTap(Help.meter, Modifier.requiredWidth(28.dp).fillMaxHeight()) {
+            OutputMeterBar(Modifier.padding(top = 12.dp, bottom = 12.dp))
+        }
     }
     if (state.analyser && analyserUnavailable.value) {
         Text(stringResource(R.string.ui_this_phone_refused_the_analyser), style = MaterialTheme.typography.bodySmall, color = Palette.TextDim)
@@ -786,9 +830,14 @@ private fun EqTab(state: AppState) {
             style = MaterialTheme.typography.bodyMedium,
         )
     } else {
+        val dynamicPlaced = remember(state) {
+            val target = Processing.target(state.copy(bypass = false), 0.0)
+            io.github.dragjon.eigentone.data.Dynamics.placedIds(target.dynamics, target.tamers)
+        }
         FilterEditor(
             filter = selected,
             filters = filters,
+            dynamicPlaced = dynamicPlaced,
             onSelect = { selectedId = it },
             onDelete = {
                 val index = filters.indexOf(selected)
@@ -853,7 +902,7 @@ private fun AnalyserEffect(enabled: Boolean) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(enabled, lifecycle) {
-        val analyser = SpectrumAnalyser { Repo.spectrum.value = it }
+        val analyser = SpectrumAnalyser(onBands = { Repo.spectrum.value = it }, onLevel = { peak, rms -> Repo.updateLevel(peak, rms) })
         val observer = LifecycleEventObserver { _, event ->
             val allowed = enabled && context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
                 PackageManager.PERMISSION_GRANTED
@@ -862,6 +911,7 @@ private fun AnalyserEffect(enabled: Boolean) {
                 Lifecycle.Event.ON_STOP -> {
                     analyser.stop()
                     Repo.spectrum.value = null
+                    Repo.level.value = null
                 }
                 else -> Unit
             }
@@ -926,12 +976,15 @@ private fun AnalyserToggle(state: AppState, modifier: Modifier) {
     }
 }
 
+private const val SPECTRUM_INFO_INSET_DP = 30
+private const val SPECTRUM_INFO_ALPHA = 0.7f
+
 private fun updateFilter(id: Int, transform: (Filter) -> Filter) {
     Repo.edit { p -> p.copy(filters = p.filters.map { if (it.id == id) transform(it) else it }) }
 }
 
 @Composable
-private fun FilterEditor(filter: Filter, filters: List<Filter>, onSelect: (Int) -> Unit, onDelete: () -> Unit) {
+private fun FilterEditor(filter: Filter, filters: List<Filter>, dynamicPlaced: Set<Int>, onSelect: (Int) -> Unit, onDelete: () -> Unit) {
     val index = filters.indexOf(filter)
     SettingsSection(
         stringResource(R.string.ui_filter_of, index + 1, filters.size),
@@ -960,14 +1013,77 @@ private fun FilterEditor(filter: Filter, filters: List<Filter>, onSelect: (Int) 
                 Text(stringResource(R.string.ui_type), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
                 InfoButton(Help.filterType)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                TypeChip(filter, FilterType.BELL, stringResource(R.string.ui_bell), Modifier.weight(1f))
-                TypeChip(filter, FilterType.LOW_SHELF, stringResource(R.string.ui_low_shelf), Modifier.weight(1.2f))
-                TypeChip(filter, FilterType.HIGH_SHELF, stringResource(R.string.ui_high_shelf), Modifier.weight(1.2f))
+            // Each chip takes the width its name needs and the rows wrap, so no name is ever cut short.
+            @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+            androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                TypeChip(filter, FilterType.BELL, stringResource(R.string.ui_bell), Modifier)
+                TypeChip(filter, FilterType.LOW_SHELF, stringResource(R.string.ui_low_shelf), Modifier)
+                TypeChip(filter, FilterType.HIGH_SHELF, stringResource(R.string.ui_high_shelf), Modifier)
+                TypeChip(filter, FilterType.TILT, stringResource(R.string.ui_tilt), Modifier)
+                TypeChip(filter, FilterType.HIGH_PASS, stringResource(R.string.ui_high_pass), Modifier)
+                TypeChip(filter, FilterType.LOW_PASS, stringResource(R.string.ui_low_pass), Modifier)
+                TypeChip(filter, FilterType.NOTCH, stringResource(R.string.ui_notch), Modifier)
+                TypeChip(filter, FilterType.BAND_PASS, stringResource(R.string.ui_band_pass), Modifier)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                TypeChip(filter, FilterType.HIGH_PASS, stringResource(R.string.ui_high_pass), Modifier.weight(1f))
-                TypeChip(filter, FilterType.LOW_PASS, stringResource(R.string.ui_low_pass), Modifier.weight(1f))
+        }
+        RowDivider()
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.ui_channel), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
+                InfoButton(Help.channel)
+            }
+            val channels = listOf(
+                io.github.dragjon.eigentone.dsp.FilterChannel.BOTH to stringResource(R.string.ui_channel_both),
+                io.github.dragjon.eigentone.dsp.FilterChannel.LEFT to stringResource(R.string.ui_channel_left),
+                io.github.dragjon.eigentone.dsp.FilterChannel.RIGHT to stringResource(R.string.ui_channel_right),
+            )
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                channels.forEachIndexed { i, (channel, name) ->
+                    SegmentedButton(
+                        selected = filter.channel == channel,
+                        onClick = {
+                            if (filter.channel != channel) {
+                                updateFilter(filter.id) { it.copy(channel = channel) }
+                                Repo.commit()
+                            }
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(i, channels.size, KeyShape),
+                        colors = segmentColors(),
+                        icon = {},
+                    ) { Text(name, maxLines = 1) }
+                }
+            }
+        }
+        if (filter.type.hasSlope) {
+            RowDivider()
+            Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.ui_slope), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
+                    InfoButton(Help.slope)
+                    Spacer(Modifier.weight(1f))
+                    Text(stringResource(R.string.ui_db_per_octave), style = MaterialTheme.typography.bodySmall, color = Palette.TextDim)
+                }
+                val current = Eq.slopeOf(filter)
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    Eq.SLOPES.forEachIndexed { i, option ->
+                        SegmentedButton(
+                            selected = current == option,
+                            onClick = {
+                                if (current != option) {
+                                    updateFilter(filter.id) { it.copy(slope = option) }
+                                    Repo.commit()
+                                }
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(i, Eq.SLOPES.size, KeyShape),
+                            colors = segmentColors(),
+                            icon = {},
+                            modifier = Modifier.semantics { contentDescription = appText(R.string.ui_slope_option, option) },
+                        ) { Text("$option", maxLines = 1) }
+                    }
+                }
             }
         }
         RowDivider()
@@ -996,6 +1112,8 @@ private fun FilterEditor(filter: Filter, filters: List<Filter>, onSelect: (Int) 
                 onFinished = Repo::commit,
             )
         }
+        // A 6 dB slope has a single gentle bend, so there's no Q to set.
+        if (!(filter.type.hasSlope && Eq.slopeOf(filter) == 6)) {
         RowDivider()
         SliderSetting(
             title = stringResource(R.string.ui_q),
@@ -1007,7 +1125,56 @@ private fun FilterEditor(filter: Filter, filters: List<Filter>, onSelect: (Int) 
             onChange = { t -> updateFilter(filter.id) { it.copy(q = qFromPosition(t)) } },
             onFinished = Repo::commit,
         )
+        }
+        if (filter.canBeDynamic) DynamicFilterRows(filter, placed = filter.id in dynamicPlaced)
     }
+}
+
+/**
+ * Turns a bell or shelf into a dynamic one, which also turns its range down while that range is loud. It
+ * uses a band of Android's multiband compressor, which the compressor and Clarity share, so it says when
+ * there's no band left for it.
+ */
+@Composable
+private fun DynamicFilterRows(filter: Filter, placed: Boolean) {
+    val dynamic = filter.dynamic
+    RowDivider()
+    SwitchSetting(
+        stringResource(R.string.ui_dynamic),
+        Help.dynamicFilter,
+        dynamic != null,
+        detail = when {
+            dynamic == null -> stringResource(R.string.ui_dynamic_detail)
+            placed -> null
+            else -> stringResource(R.string.ui_dynamic_no_room)
+        },
+    ) { on ->
+        updateFilter(filter.id) { it.copy(dynamic = if (on) it.dynamic ?: io.github.dragjon.eigentone.dsp.FilterDynamics() else null) }
+        Repo.commit()
+    }
+    if (dynamic == null) return
+    RowDivider()
+    SliderSetting(
+        title = stringResource(R.string.ui_threshold),
+        tip = Help.dynamicFilter,
+        readout = String.format(Locale.US, "%.0f dB", dynamic.thresholdDb),
+        value = dynamic.thresholdDb.toFloat(),
+        range = -60f..0f,
+        default = -30f,
+        onChange = { v -> updateFilter(filter.id) { it.copy(dynamic = dynamic.copy(thresholdDb = kotlin.math.round(v.toDouble()))) } },
+        onFinished = Repo::commit,
+    )
+    RowDivider()
+    SliderSetting(
+        title = stringResource(R.string.ui_ratio),
+        tip = Help.dynamicFilter,
+        readout = String.format(Locale.US, "%.1f:1", dynamic.ratio),
+        value = dynamic.ratio.toFloat(),
+        range = 1f..10f,
+        default = 3f,
+        onChange = { v -> updateFilter(filter.id) { it.copy(dynamic = dynamic.copy(ratio = kotlin.math.round(v * 2.0) / 2.0)) } },
+        onFinished = Repo::commit,
+    )
 }
 
 @Composable
@@ -1759,17 +1926,38 @@ private fun HeadphonesTab(state: AppState) {
     val preset = state.current
     val saved = savedPreset(state)?.tone
 
-    Column(Modifier.padding(horizontal = 4.dp)) {
-        Text(output.label, style = MaterialTheme.typography.titleLarge, color = Palette.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Text(stringResource(R.string.ui_hp_scope), style = MaterialTheme.typography.bodySmall, color = Palette.TextDim)
+    val kind = output.kind
+    val hasCorrection = preset.filters.any { it.gainDb != 0.0 || !it.type.hasGain } || preset.tone.importedCurve.isNotEmpty()
+
+    Row(Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(painterResource(kind.icon()), contentDescription = null, tint = Palette.Lit, modifier = Modifier.padding(end = 12.dp).size(28.dp))
+        Column {
+            Text(output.label, style = MaterialTheme.typography.titleLarge, color = Palette.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(
+                stringResource(
+                    when (kind) {
+                        OutputKind.PHONE -> R.string.ui_device_scope_phone
+                        OutputKind.SPEAKER -> R.string.ui_device_scope_speaker
+                        OutputKind.CAR -> R.string.ui_device_scope_car
+                        else -> R.string.ui_hp_scope
+                    },
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = Palette.TextDim,
+            )
+        }
     }
 
-    SettingsSection(stringResource(R.string.ui_hp_correction)) {
-        ActionRow(stringResource(R.string.ui_find_headphones), Help.find) { finding = true }
-        if (preset.filters.any { it.gainDb != 0.0 || !it.type.hasGain } || preset.tone.importedCurve.isNotEmpty()) {
-            RowDivider()
+    // Headphone corrections are measured on heads, so finding one only makes sense for something worn.
+    // Anything else still shows the strength of a correction its preset already has.
+    if (kind.isWorn || hasCorrection) SettingsSection(stringResource(R.string.ui_hp_correction)) {
+        if (kind.isWorn) {
+            ActionRow(stringResource(if (kind == OutputKind.EARBUDS) R.string.ui_find_earbuds else R.string.ui_find_headphones), Help.find) { finding = true }
+        }
+        if (hasCorrection) {
+            if (kind.isWorn) RowDivider()
             SliderSetting(
-                title = stringResource(R.string.ui_headphone_correction),
+                title = stringResource(if (kind.isWorn) R.string.ui_headphone_correction else R.string.ui_hp_correction),
                 tip = Help.correction,
                 readout = if (preset.tone.correction <= 0.0) stringResource(R.string.ui_mode_off) else formatPercent(preset.tone.correction),
                 value = preset.tone.correction.toFloat(),
@@ -1790,8 +1978,18 @@ private fun HeadphonesTab(state: AppState) {
     OutputSection(state, output.key, output.label)
 
     SettingsSection(stringResource(R.string.ui_your_ears)) {
-        ActionRow(stringResource(R.string.ui_hearing_check), Help.hearing, detail = stringResource(R.string.ui_builds_a_curve_for_how_you_hear), onClick = LocalOpenHearing.current)
-        EarCorrectionRows(state)
+        if (kind.isWorn) {
+            ActionRow(stringResource(R.string.ui_hearing_check), Help.hearing, detail = stringResource(R.string.ui_builds_a_curve_for_how_you_hear), onClick = LocalOpenHearing.current)
+            EarCorrectionRows(state)
+        } else {
+            // A speaker reaches both ears at once, and the room changes what each one hears.
+            Text(
+                stringResource(R.string.ui_ears_need_headphones, output.label),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Palette.TextDim,
+                modifier = Modifier.padding(16.dp),
+            )
+        }
     }
 
     SettingsSection(stringResource(R.string.ui_quiet_listening)) {

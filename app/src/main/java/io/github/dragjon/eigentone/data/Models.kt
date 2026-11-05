@@ -467,7 +467,59 @@ object Profiles {
         }
 }
 
-data class OutputInfo(val key: String, val label: String)
+data class OutputInfo(val key: String, val label: String, val kind: OutputKind = OutputKind.guess(key, label))
+
+/**
+ * Peak and average (RMS) level of everything playing, in dB below full scale, with the highest recent
+ * peak held for a moment so a short one can be read.
+ */
+data class OutputLevel(val peakDb: Float, val rmsDb: Float, val heldPeakDb: Float = peakDb) {
+    /** The next reading, keeping the held peak until a higher one comes or it has been held long enough. */
+    fun next(peak: Float, rms: Float, heldFor: Long): Pair<OutputLevel, Boolean> {
+        val renew = peak >= heldPeakDb || heldFor > HOLD_MS
+        return OutputLevel(peak, rms, if (renew) peak else heldPeakDb) to renew
+    }
+
+    companion object {
+        const val HOLD_MS = 1500L
+    }
+}
+
+/** What kind of thing is playing, which names the device tab and decides what it offers. */
+enum class OutputKind {
+    PHONE, HEADPHONES, EARBUDS, SPEAKER, CAR;
+
+    /** Worn on the head, so each ear can be reached separately and headphone corrections apply. */
+    val isWorn: Boolean get() = this == HEADPHONES || this == EARBUDS
+
+    companion object {
+        private val CAR_WORDS = Regex(
+            """\b(car|carkit|car kit|auto|android auto|carplay|sync|uconnect|mbux|idrive|mylink|bmw|audi|toyota|honda|ford|vw|volkswagen|kia|hyundai|mazda|nissan|tesla|subaru|lexus|mercedes|peugeot|renault|skoda|volvo|seat|opel|chevrolet|jeep|porsche)\b""",
+            RegexOption.IGNORE_CASE,
+        )
+        private val SPEAKER_WORDS = Regex(
+            """(speaker|soundbar|sound bar|soundlink|soundcore motion|partybox|\bflip\b|\bcharge\b|\bboom\b|megaboom|wonderboom|xtreme|\bpulse\b|\becho\b|\bnest\b|sonos|homepod|stanmore|emberton|acton|marshall woburn)""",
+            RegexOption.IGNORE_CASE,
+        )
+        private val EARBUD_WORDS = Regex(
+            """(buds|pods|earbud|\biem\b|\btws\b|\bwf-|nothing ear|jabra elite|soundcore liberty|momentum true|\bfreebuds|\bear \()""",
+            RegexOption.IGNORE_CASE,
+        )
+
+        /**
+         * A best guess from the output and its name, since Android only says a Bluetooth device plays audio,
+         * not whether it's headphones, a speaker or a car. Names like "Galaxy Buds" or "JBL Flip" say the rest.
+         */
+        fun guess(key: String, name: String, speakerType: Boolean = false): OutputKind = when {
+            key == "speaker" -> PHONE
+            speakerType -> SPEAKER
+            CAR_WORDS.containsMatchIn(name) -> CAR
+            SPEAKER_WORDS.containsMatchIn(name) -> SPEAKER
+            EARBUD_WORDS.containsMatchIn(name) -> EARBUDS
+            else -> HEADPHONES
+        }
+    }
+}
 
 /** Live engine facts, never saved. */
 data class EngineStatus(

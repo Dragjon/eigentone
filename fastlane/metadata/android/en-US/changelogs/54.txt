@@ -1,0 +1,7 @@
+- New filter types: tilt, notch and band pass
+- High and low pass have a slope, from a gentle 6 to a steep 48 dB per octave
+- Each filter can shape both channels, or just the left or the right
+- Bells and shelves can be dynamic, turning their range down only while it gets loud
+- The last tab is named and drawn for what's playing: Phone, Headphones, Earbuds, Speaker or Car, with an animation when it changes, and its page offers what suits that device
+- An output level meter beside the spectrum, which turns red when peaks reach full scale. Tap it to read about it. While the spectrum shows, a faint info button on the graph explains it
+- Discarding changes no longer leaves the filter editor empty

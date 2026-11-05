@@ -2,6 +2,7 @@ package io.github.dragjon.eigentone.data
 
 import io.github.dragjon.eigentone.dsp.Eq
 import io.github.dragjon.eigentone.dsp.Filter
+import io.github.dragjon.eigentone.dsp.FilterChannel
 import io.github.dragjon.eigentone.dsp.FilterType
 import io.github.dragjon.eigentone.dsp.GraphicEq
 import kotlin.math.log10
@@ -87,12 +88,41 @@ object Processing {
     fun fixedFilters(preset: Preset): List<Filter> {
         val tone = preset.tone
         val filterScale = tone.strength * tone.correction
-        return preset.filters.map { filter ->
-            if (filterScale != 1.0 && filter.type.hasGain) filter.copy(gainDb = filter.gainDb * filterScale) else filter
-        }.filterNot { tone.correction == 0.0 && !it.type.hasGain } +
+        return scaled(preset, preset.filters.filter { it.channel == FilterChannel.BOTH }) +
             curveFilter(IMPORTED_CURVE_ID, tone.importedCurve, filterScale) +
             curveFilter(TARGET_CURVE_ID, HeadphoneTargets.change(HeadphoneTarget.of(tone.targetId), tone.correctionInfo), filterScale)
     }
+
+    /** The preset's filters at its strength and correction amount, with an unused pass dropped. */
+    private fun scaled(preset: Preset, filters: List<Filter>): List<Filter> {
+        val tone = preset.tone
+        val filterScale = tone.strength * tone.correction
+        return filters.map { filter ->
+            if (filterScale != 1.0 && filter.type.hasGain) filter.copy(gainDb = filter.gainDb * filterScale) else filter
+        }.filterNot { tone.correction == 0.0 && !it.type.hasGain }
+    }
+
+    /**
+     * Filters set to one channel only, as left and right. They're left out of [presetFilters], which
+     * is the sound both channels share, and added to each side by [channelFilters].
+     */
+    fun sidedFilters(preset: Preset): Pair<List<Filter>, List<Filter>> {
+        val sided = scaled(preset, preset.filters.filter { it.channel != FilterChannel.BOTH })
+        return sided.filter { it.channel == FilterChannel.LEFT } to sided.filter { it.channel == FilterChannel.RIGHT }
+    }
+
+    /** The ranges the preset's dynamic filters watch, in filter order, which is the order they get bands in. */
+    fun dynamicRanges(preset: Preset): List<DynamicRange> =
+        if (preset.tone.strength == 0.0 || preset.tone.correction == 0.0) emptyList() else preset.filters
+            .filter { it.enabled && it.canBeDynamic && it.dynamic != null }
+            .map { f ->
+                val d = f.dynamic!!.clamped()
+                val range = f.dynamicRange()
+                DynamicRange(
+                    f.id, range.start, range.endInclusive,
+                    CompressorBand(thresholdDb = d.thresholdDb, ratio = d.ratio, attackMs = DYNAMIC_ATTACK_MS, releaseMs = DYNAMIC_RELEASE_MS),
+                )
+            }
 
     /** Everything a preset contributes: its filters and its tone adjustments. */
     fun presetFilters(preset: Preset): List<Filter> {
@@ -150,8 +180,11 @@ object Processing {
     fun channelFilters(state: AppState, outputKey: String, filters: List<Filter>): Pair<List<Filter>, List<Filter>>? {
         val ears = state.earsFor(outputKey)?.takeIf { it.enabled }
         val width = state.current.tone.surround.takeIf { it > 0.0 && !state.useSystemSurround }
-        if (ears == null && width == null) return null
-        val (left, right) = if (ears == null) filters to filters else earCurves(filters, ears)
+        val (onlyLeft, onlyRight) = sidedFilters(state.current)
+        if (ears == null && width == null && onlyLeft.isEmpty() && onlyRight.isEmpty()) return null
+        val (sharedLeft, sharedRight) = if (ears == null) filters to filters else earCurves(filters, ears)
+        val left = sharedLeft + onlyLeft
+        val right = sharedRight + onlyRight
         if (width == null) return left to right
         val (leanLeft, leanRight) = StereoWidth.curves(width)
         return (left + curveFilter(WIDTH_CURVE_ID, leanLeft)) to (right + curveFilter(WIDTH_CURVE_ID, leanRight))
@@ -221,7 +254,7 @@ object Processing {
 
     /** The preset as ordinary filters, or null if it uses faders or a curve, which filters can't express. */
     fun exportFilters(preset: Preset): List<Filter>? =
-        presetFilters(preset).takeIf { list -> list.isNotEmpty() && list.none { it.type == FilterType.CURVE } }
+        presetFilters(preset).takeIf { list -> list.isNotEmpty() && list.all { Eq.canExport(it) } && preset.filters.all { it.channel == FilterChannel.BOTH } }
 
     /** Each ear's filters: the same sound, plus that ear's own correction. */
     fun earCurves(filters: List<Filter>, ears: EarCorrection): Pair<List<Filter>, List<Filter>> =
@@ -262,6 +295,7 @@ object Processing {
                     state.current.tone.boomTamer,
                     state.current.tone.bassCharacter,
                     (state.current.tone.bassDb * state.current.tone.strength).coerceAtLeast(0.0),
+                    dynamicRanges(state.current),
                 ),
             )
         }
@@ -305,6 +339,8 @@ object Processing {
     }
 
     private const val MIN_SIDE_LEVEL = 0.001
+    private const val DYNAMIC_ATTACK_MS = 10.0
+    private const val DYNAMIC_RELEASE_MS = 150.0
     private const val LOUDNESS_STEPS = 120
     private const val EXPORT_POINTS = 127
     private const val PEAK_STEPS = 240

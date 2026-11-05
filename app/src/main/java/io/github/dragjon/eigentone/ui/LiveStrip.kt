@@ -284,7 +284,7 @@ private fun MiniCurve(state: AppState, outputKey: String, working: Boolean) {
     val attenuation by Repo.attenuationDb.collectAsStateWithLifecycle()
     val spectrum = Repo.spectrum.collectAsStateWithLifecycle()
     val filters = remember(state, attenuation, outputKey) { Processing.effectiveFilters(state, attenuation, outputKey) }
-    val channels = remember(filters, state.earCorrections, outputKey, state.useSystemSurround) {
+    val channels = remember(filters, state.current.filters, state.earCorrections, outputKey, state.useSystemSurround) {
         Processing.channelFilters(state, outputKey, filters)
     }
     fun sample(list: List<io.github.dragjon.eigentone.dsp.Filter>) =

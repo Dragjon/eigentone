@@ -79,6 +79,8 @@ fun EqGraph(
     rangeDb: Double = RANGE_DB,
     /** When this changes, such as the preset, the curves glide to their new shape. */
     morphKey: Any? = null,
+    /** Room kept clear at the top left, such as for an info button over the graph, which the ear legend moves past. */
+    legendInsetDp: Int = 0,
 ) {
     val currentFilters by rememberUpdatedState(filters)
     val measurer = rememberTextMeasurer()
@@ -286,10 +288,11 @@ fun EqGraph(
             val mark = 4.dp.toPx()
             val stroke = 1.5.dp.toPx()
             val markY = 12.dp.toPx()
-            val leftX = 10.dp.toPx()
+            val inset = legendInsetDp.dp.toPx()
+            val leftX = 10.dp.toPx() + inset
             drawLine(accent, Offset(leftX - mark, markY - mark), Offset(leftX + mark, markY + mark), stroke)
             drawLine(accent, Offset(leftX - mark, markY + mark), Offset(leftX + mark, markY - mark), stroke)
-            label(appText(R.string.ui_left_ear), 18.dp.toPx(), 4f, labelStyle.copy(color = accent))
+            label(appText(R.string.ui_left_ear), 18.dp.toPx() + inset, 4f, labelStyle.copy(color = accent))
             label(appText(R.string.ui_right_ear), w - rightLabel - 18.dp.toPx(), 4f, rightStyle)
             drawCircle(rightColour, mark, Offset(w - 10.dp.toPx(), markY), style = Stroke(stroke))
         }
@@ -308,6 +311,14 @@ fun EqGraph(
                     drawCircle(Palette.Background, radius, center)
                     drawCircle(nodeColour, radius, center, style = Stroke(2.dp.toPx()))
                 }
+            }
+            // A filter on one channel only says which, beside its node.
+            if (f.channel != io.github.dragjon.eigentone.dsp.FilterChannel.BOTH) {
+                val side = measurer.measure(
+                    appText(if (f.channel == io.github.dragjon.eigentone.dsp.FilterChannel.LEFT) R.string.ui_channel_left_short else R.string.ui_channel_right_short),
+                    labelStyle.copy(color = nodeColour),
+                )
+                drawText(side, topLeft = Offset(center.x + radius + 2.dp.toPx(), center.y - radius - side.size.height / 2))
             }
         }
     }
