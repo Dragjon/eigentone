@@ -1,0 +1,17 @@
+- New Headphones tab, replacing Tune: correction, automatic preset, noise mode, your ears, quiet listening and the listening tests, all for what's connected
+- The save bar shows on every tab, and is the one place to save or discard edits
+- The spectrum analyser is a button on the graph
+- Dynamic EQ is now called Clarity, and Dynamics is now Volume
+- Settings opens from the gear at the top right, leaving four tabs at the bottom
+- The bottom tabs sit closer together, and Timing and crossovers in the compressor is a clear row to open
+- New Advanced controls switch in Settings. New installs start simple; anyone updating keeps every control. Anything you've changed always stays in view
+- The tabs are now Equaliser, Effects, Presets and Headphones, evenly spaced
+- A new reverb icon in the status strip: a sound fading away
+- A welcome for new users: turn Eigentone on, set up your headphones, find your sound and choose whether to turn on Advanced controls. Settings, Help, shows it again
+- In Simple, the landscape key sits with Undo and Reset instead of alone on its own row
+- Each welcome step sweeps away fader by fader behind a lit line, like a frequency sweep: left to right going forward, right to left going back
+- Start listening powers the app on: the welcome closes into a lit line, a pulse rings out, a spectrum bursts from the line, and the app unfolds as it settles
+- A new icon: a strand of DNA in amber, on black
+- In landscape, Precision and Smooth are one sliding toggle, with room above and below
+- Undo and Redo now show in the landscape faders, where they were drawn too dark to see
+- A tour of the main screen, after the welcome or any time from Settings, Help. Anyone updating is offered it once

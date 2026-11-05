@@ -130,6 +130,8 @@ fun CompressorSection(state: AppState) {
                 )
             }
         }
+        // The styles are enough for most. The bands appear with Advanced controls, or once set by hand.
+        if (!com.phonons.app.data.Disclosure.compressorBands(state)) return@SettingsSection
         RowDivider()
         SingleChoiceSegmentedButtonRow(
             Modifier
@@ -187,12 +189,8 @@ fun CompressorSection(state: AppState) {
                 onFinished = Repo::commit,
             )
         }
-        TextButton(
-            onClick = { details = !details },
-            modifier = Modifier
-                .padding(horizontal = 8.dp)
-                .heightIn(min = 48.dp),
-        ) { Text(if (details) stringResource(R.string.ui_hide_timing_and_crossovers) else stringResource(R.string.ui_timing_and_crossovers)) }
+        RowDivider()
+        DisclosureRow(stringResource(R.string.ui_timing_and_crossovers), details) { details = !details }
         if (details) {
             if (band.enabled) {
                 LogSlider(

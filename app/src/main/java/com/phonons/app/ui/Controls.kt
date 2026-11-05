@@ -255,6 +255,30 @@ fun ActionRow(title: String, tip: Tip, detail: String? = null, enabled: Boolean 
     }
 }
 
+/** Opens more settings inside a section. Looks and works like a folding section's header, at row size. */
+@Composable
+fun DisclosureRow(label: String, open: Boolean, onToggle: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 52.dp)
+            .clickable(
+                role = Role.Button,
+                onClickLabel = stringResource(if (open) R.string.ui_fold_close else R.string.ui_fold_open),
+            ) { onToggle() }
+            .padding(start = 16.dp, end = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = Palette.Lit, modifier = Modifier.weight(1f))
+        Icon(
+            if (open) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+            contentDescription = null,
+            tint = Palette.Lit,
+            modifier = Modifier.padding(horizontal = 8.dp),
+        )
+    }
+}
+
 /** Reads a value out. Lit means it differs from the default, so changes are easy to spot. */
 @Composable
 fun SliderSetting(

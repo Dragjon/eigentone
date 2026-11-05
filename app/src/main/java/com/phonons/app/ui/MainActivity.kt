@@ -49,7 +49,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         AppText.context = applicationContext
-        notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        // On a first run the welcome asks, with an explanation, when the EQ is turned on.
+        if (Repo.state.value.welcomeDone) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         setContent {
             val modes = remember { Repo.state.map { it.themeMode }.distinctUntilChanged() }
             val mode by modes.collectAsStateWithLifecycle(Repo.state.value.themeMode)

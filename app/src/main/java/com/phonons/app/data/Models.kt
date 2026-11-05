@@ -263,6 +263,14 @@ data class AppState(
     /** Lifts the level after limiting. It can't push peaks past full scale. */
     val limiterPostGainDb: Double = 0.0,
     val guidedSetupSeen: Boolean = false,
+    /** Shows every control. Off, the app shows what most people need, plus anything already changed. */
+    val advancedControls: Boolean = false,
+    /** Whether the welcome has been finished or skipped. Settings, Help, shows it again. */
+    val welcomeDone: Boolean = false,
+    /** Where the welcome was left, so closing the app partway through resumes there. */
+    val welcomeStep: Int = 0,
+    /** Whether the tour of the main screen has been taken or turned down. Offered once until then. */
+    val tourSeen: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.DEVICE,
     val faderMode: FaderMode = FaderMode.PRECISION,
     val faderView: FaderView = FaderView.SCROLL,
@@ -367,7 +375,8 @@ data class AppState(
         }
         // A preview's temporary level can only be here if the app was closed during one.
         val clean = current.copy(tone = current.tone.copy(trimDb = 0.0))
-        return withCurve.copy(stateVersion = CURRENT_STATE_VERSION, current = clean)
+        // Anyone updating keeps every control they had and skips the welcome. Only new installs start simple.
+        return withCurve.copy(stateVersion = CURRENT_STATE_VERSION, current = clean, advancedControls = advancedControls || stateVersion < 3, welcomeDone = welcomeDone || stateVersion < 3)
             .withoutLegacyTone()
             .withLegacyCompressorMoved()
             .let { state ->
@@ -401,7 +410,7 @@ data class AppState(
     }
 
     companion object {
-        const val CURRENT_STATE_VERSION = 2
+        const val CURRENT_STATE_VERSION = 3
 
         private val OWNER_CURVE = CustomShape(
             "custom:my-soundcore-curve",

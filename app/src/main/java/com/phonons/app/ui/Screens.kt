@@ -1,5 +1,15 @@
 package com.phonons.app.ui
 
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.res.stringResource
 import android.Manifest
 import android.annotation.SuppressLint
@@ -38,6 +48,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
@@ -113,6 +124,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.phonons.app.R
 import com.phonons.app.data.AppState
+import com.phonons.app.data.Disclosure
 import com.phonons.app.data.AutoEqCatalog
 import com.phonons.app.data.BackupCodec
 import com.phonons.app.data.BuiltIns
@@ -148,7 +160,7 @@ private enum class Tab(@StringRes val label: Int, @DrawableRes val icon: Int) {
     EQ(R.string.ui_tab_eq, R.drawable.ic_tab_eq),
     SOUND(R.string.ui_tab_sound, R.drawable.ic_tab_sound),
     PRESETS(R.string.ui_tab_presets, R.drawable.ic_tab_presets),
-    TUNE(R.string.ui_tab_tune, R.drawable.ic_tab_tune),
+    HEADPHONES(R.string.ui_tab_headphones, R.drawable.ic_tab_headphones),
     SYSTEM(R.string.ui_tab_system, R.drawable.ic_tab_system),
 }
 
@@ -184,7 +196,69 @@ private val LocalOpenHearing = compositionLocalOf<() -> Unit> { error("No hearin
 
 private const val SEARCH_FROM_PRESETS = 6
 private const val TAB_FADE_MS = 140
+private const val OPEN_MS = 1500
+/** When, as a share of the opening, the app starts to unfold out of the line. */
+private const val OPEN_UNFOLD_AT = 0.52f
+private const val OPEN_BARS = 41
+
+/** How far through the window from [start] to [end] the progress is, from 0 to 1. */
+private fun phase(progress: Float, start: Float, end: Float) = ((progress - start) / (end - start)).coerceIn(0f, 1f)
+
+/**
+ * The power-on drawn over the app as it opens: the lit line, two pulses ringing out from its middle, and a
+ * spectrum that bursts out of the line from the centre outward, moves like live sound, then settles back
+ * into the line, edges first, as the app unfolds.
+ */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPowerOn(p: Float) {
+    val centre = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+    val reach = kotlin.math.hypot(size.width, size.height) / 2f
+    // Pulses.
+    for (k in 0..1) {
+        val r = phase(p, 0.02f + k * 0.13f, 0.6f + k * 0.13f)
+        if (r > 0f && r < 1f) {
+            drawCircle(
+                Palette.Lit.copy(alpha = (1f - r) * 0.55f),
+                radius = r * reach * 1.1f,
+                center = centre,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = (1f + 3f * (1f - r)) * density),
+            )
+        }
+    }
+    // The line, brightest at the start and gone once the app is open.
+    val lineAlpha = 1f - phase(p, OPEN_UNFOLD_AT, OPEN_UNFOLD_AT + 0.25f)
+    drawLine(
+        Palette.Lit.copy(alpha = lineAlpha),
+        androidx.compose.ui.geometry.Offset(0f, centre.y),
+        androidx.compose.ui.geometry.Offset(size.width, centre.y),
+        strokeWidth = 3f * density,
+    )
+    // The spectrum.
+    val rise = phase(p, 0.06f, 0.42f)
+    val settle = phase(p, OPEN_UNFOLD_AT - 0.06f, 0.9f)
+    val slot = size.width / OPEN_BARS
+    val barWidth = slot * 0.55f
+    val tallest = size.height * 0.26f
+    for (i in 0 until OPEN_BARS) {
+        // 0 in the middle, 1 at the edges.
+        val distance = kotlin.math.abs(i - (OPEN_BARS - 1) / 2f) / ((OPEN_BARS - 1) / 2f)
+        val up = ((rise * 1.5f - distance * 0.5f)).coerceIn(0f, 1f)
+        val down = ((settle * 1.5f - (1f - distance) * 0.5f)).coerceIn(0f, 1f)
+        val upEased = 1f - (1f - up) * (1f - up)
+        // Moves like music: two waves at different speeds, louder in the middle, as bass and mids are.
+        val motion = 0.55f + 0.45f * kotlin.math.sin(i * 0.9f + p * 22f) * kotlin.math.sin(i * 0.31f - p * 9f)
+        val height = tallest * upEased * (1f - down) * motion * (1f - 0.55f * distance)
+        if (height < 0.5f) continue
+        val x = slot * i + (slot - barWidth) / 2f
+        drawRoundRect(
+            Palette.Lit.copy(alpha = 0.9f * (1f - down * 0.5f)),
+            topLeft = androidx.compose.ui.geometry.Offset(x, centre.y - height),
+            size = androidx.compose.ui.geometry.Size(barWidth, height * 2f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2f),
+        )
+    }
+}
 private const val UNSAVED_BAR_ROOM_DP = 80
+private const val NAV_EDGE_DP = 8
 
 private val LocalOpenPresets = compositionLocalOf<() -> Unit> { error("No presets tab") }
 
@@ -205,6 +279,16 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
     val state by Repo.state.collectAsStateWithLifecycle()
     val status by Repo.status.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(Tab.EQ) }
+    // Settings opens from the top bar, so Back returns to whichever tab it was opened from.
+    var beforeSettings by rememberSaveable { mutableStateOf(Tab.EQ) }
+    val toggleSettings = {
+        if (tab == Tab.SYSTEM) {
+            tab = beforeSettings
+        } else {
+            beforeSettings = tab
+            tab = Tab.SYSTEM
+        }
+    }
     val snackbar = remember { SnackbarHostState() }
     val appContext = LocalContext.current
     LaunchedEffect(state.favorites, state.presets) {
@@ -256,7 +340,68 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
         ShapeBrowser(onClose = { browsingShapes = false })
         return
     }
+    // After the tools above, so Find your sound opens over the welcome and returns to it.
+    if (!state.welcomeDone) {
+        WelcomeScreen(onSetEnabled = onSetEnabled, onFindSound = { finding = true })
+        return
+    }
 
+    // The tour runs on the Equaliser tab, scrolled so the control it points at is in view.
+    val tourStop = Tour.stop
+    val screenHeight = with(LocalDensity.current) { androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp.toPx() }
+    val navRoom = with(LocalDensity.current) { 140.dp.toPx() }
+    LaunchedEffect(tourStop) {
+        if (tourStop == null) return@LaunchedEffect
+        if (tab != Tab.EQ) tab = Tab.EQ
+        when (tourStop) {
+            TourStop.FADERS -> {
+                kotlinx.coroutines.delay(60)
+                val r = Tour.anchors[tourStop] ?: return@LaunchedEffect
+                val over = r.bottom - (screenHeight - navRoom)
+                if (over > 0f) scrolls.getValue(Tab.EQ).animateScrollBy(over)
+            }
+            TourStop.POWER -> scrolls.getValue(Tab.EQ).animateScrollTo(0)
+            else -> Unit
+        }
+    }
+
+    // Straight after the welcome, the app powers on out of the lit line it closed into: a pulse rings out,
+    // a spectrum bursts from the line, and the app unfolds as the bars settle back into it.
+    val opening = remember { Animatable(if (openingFromWelcome.value) 0f else 1f) }
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    LaunchedEffect(Unit) {
+        if (openingFromWelcome.value) {
+            launch {
+                kotlinx.coroutines.delay((OPEN_MS * OPEN_UNFOLD_AT).toLong())
+                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+            }
+            opening.animateTo(1f, tween(OPEN_MS, easing = LinearEasing))
+            openingFromWelcome.value = false
+            // A new user goes straight on to the tour of the screen they've just arrived at.
+            if (!Repo.state.value.tourSeen) Tour.start()
+        }
+    }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .drawWithContent {
+                val p = opening.value
+                if (p >= 1f) {
+                    drawContent()
+                    return@drawWithContent
+                }
+                drawRect(Palette.Background)
+                drawContent()
+                drawPowerOn(p)
+            }
+            .graphicsLayer {
+                val unfold = phase(opening.value, OPEN_UNFOLD_AT, 1f)
+                // Opens quickly and settles gently.
+                val eased = 1f - (1f - unfold) * (1f - unfold) * (1f - unfold)
+                scaleY = 0.006f + 0.994f * eased
+                alpha = (unfold * 3f).coerceIn(0f, 1f)
+            },
+    ) {
     CompositionLocalProvider(
         LocalSnackbar provides snackbar,
         LocalOpenFinder provides { finding = true },
@@ -270,29 +415,27 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
     ) {
         Scaffold(
             containerColor = Palette.Background,
-            topBar = { TopBar(state, status, showCurve = tab != Tab.EQ, onSetEnabled) },
+            topBar = { TopBar(state, status, showCurve = tab != Tab.EQ, settingsOpen = tab == Tab.SYSTEM, onSettings = toggleSettings, onSetEnabled) },
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = {
-                NavigationBar(containerColor = Palette.Bar, tonalElevation = 0.dp) {
-                    Tab.entries.forEach { t ->
-                        NavigationBarItem(
-                            selected = tab == t,
-                            onClick = { tab = t },
-                            // The label below already names the tab for screen readers.
-                            icon = { Icon(painterResource(t.icon), contentDescription = null) },
-                            label = { Text(stringResource(t.label)) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Palette.OnLit,
-                                selectedTextColor = Palette.Text,
-                                indicatorColor = Palette.Lit,
-                                unselectedIconColor = Palette.TextDim,
-                                unselectedTextColor = Palette.TextDim,
-                            ),
-                        )
+                // Settings lives in the top bar, which leaves the bottom for the four everyday tabs. They share
+                // the width equally, with labels of similar length, so the spacing is even edge to edge.
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(Palette.Bar)
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                        .padding(start = NAV_EDGE_DP.dp, end = NAV_EDGE_DP.dp, top = 12.dp, bottom = 12.dp)
+                        .tourTarget(TourStop.TABS)
+                        .selectableGroup(),
+                ) {
+                    Tab.entries.filter { it != Tab.SYSTEM }.forEach { t ->
+                        NavItem(t, selected = tab == t, modifier = Modifier.weight(1f)) { tab = t }
                     }
                 }
             },
         ) { padding ->
+            androidx.activity.compose.BackHandler(enabled = tab == Tab.SYSTEM) { tab = beforeSettings }
             Box(
                 Modifier
                     .fillMaxSize()
@@ -319,7 +462,7 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
                                 Tab.EQ -> EqTab(state)
                                 Tab.SOUND -> SoundTab(state)
                                 Tab.PRESETS -> PresetsTab(state)
-                                Tab.TUNE -> TuneTab(state)
+                                Tab.HEADPHONES -> HeadphonesTab(state)
                                 Tab.SYSTEM -> SystemTab(state, status)
                             }
                         }
@@ -328,7 +471,7 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
                 // Floats over the page rather than sitting in it, so appearing can never move anything,
                 // such as a fader under a finger that's still dragging it.
                 val savedVersion = Repo.allPresets(state).firstOrNull { it.id == state.current.id }
-                if ((tab == Tab.EQ || tab == Tab.SOUND) && savedVersion != null && savedVersion != state.current) {
+                if (savedVersion != null && savedVersion != state.current) {
                     UnsavedBar(
                         state,
                         savedVersion,
@@ -341,11 +484,54 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
             }
         }
     }
+    TourOverlay()
+    }
+}
+
+/** One bottom tab: a lit pill behind the icon when chosen, and the name below. */
+@Composable
+private fun NavItem(tab: Tab, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    // The whole tab takes the touch, but the press ripples inside the rounded pill, as Android's own tabs do,
+    // rather than as a tight box around the narrow tab.
+    val presses = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    Column(
+        modifier
+            .selectable(selected = selected, interactionSource = presses, indication = null, role = Role.Tab, onClick = onClick)
+            .padding(vertical = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier
+                .size(width = 64.dp, height = 32.dp)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                .background(if (selected) Palette.Lit else Color.Transparent)
+                .indication(presses, androidx.compose.material3.ripple()),
+            contentAlignment = Alignment.Center,
+        ) {
+            // The label below already names the tab for screen readers.
+            Icon(painterResource(tab.icon), contentDescription = null, tint = if (selected) Palette.OnLit else Palette.TextDim)
+        }
+        Text(
+            stringResource(tab.label),
+            style = MaterialTheme.typography.labelMedium,
+            color = if (selected) Palette.Text else Palette.TextDim,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
 }
 
 /** Stays on screen, so power and Bypass are always one tap away. */
 @Composable
-private fun TopBar(state: AppState, status: EngineStatus, showCurve: Boolean, onSetEnabled: (Boolean) -> Unit) {
+private fun TopBar(
+    state: AppState,
+    status: EngineStatus,
+    showCurve: Boolean,
+    settingsOpen: Boolean,
+    onSettings: () -> Unit,
+    onSetEnabled: (Boolean) -> Unit,
+) {
     // Here because the strip below always shows the live spectrum. It still stops when the app is closed.
     AnalyserEffect(state.analyser)
     Column(
@@ -371,19 +557,31 @@ private fun TopBar(state: AppState, status: EngineStatus, showCurve: Boolean, on
             currentId = state.current.id,
             onPick = Repo::loadPreset,
             onAll = LocalOpenPresets.current,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .tourTarget(TourStop.PRESETS),
         ) {
             Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, color = Palette.Text)
         }
-        if (state.enabled) BypassButton(state.bypass)
-        InfoButton(Help.power)
-        Switch(
-            checked = state.enabled,
-            onCheckedChange = onSetEnabled,
-            modifier = Modifier.semantics { contentDescription = "Eigentone" },
-        )
+        Row(Modifier.tourTarget(TourStop.POWER), verticalAlignment = Alignment.CenterVertically) {
+            if (state.enabled) BypassButton(state.bypass)
+            Switch(
+                checked = state.enabled,
+                onCheckedChange = onSetEnabled,
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .semantics { contentDescription = "Eigentone" },
+            )
+        }
+        IconButton(onClick = onSettings, modifier = Modifier.tourTarget(TourStop.SETTINGS)) {
+            Icon(
+                Icons.Outlined.Settings,
+                contentDescription = stringResource(R.string.ui_tab_system),
+                tint = if (settingsOpen) Palette.Lit else Palette.TextDim,
+            )
+        }
     }
-    LiveStrip(state, showCurve)
+    Box(Modifier.tourTarget(TourStop.STRIP)) { LiveStrip(state, showCurve) }
     }
 }
 
@@ -419,6 +617,8 @@ private fun EqTab(state: AppState) {
     var graphicMode by rememberSaveable { mutableStateOf(true) }
     val openFinder = LocalOpenFinder.current
     val selected = filters.firstOrNull { it.id == selectedId }
+    val showParametric = Disclosure.parametric(state)
+    val inGraphic = graphicMode || !showParametric
     val attenuation by Repo.attenuationDb.collectAsStateWithLifecycle()
     val curveFilters = remember(state, attenuation, Repo.output.value.key) { Processing.effectiveFilters(state, attenuation, Repo.output.value.key) }
     val graphOutput by Repo.output.collectAsStateWithLifecycle()
@@ -444,7 +644,9 @@ private fun EqTab(state: AppState) {
     }
     val spectrumState = Repo.spectrum.collectAsStateWithLifecycle()
 
-    if (!state.guidedSetupSeen) {
+    if (!state.tourSeen && Tour.stop == null) {
+        TourOffer()
+    } else if (!state.guidedSetupSeen) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -476,8 +678,8 @@ private fun EqTab(state: AppState) {
     ) {
         EqGraph(
             // Graphic mode has its own faders, so the parametric nodes would only get in the way.
-            filters = if (graphicMode) emptyList() else filters,
-            heightDp = if (graphicMode) 170 else 260,
+            filters = if (inGraphic) emptyList() else filters,
+            heightDp = if (inGraphic) 170 else 260,
             curveFilters = earCurves?.first ?: curveFilters,
             rightCurveFilters = earCurves?.second,
             ghostFilters = savedCurve,
@@ -493,9 +695,19 @@ private fun EqTab(state: AppState) {
             onDragEnd = Repo::commit,
         )
     }
+    if (state.analyser && analyserUnavailable.value) {
+        Text(stringResource(R.string.ui_this_phone_refused_the_analyser), style = MaterialTheme.typography.bodySmall, color = Palette.TextDim)
+    }
 
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        SingleChoiceSegmentedButtonRow(Modifier.weight(1f)) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.End,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        // Without the mode switch beside it, the analyser is a labelled chip, so it doesn't sit alone as a bare icon.
+        if (!showParametric) {
+            AnalyserChip(state)
+        } else SingleChoiceSegmentedButtonRow(Modifier.weight(1f)) {
             SegmentedButton(
                 selected = graphicMode,
                 onClick = { graphicMode = true },
@@ -511,12 +723,13 @@ private fun EqTab(state: AppState) {
                 icon = {},
             ) { Text(stringResource(R.string.ui_parametric), maxLines = 1) }
         }
-        InfoButton(Help.eqMode)
+        // Beside the mode rather than on the graph, where the ear legends sit.
+        if (showParametric) AnalyserToggle(state, Modifier)
+        if (showParametric) InfoButton(Help.eqMode)
     }
 
-    if (graphicMode) {
+    if (inGraphic) {
         GraphicEqConsole(state.current.tone, state.current.id, onBrowseShapes = LocalOpenShapes.current, onExpand = LocalOpenFaders.current)
-        SettingsSection(stringResource(R.string.ui_display)) { AnalyserSetting(state) }
         return
     }
 
@@ -563,8 +776,6 @@ private fun EqTab(state: AppState) {
             },
         )
     }
-
-    SettingsSection(stringResource(R.string.ui_display)) { AnalyserSetting(state) }
 }
 
 /** Shown while the preset has changes, so they can be kept or dropped without leaving the EQ. */
@@ -643,25 +854,52 @@ private fun AnalyserEffect(enabled: Boolean) {
 
 private val analyserUnavailable = mutableStateOf(false)
 
+/** Turns the live spectrum on or off, first asking for the microphone permission Android requires to read it. */
 @Composable
-private fun AnalyserSetting(state: AppState) {
+private fun rememberAnalyserSwitch(): (Boolean) -> Unit {
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) Repo.update { it.copy(analyser = true) }
     }
     val context = LocalContext.current
-    SwitchSetting(
-        stringResource(R.string.ui_spectrum_analyser),
-        Help.analyser,
-        state.analyser,
-        detail = if (analyserUnavailable.value) stringResource(R.string.ui_this_phone_refused_the_analyser) else null,
-    ) { on ->
-        val granted = context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
-            PackageManager.PERMISSION_GRANTED
-        if (on && !granted) {
-            permission.launch(Manifest.permission.RECORD_AUDIO)
-        } else {
-            Repo.update { it.copy(analyser = on) }
-        }
+    return { on ->
+        val granted = context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        if (on && !granted) permission.launch(Manifest.permission.RECORD_AUDIO) else Repo.update { it.copy(analyser = on) }
+    }
+}
+
+/** The analyser as a labelled chip, for when it stands on its own row. */
+@Composable
+private fun AnalyserChip(state: AppState) {
+    val switch = rememberAnalyserSwitch()
+    FilterChip(
+        selected = state.analyser,
+        onClick = { switch(!state.analyser) },
+        label = { Text(stringResource(R.string.ui_live_spectrum), maxLines = 1) },
+        leadingIcon = { Icon(painterResource(R.drawable.ic_spectrum), contentDescription = null, modifier = Modifier.size(18.dp)) },
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = Palette.Lit,
+            selectedLabelColor = Palette.OnLit,
+            selectedLeadingIconColor = Palette.OnLit,
+            labelColor = Palette.Text,
+            iconColor = Palette.TextDim,
+        ),
+    )
+}
+
+/** Shows the live spectrum behind the curve, as an icon beside the EQ mode switch. */
+@Composable
+private fun AnalyserToggle(state: AppState, modifier: Modifier) {
+    val switch = rememberAnalyserSwitch()
+    androidx.compose.material3.IconToggleButton(
+        checked = state.analyser,
+        onCheckedChange = { on -> switch(on) },
+        modifier = modifier,
+    ) {
+        Icon(
+            painterResource(R.drawable.ic_spectrum),
+            contentDescription = stringResource(R.string.ui_spectrum_analyser),
+            tint = if (state.analyser) Palette.Lit else Palette.TextDim,
+        )
     }
 }
 
@@ -805,7 +1043,7 @@ private fun ScopeNote(text: String) {
 private fun SoundTab(state: AppState) {
     val saved = savedPreset(state)?.tone
     ScopeNote(stringResource(R.string.ui_sound_scope, state.current.name))
-    SettingsSection(state.current.name) {
+    if (Disclosure.presetLevel(state)) SettingsSection(state.current.name) {
         SliderSetting(
             title = stringResource(R.string.ui_preset_strength),
             tip = Help.strength,
@@ -818,20 +1056,6 @@ private fun SoundTab(state: AppState) {
             onFinished = Repo::commit,
             resetTo = (saved?.strength ?: 1.0).toFloat(),
         )
-        if (state.current.filters.any { it.gainDb != 0.0 || !it.type.hasGain } || state.current.tone.importedCurve.isNotEmpty()) {
-            RowDivider()
-            SliderSetting(
-                title = stringResource(R.string.ui_headphone_correction),
-                tip = Help.correction,
-                readout = if (state.current.tone.correction <= 0.0) stringResource(R.string.ui_mode_off) else formatPercent(state.current.tone.correction),
-                value = state.current.tone.correction.toFloat(),
-                range = 0f..1f,
-                default = 1f,
-                onChange = { v -> Repo.editTone { it.copy(correction = kotlin.math.round(v * 20.0) / 20.0) } },
-                onFinished = Repo::commit,
-                resetTo = (saved?.correction ?: 1.0).toFloat(),
-            )
-        }
         RowDivider()
         SliderSetting(
             title = stringResource(R.string.ui_preamp),
@@ -879,7 +1103,7 @@ private fun ToneSection(state: AppState, saved: Tone?) {
     ) {
         ToneSlider(stringResource(R.string.ui_bass), Help.bass, tone.bassDb, saved?.bassDb ?: 0.0) { v -> Repo.editTone { it.copy(bassDb = v) } }
         // Only means something once there's a bass change to place.
-        if (tone.bassDb != 0.0) {
+        if (tone.bassDb != 0.0 && Disclosure.bassDetail(state)) {
             SliderSetting(
                 title = stringResource(R.string.ui_bass_frequency),
                 tip = Help.bassFrequency,
@@ -893,7 +1117,7 @@ private fun ToneSection(state: AppState, saved: Tone?) {
             )
         }
         // Only shapes bass that's been added, so it only shows then.
-        if (tone.bassDb > 0.0) {
+        if (tone.bassDb > 0.0 && Disclosure.bassDetail(state)) {
             Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.ui_bass_character), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
@@ -978,15 +1202,14 @@ private fun SpaceSection(state: AppState, saved: Tone?) {
     }
 }
 
-/** Stereo and ear settings, which belong to the phone and the headphones rather than to a preset. */
+/** Stereo settings, which belong to the phone rather than to a preset. */
 @Composable
 private fun StereoSection(state: AppState) {
     val parts = buildList {
         if (state.useSystemSurround) add(stringResource(R.string.ui_virtual_surround_short))
         if (kotlin.math.abs(state.balance) > 0.005) add(stringResource(R.string.ui_balance))
-        if (state.earsFor(Repo.output.value.key)?.enabled == true) add(stringResource(R.string.ui_fx_ears))
     }
-    SettingsSection(stringResource(R.string.ui_stereo_and_ears), summary = foldSummary(parts)) {
+    SettingsSection(stringResource(R.string.ui_stereo), summary = foldSummary(parts)) {
         SwitchSetting(stringResource(R.string.ui_use_the_phone_s_virtual_surround), Help.systemSurround, state.useSystemSurround) { on ->
             Repo.update { it.copy(useSystemSurround = on) }
         }
@@ -1005,7 +1228,6 @@ private fun StereoSection(state: AppState) {
             origin = 0f,
             onChange = { v -> Repo.update { it.copy(balance = v.toDouble()) } },
         )
-        EarCorrectionRows(state)
     }
 }
 
@@ -1146,10 +1368,14 @@ private fun DynamicsSection(state: AppState, attenuation: Double) {
         if (state.nightSchedule.enabled) add(stringResource(R.string.ui_night_mode_schedule))
     }
     SettingsSection(stringResource(R.string.ui_dynamics), summary = foldSummary(volumeParts)) {
-        SwitchSetting(stringResource(R.string.ui_adapt_to_volume), Help.loudness, state.loudness) { on ->
+        SwitchSetting(
+            stringResource(R.string.ui_adapt_to_volume),
+            Help.loudness,
+            state.loudness,
+            detail = if (state.loudness) stringResource(R.string.ui_loudness_tuned_per_output) else null,
+        ) { on ->
             Repo.update { it.copy(loudness = on) }
         }
-        if (state.loudness) EqualLoudnessRows(state, attenuation)
         RowDivider()
         SliderSetting(
             title = stringResource(R.string.ui_night_mode),
@@ -1343,9 +1569,7 @@ private fun LimiterDetails(state: AppState) {
         color = Palette.TextDim,
         modifier = Modifier.padding(horizontal = 16.dp),
     )
-    TextButton(onClick = { open = !open }, modifier = Modifier.padding(horizontal = 4.dp)) {
-        Text(stringResource(if (open) R.string.ui_limiter_fewer else R.string.ui_limiter_more))
-    }
+    DisclosureRow(stringResource(R.string.ui_limiter_more), open) { open = !open }
     if (!open) return
     SliderSetting(
         title = stringResource(R.string.ui_limiter_attack),
@@ -1466,11 +1690,13 @@ private fun LevelSection(state: AppState, attenuation: Double) {
                 origin = 0f,
                 onChange = { v -> Repo.update { it.copy(limiterThresholdDb = snapTone(v)) } },
             )
-            LimiterDetails(state)
+            if (Disclosure.limiterDetail(state)) LimiterDetails(state)
         }
-        RowDivider()
-        SwitchSetting(stringResource(R.string.ui_level_matched_bypass), Help.matchBypass, state.matchBypass) { on ->
-            Repo.update { it.copy(matchBypass = on) }
+        if (Disclosure.matchBypass(state)) {
+            RowDivider()
+            SwitchSetting(stringResource(R.string.ui_level_matched_bypass), Help.matchBypass, state.matchBypass) { on ->
+                Repo.update { it.copy(matchBypass = on) }
+            }
         }
     }
 }
@@ -1480,31 +1706,79 @@ private fun CoroutineScope.notify(snackbar: SnackbarHostState, message: String) 
     launch { snackbar.showSnackbar(message, withDismissAction = true, duration = SnackbarDuration.Short) }
 }
 
-/** Everything used occasionally to tune the sound to these headphones and these ears. */
+/**
+ * Everything about what's connected: its correction, the preset it switches to, your ears, and how it adapts
+ * to quiet listening. Each output keeps its own, so this page follows whatever is plugged in.
+ */
 @Composable
-private fun TuneTab(state: AppState) {
+private fun HeadphonesTab(state: AppState) {
     val scope = rememberCoroutineScope()
     val snackbar = LocalSnackbar.current
+    val output by Repo.output.collectAsStateWithLifecycle()
+    val attenuation by Repo.attenuationDb.collectAsStateWithLifecycle()
     var finding by remember { mutableStateOf(false) }
     var tuning by remember { mutableStateOf(false) }
+    val preset = state.current
+    val saved = savedPreset(state)?.tone
 
-    SettingsSection(stringResource(R.string.ui_headphones)) {
+    Column(Modifier.padding(horizontal = 4.dp)) {
+        Text(output.label, style = MaterialTheme.typography.titleLarge, color = Palette.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(stringResource(R.string.ui_hp_scope), style = MaterialTheme.typography.bodySmall, color = Palette.TextDim)
+    }
+
+    SettingsSection(stringResource(R.string.ui_hp_correction)) {
         ActionRow(stringResource(R.string.ui_find_headphones), Help.find) { finding = true }
-        if (state.current.filters.any { it.gainDb != 0.0 } || state.current.tone.importedCurve.isNotEmpty()) {
+        if (preset.filters.any { it.gainDb != 0.0 || !it.type.hasGain } || preset.tone.importedCurve.isNotEmpty()) {
+            RowDivider()
+            SliderSetting(
+                title = stringResource(R.string.ui_headphone_correction),
+                tip = Help.correction,
+                readout = if (preset.tone.correction <= 0.0) stringResource(R.string.ui_mode_off) else formatPercent(preset.tone.correction),
+                value = preset.tone.correction.toFloat(),
+                range = 0f..1f,
+                default = 1f,
+                detail = stringResource(R.string.ui_saved_with, preset.name),
+                onChange = { v -> Repo.editTone { it.copy(correction = kotlin.math.round(v * 20.0) / 20.0) } },
+                onFinished = Repo::commit,
+                resetTo = (saved?.correction ?: 1.0).toFloat(),
+            )
+        }
+        if (preset.filters.any { it.gainDb != 0.0 } || preset.tone.importedCurve.isNotEmpty()) {
             RowDivider()
             ActionRow(stringResource(R.string.ui_tune_correction), Help.tuner, detail = stringResource(R.string.ui_use_less_of_it_or_add_bass_or_treble_bac)) { tuning = true }
         }
     }
+
+    OutputSection(state, output.key, output.label)
+
+    SettingsSection(stringResource(R.string.ui_your_ears)) {
+        ActionRow(stringResource(R.string.ui_hearing_check), Help.hearing, detail = stringResource(R.string.ui_builds_a_curve_for_how_you_hear), onClick = LocalOpenHearing.current)
+        EarCorrectionRows(state)
+    }
+
+    SettingsSection(stringResource(R.string.ui_quiet_listening)) {
+        if (state.loudness) {
+            EqualLoudnessRows(state, attenuation)
+        } else {
+            Text(
+                stringResource(R.string.ui_quiet_off, output.label),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Palette.TextDim,
+                modifier = Modifier.padding(16.dp),
+            )
+        }
+    }
+
     SettingsSection(stringResource(R.string.ui_listening_tools)) {
-        ActionRow(stringResource(R.string.ui_compare_two_sounds), Help.compare, detail = stringResource(R.string.ui_switch_instantly_with_an_optional_blind), onClick = LocalOpenCompare.current)
-        RowDivider()
         ActionRow(stringResource(R.string.ui_find_my_sound), Help.finder, detail = stringResource(R.string.ui_a_short_guided_listening_test), onClick = LocalOpenFinder.current)
         RowDivider()
-        ActionRow(stringResource(R.string.ui_hearing_check), Help.hearing, detail = stringResource(R.string.ui_builds_a_curve_for_how_you_hear), onClick = LocalOpenHearing.current)
-        RowDivider()
-        ActionRow(stringResource(R.string.ui_find_peaks_for_me), Help.peakFinder, detail = stringResource(R.string.ui_a_guided_test_that_finds_peaks_and_dips), onClick = LocalOpenPeaks.current)
-        RowDivider()
-        ActionRow(stringResource(R.string.ui_frequency_sweep), Help.sweep, detail = stringResource(R.string.ui_find_and_fix_peaks_in_your_headphones_by), onClick = LocalOpenSweep.current)
+        ActionRow(stringResource(R.string.ui_compare_two_sounds), Help.compare, detail = stringResource(R.string.ui_switch_instantly_with_an_optional_blind), onClick = LocalOpenCompare.current)
+        if (Disclosure.measureTools(state)) {
+            RowDivider()
+            ActionRow(stringResource(R.string.ui_find_peaks_for_me), Help.peakFinder, detail = stringResource(R.string.ui_a_guided_test_that_finds_peaks_and_dips), onClick = LocalOpenPeaks.current)
+            RowDivider()
+            ActionRow(stringResource(R.string.ui_frequency_sweep), Help.sweep, detail = stringResource(R.string.ui_find_and_fix_peaks_in_your_headphones_by), onClick = LocalOpenSweep.current)
+        }
     }
 
     if (finding) {
@@ -1520,10 +1794,8 @@ private fun TuneTab(state: AppState) {
 
 @Composable
 private fun PresetsTab(state: AppState) {
-    val output by Repo.output.collectAsStateWithLifecycle()
     PresetListSection(state)
-    OutputSection(state, output.key, output.label)
-    PerAppSection(state)
+    if (Disclosure.perApp(state)) PerAppSection(state)
     ManageSection(state)
 }
 
@@ -1536,7 +1808,7 @@ private fun OutputSection(state: AppState, outputKey: String, outputLabel: Strin
     val canAssign = Repo.findPreset(state.current.id) != null
     val alreadyAssigned = assigned?.id == state.current.id
 
-    SettingsSection(outputLabel) {
+    SettingsSection(stringResource(R.string.ui_hp_preset)) {
         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.ui_assigned_preset), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
@@ -1842,21 +2114,6 @@ private fun ManageSection(state: AppState) {
 
     SettingsSection(stringResource(R.string.ui_this_preset)) {
         ActionRow(stringResource(R.string.ui_save_as_new), Help.saveNew) { saving = true }
-        if (saved != null && saved != state.current) {
-            RowDivider()
-            ActionRow(stringResource(R.string.ui_update, saved.name), Help.update) {
-                Repo.overwriteCurrent()
-                scope.notify(snackbar, appText(R.string.ui_updated, saved.name))
-            }
-        }
-        val original = Repo.findPreset(state.current.id)
-        if (original != null && original != state.current) {
-            RowDivider()
-            ActionRow(stringResource(R.string.ui_discard_edits), Help.discardEdits) {
-                Repo.discardEdits()
-                scope.notify(snackbar, appText(R.string.ui_edits_discarded, original.name))
-            }
-        }
         ShareRows { message -> scope.notify(snackbar, message) }
     }
     SettingsSection(stringResource(R.string.ui_files_and_backup)) {
@@ -2022,6 +2279,7 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
         onPauseOrDispose { }
     }
 
+    Text(stringResource(R.string.ui_tab_system), style = MaterialTheme.typography.titleLarge, color = Palette.Text, modifier = Modifier.padding(horizontal = 4.dp))
     EveryPresetSections(state)
 
     SettingsSection(stringResource(R.string.ui_appearance)) {
@@ -2041,9 +2299,17 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
                 onSelect = { i -> Repo.update { it.copy(themeMode = modes[i]) } },
             )
         }
+        RowDivider()
+        SwitchSetting(
+            stringResource(R.string.ui_advanced_controls),
+            Help.advanced,
+            state.advancedControls,
+            detail = stringResource(if (state.advancedControls) R.string.ui_advanced_on else R.string.ui_advanced_off),
+        ) { on -> Repo.update { it.copy(advancedControls = on) } }
     }
 
-    SettingsSection(stringResource(R.string.ui_engine)) {
+    SettingsSection(stringResource(R.string.ui_engine), trailing = { InfoButton(Help.power) }) {
+        if (Disclosure.engine(state)) {
         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.ui_audio_route), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
@@ -2067,6 +2333,7 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
             Repo.update { it.copy(lowLatency = on) }
         }
         RowDivider()
+        }
         SwitchSetting(stringResource(R.string.ui_start_automatically), Help.startOnBoot, state.startOnBoot) { on ->
             Repo.update { it.copy(startOnBoot = on) }
         }
@@ -2086,6 +2353,12 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
     var showGuide by remember { mutableStateOf(false) }
     var confirmReset by remember { mutableStateOf(false) }
     SettingsSection(stringResource(R.string.ui_help_and_reset)) {
+        ActionRow(stringResource(R.string.tour_take), Help.tour) { Tour.start() }
+        RowDivider()
+        ActionRow(stringResource(R.string.welcome_show_again), Help.welcome) {
+            Repo.update { it.copy(welcomeDone = false, welcomeStep = 0) }
+        }
+        RowDivider()
         ActionRow(stringResource(R.string.ui_getting_the_best_sound), Help.guide) { showGuide = true }
         RowDivider()
         ActionRow(stringResource(R.string.ui_reset_sound_settings_2), Help.reset) { confirmReset = true }
@@ -2109,7 +2382,7 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
 
     DiagnosticsSection(status, output)
 
-    SettingsSection(stringResource(R.string.ui_status)) {
+    if (Disclosure.status(state)) SettingsSection(stringResource(R.string.ui_status)) {
         Fact(stringResource(R.string.help_status_running_title), Help.statusRunning, if (status.running) stringResource(R.string.ui_yes) else stringResource(R.string.ui_no))
         RowDivider()
         Fact(stringResource(R.string.help_status_mode_title), Help.statusMode, status.mode)

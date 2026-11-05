@@ -1,5 +1,9 @@
 package com.phonons.app.ui
 
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -84,6 +88,68 @@ fun WordSegments(labels: List<String>, selected: Int, onSelect: (Int) -> Unit, m
                     textAlign = TextAlign.Center,
                     maxLines = 2,
                 )
+            }
+        }
+    }
+}
+
+/**
+ * One switch between two or three choices: a rounded track with a lit thumb that slides to the chosen one, so
+ * it reads as a single control rather than separate buttons.
+ */
+@Composable
+fun SlidingToggle(
+    options: List<Pair<Int, String>>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.foundation.layout.BoxWithConstraints(
+        modifier
+            .height(40.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(Palette.SurfaceHigh)
+            .border(1.dp, Palette.Line, RoundedCornerShape(20.dp))
+            .padding(3.dp)
+            .selectableGroup(),
+    ) {
+        val share = maxWidth / options.size
+        val thumbX by androidx.compose.animation.core.animateDpAsState(share * selected, label = "toggle")
+        Box(
+            Modifier
+                .offset(x = thumbX)
+                .width(share)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(17.dp))
+                .background(Palette.Lit),
+        )
+        Row(Modifier.fillMaxSize()) {
+            options.forEachIndexed { i, (icon, label) ->
+                val on = i == selected
+                Row(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(17.dp))
+                        .selectable(selected = on, role = Role.RadioButton, onClick = { onSelect(i) })
+                        .padding(horizontal = 10.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    androidx.compose.material3.Icon(
+                        androidx.compose.ui.res.painterResource(icon),
+                        contentDescription = null,
+                        tint = if (on) Palette.OnLit else Palette.TextDim,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (on) Palette.OnLit else Palette.Text,
+                        maxLines = 1,
+                        modifier = Modifier.padding(start = 6.dp),
+                    )
+                }
             }
         }
     }
@@ -274,10 +340,12 @@ fun UndoRedoButtons() {
     val canUndo by Repo.canUndo.collectAsStateWithLifecycle()
     val canRedo by Repo.canRedo.collectAsStateWithLifecycle()
     Row {
+        // Coloured here rather than inherited, so they show on any surface, such as the landscape faders' bar.
         IconButton(enabled = canUndo, onClick = Repo::undo) {
             Icon(
                 painterResource(R.drawable.ic_undo),
                 contentDescription = stringResource(R.string.ui_undo),
+                tint = if (canUndo) Palette.Text else Palette.TextDim.copy(alpha = 0.4f),
                 modifier = Modifier.size(20.dp),
             )
         }
@@ -285,6 +353,7 @@ fun UndoRedoButtons() {
             Icon(
                 painterResource(R.drawable.ic_undo),
                 contentDescription = stringResource(R.string.ui_redo),
+                tint = if (canRedo) Palette.Text else Palette.TextDim.copy(alpha = 0.4f),
                 modifier = Modifier
                     .size(20.dp)
                     .graphicsLayer(scaleX = -1f),

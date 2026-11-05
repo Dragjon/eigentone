@@ -298,7 +298,7 @@ Light is composed, not inverted: a warm putty faceplate, as on lab equipment. A 
 
 One vertical column, capped at 640dp and centred, with 16dp side padding, 12dp above and 16dp below. Sections are 12dp apart (`SectionSpacing`). Spacing steps are 4, 8, 12 and 16dp, with 16dp dominant. Each tab keeps its own scroll position.
 
-The frame is fixed: top bar (name, preset dropdown, Bypass while the engine is on, info, power), status strip, scrolling page, five-tab bottom bar (EQ, Sound, Presets, Tune, System). Minimum heights: setting rows 56dp, value tracks and the preset switcher 48dp, section headers 40dp.
+The frame is fixed: top bar (name, preset dropdown, Bypass while the engine is on, power, Settings gear, lit while Settings is open), status strip, scrolling page, four-tab bottom bar (Equaliser, Effects, Presets, Headphones), labels of similar length, each tab an equal share of the width inside 8dp edges, and a 64 × 32dp lit pill behind the chosen icon that also holds the press ripple. Back from Settings returns to the tab it was opened from. Minimum heights: setting rows 56dp, value tracks and the preset switcher 48dp, section headers 40dp.
 
 **The No Sideways Rule.** Nothing scrolls horizontally, except the precision fader bank, which the user asked for, under an overview of the whole curve. Short sets wrap with `FlowRow` (8dp gaps), and long lists use dropdowns (user decision).
 
@@ -328,7 +328,10 @@ Built to feel like hardware controls: rectangular, labelled and precise.
 - **Chips:** used for short shape sets that wrap. Selected is ivory.
 
 ### Cards / Containers
-- **Folding section** (`SettingsSection` with a summary): on the Sound tab, Space and Compressor fold, and on the Settings tab so do Dynamics, Level and Stereo and ears, under their legend with a chevron. While closed, a one-line amber summary lists what's on, or "All off" in dim text, so nothing changed is hidden. Preset and Tone stay open.
+- **Welcome** (`WelcomeScreen`, first run only, again from Settings, Help): five steps (Hello, Turn it on, Your headphones, Find your sound, How hands-on?), step dots at the top with Skip, Back and the lit next key in a bottom bar, content at most 560dp wide, large bordered choice cards. The step is saved, so it resumes.
+- **Tour** (`TourOverlay`): seven stops over the live app. A 74% black scrim with a rounded cut-out around the control, a 2dp lit outline pulsing between 45% and 100%, and a Tooltip card with the step count in lit labelMedium, placed below the control in the top half and above it in the bottom half. The cut-out glides between stops in 380ms. Taken after the welcome, offered once by a card on the Equaliser otherwise, and again from Settings, Help.
+- **Advanced controls** (Settings, Appearance; off for new installs, on for anyone updating): `Disclosure` decides each advanced control, which also shows whenever its setting differs from the default, so nothing in use is hidden.
+- **Folding section** (`SettingsSection` with a summary): on the Effects tab, Space, Clarity and Compressor fold, and on the Settings tab so do Volume, Level and Stereo, under their legend with a chevron. While closed, a one-line amber summary lists what's on, or "All off" in dim text, so nothing changed is hidden. Preset and Tone stay open.
 - **Settings panel** (`SettingsSection`): Enamel, 4dp, no border, with an optional Panel Legend above and 16dp-inset Hairline dividers between rows.
 - **Prompt panel:** Raised Key, 16dp padding, 8dp internal gaps.
 - **Comparison card** (`SideCard`): 140dp tall with a 1dp border. Selected fills with ivory.

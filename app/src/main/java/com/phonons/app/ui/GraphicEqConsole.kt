@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.background
 import kotlin.math.abs
+import com.phonons.app.data.Disclosure
 import com.phonons.app.data.FaderMode
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.StrokeCap
@@ -159,6 +160,7 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, o
         tone.faderLabel(yours + GraphicEq.shapes + ShapeLibrary.all.map { it.shape })
     }
 
+    val showFaderOptions = Disclosure.faderOptions(appState)
     SettingsSection(null) {
         Row(
             Modifier
@@ -178,6 +180,8 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, o
                     .semantics { contentDescription = appText(R.string.ui_current_shape, shapeLabel) },
             )
             UndoRedoButtons()
+            // Without the fader options row, the landscape key joins this one rather than sitting alone.
+            if (!showFaderOptions) LandscapeButton(onExpand)
             InfoButton(Help.graphic)
             if (!GraphicEq.isFlat(gains)) {
                 TextButton(onClick = {
@@ -187,7 +191,7 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, o
             }
         }
         // Small and right above the faders, so how they behave can be changed without leaving them.
-        Row(
+        if (showFaderOptions) Row(
             Modifier
                 .fillMaxWidth()
                 .padding(start = 12.dp, end = 4.dp, bottom = 4.dp),
@@ -213,13 +217,12 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, o
                 selected = FaderView.entries.indexOf(appState.faderView),
                 onSelect = { i -> Repo.update { it.copy(faderView = FaderView.entries[i]) } },
             )
-            IconButton(onClick = onExpand) {
-                Icon(painterResource(R.drawable.ic_landscape), contentDescription = stringResource(R.string.ui_expand_faders), tint = Palette.TextDim)
-            }
+            LandscapeButton(onExpand)
         }
         Faders(
             gains = gains,
             saved = savedFaders(appState, presetId, bands),
+            area = Modifier.tourTarget(TourStop.FADERS),
             smooth = appState.faderMode == FaderMode.SMOOTH,
             scrollable = appState.faderView == FaderView.SCROLL,
             shown = rememberMorphed(gains.toDoubleArray(), presetId to tone.shape?.name),
@@ -268,6 +271,7 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, o
         }
         RowDivider()
 
+        if (Disclosure.bandCount(appState)) {
         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.ui_bands), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
@@ -296,17 +300,20 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, o
             }
         }
         RowDivider()
+        }
 
         Column(Modifier.padding(top = 4.dp, bottom = 12.dp)) {
             Row(Modifier.padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.ui_shapes), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
                 InfoButton(Help.graphicShapes)
                 Spacer(Modifier.weight(1f))
-                TextButton(enabled = !GraphicEq.isFlat(gains), onClick = {
-                    setGains(GraphicEq.smooth(gains))
-                    Repo.commit()
-                }) { Text(stringResource(R.string.ui_smooth)) }
-                InfoButton(Help.graphicSmooth)
+                if (Disclosure.smoothing(appState)) {
+                    TextButton(enabled = !GraphicEq.isFlat(gains), onClick = {
+                        setGains(GraphicEq.smooth(gains))
+                        Repo.commit()
+                    }) { Text(stringResource(R.string.ui_smooth)) }
+                    InfoButton(Help.graphicSmooth)
+                }
             }
             FlowRow(
                 Modifier.padding(horizontal = 16.dp),
@@ -336,6 +343,14 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, o
                     .padding(start = 16.dp, end = 16.dp, top = 8.dp),
             ) { Text(stringResource(R.string.ui_browse_all_shapes, ShapeLibrary.all.size)) }
         }
+    }
+}
+
+/** Opens the faders across the whole screen in landscape. */
+@Composable
+private fun LandscapeButton(onExpand: () -> Unit) {
+    IconButton(onClick = onExpand) {
+        Icon(painterResource(R.drawable.ic_landscape), contentDescription = stringResource(R.string.ui_expand_faders), tint = Palette.TextDim)
     }
 }
 
@@ -770,8 +785,8 @@ fun ExpandedFaders(onClose: () -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .background(Palette.Bar)
-                .heightIn(min = 48.dp)
-                .padding(start = 4.dp, end = 12.dp),
+                .heightIn(min = 56.dp)
+                .padding(start = 4.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onClose) {
@@ -787,11 +802,14 @@ fun ExpandedFaders(onClose: () -> Unit) {
             )
             UndoRedoButtons()
             Spacer(Modifier.width(8.dp))
-            WordSegments(
-                labels = listOf(stringResource(R.string.ui_fader_precision), stringResource(R.string.ui_fader_smooth)),
+            SlidingToggle(
+                options = listOf(
+                    R.drawable.ic_touch_precise to stringResource(R.string.ui_fader_precision),
+                    R.drawable.ic_touch_smooth to stringResource(R.string.ui_fader_smooth),
+                ),
                 selected = FaderMode.entries.indexOf(state.faderMode),
                 onSelect = { i -> Repo.update { it.copy(faderMode = FaderMode.entries[i]) } },
-                modifier = Modifier.width(240.dp),
+                modifier = Modifier.width(260.dp),
             )
         }
         Faders(

@@ -13,11 +13,11 @@
     <string name="ui_compare_measurements_intro" formatted="false">Reviewers measure the same headphones differently. Play some music and switch between them. They play at about the same loudness as your current sound.</string>
     <string name="ui_could_not_download_measurements" formatted="false">Could not download these measurements. Check your connection and try again.</string>
     <string name="ui_what_i_had" formatted="false">What I had</string>
-    <string name="ui_dynamic_eq" formatted="false">Dynamic EQ</string>
+    <string name="ui_dynamic_eq" formatted="false">Clarity</string>
     <string name="ui_harshness_tamer" formatted="false">Harshness tamer</string>
     <string name="ui_boom_tamer" formatted="false">Boom tamer</string>
     <string name="ui_tamers_unavailable" formatted="false">This phone doesn\'t allow the extra bands these need, so they have no effect here.</string>
-    <string name="help_dynamic_eq_title" formatted="false">Dynamic EQ</string>
+    <string name="help_dynamic_eq_title" formatted="false">Clarity</string>
     <string name="help_dynamic_eq_body" formatted="false">Turns a range of frequencies down only while it\'s too loud, so the rest of the time your sound is untouched. A normal EQ cut would dull it all the time. Saved with each preset.</string>
     <string name="help_harsh_tamer_title" formatted="false">Harshness tamer</string>
     <string name="help_harsh_tamer_body" formatted="false">Holds back sharp treble, such as sibilance and cymbals, around 4 to 9 kHz, when it gets loud. Too much can make music sound dull, so use as little as helps.</string>
@@ -256,7 +256,7 @@
     <string name="ui_display" formatted="false">Display</string>
     <string name="ui_done" formatted="false">Done</string>
     <string name="ui_downloading" formatted="false">Downloading…</string>
-    <string name="ui_dynamics" formatted="false">Dynamics</string>
+    <string name="ui_dynamics" formatted="false">Volume</string>
     <string name="ui_ear_correction" formatted="false">Ear correction</string>
     <string name="ui_earbud_noise_mode" formatted="false">Earbud noise mode</string>
     <string name="ui_edit_preset" formatted="false">Edit preset</string>
@@ -361,7 +361,7 @@
     <string name="ui_share_code" formatted="false">Share code</string>
     <string name="ui_share_crash_report" formatted="false">Share crash report</string>
     <string name="ui_share_this_sound" formatted="false">Share this sound</string>
-    <string name="ui_smooth" formatted="false">Smooth</string>
+    <string name="ui_smooth" formatted="false">Smoothen</string>
     <string name="ui_space" formatted="false">Space</string>
     <string name="ui_spectrum_analyser" formatted="false">Spectrum analyser</string>
     <string name="ui_start" formatted="false">Start</string>
@@ -408,8 +408,8 @@
     <string name="ui_your_headphones_may_have_their_own_eq" formatted="false">Your headphones may have their own EQ</string>
     <string name="ui_your_marks" formatted="false">Your marks</string>
     <string name="ui_your_sound" formatted="false">Your sound</string>
-    <string name="ui_tab_eq" formatted="false">EQ</string>
-    <string name="ui_tab_sound" formatted="false">Sound</string>
+    <string name="ui_tab_eq" formatted="false">Equaliser</string>
+    <string name="ui_tab_sound" formatted="false">Effects</string>
     <string name="ui_tab_presets" formatted="false">Presets</string>
     <string name="ui_tab_tune" formatted="false">Tune</string>
     <string name="ui_tab_system" formatted="false">Settings</string>
@@ -458,7 +458,7 @@
     <string name="ui_this_phone_wouldn_t_play_the" formatted="false">This phone wouldn\'t play the tone. Try Play again.</string>
     <string name="ui_this_lifts_the_frequencies_you_heard" formatted="false">This lifts the frequencies you heard least well, by half the difference. These headphones\' own tuning is part of the result, so it suits them best.</string>
     <string name="ui_your_results_were_about_even_across" formatted="false">Your results were about even across frequencies, so there\'s no shared curve to add.</string>
-    <string name="ui_your_ears_differed_by_up_to" formatted="false">Your ears differed by up to %1$s dB at some frequencies, which can also come from fit. Eigentone can close half of that gap, frequency by frequency, with a separate EQ for each ear. It\'s saved for %2$s, and you can also do this later in Settings, under Stereo and ears.</string>
+    <string name="ui_your_ears_differed_by_up_to" formatted="false">Your ears differed by up to %1$s dB at some frequencies, which can also come from fit. Eigentone can close half of that gap, frequency by frequency, with a separate EQ for each ear. It\'s saved for %2$s, and you can also do this later on the Headphones tab, under Your ears.</string>
     <string name="ui_each_ear_is_now_corrected" formatted="false">Each ear is now corrected</string>
     <string name="ui_correct_each_ear" formatted="false">Correct each ear</string>
     <string name="ui_correct_each_ear_anyway" formatted="false">Correct each ear anyway</string>
@@ -759,22 +759,99 @@
     <string name="ui_strip_at" formatted="false">At %1$s</string>
     <string name="ui_strip_scheduled" formatted="false">At %1$s, from the night schedule</string>
     <string name="ui_strip_comp_custom" formatted="false">Your own settings</string>
-    <string name="ui_strip_comp_off" formatted="false">Not compressing. Turn on the compressor in Sound, or night mode or the leveller in Settings</string>
+    <string name="ui_strip_comp_off" formatted="false">Not compressing. Turn on the compressor in Effects, or night mode or the leveller in Settings</string>
     <string name="ui_strip_width" formatted="false">%1$s wider</string>
-    <string name="ui_strip_width_off" formatted="false">Normal stereo. Set Space in Sound to widen it</string>
-    <string name="ui_strip_surround_off" formatted="false">Not in use. Set Space in Sound</string>
+    <string name="ui_strip_width_off" formatted="false">Normal stereo. Set Space in Effects to widen it</string>
+    <string name="ui_strip_surround_off" formatted="false">Not in use. Set Space in Effects</string>
     <string name="ui_strip_ears_on" formatted="false">A separate EQ for each ear on %1$s</string>
     <string name="ui_strip_ears_saved" formatted="false">A hearing check is saved for these headphones, but not in use</string>
     <string name="ui_strip_ears_none" formatted="false">No hearing check for these headphones yet</string>
     <string name="ui_strip_reverb_on" formatted="false">%1$s at %2$s, reaching %3$s</string>
     <string name="ui_strip_reverb_waiting" formatted="false">%1$s at %2$s, waiting for an app to announce its audio</string>
-    <string name="ui_strip_reverb_off" formatted="false">No reverb. Choose a room in Sound, under Space</string>
+    <string name="ui_strip_reverb_off" formatted="false">No reverb. Choose a room in Effects, under Space</string>
     <string name="ui_strip_tame" formatted="false">Harshness %1$s, boom %2$s</string>
     <string name="ui_strength_for" formatted="false">For %1$s</string>
     <string name="ui_name_taken" formatted="false">A preset is already called %1$s. Choose another name.</string>
     <string name="ui_sound_scope" formatted="false">These are saved with %1$s. Settings for every preset, such as the limiter and night mode, are in Settings.</string>
-    <string name="ui_settings_scope" formatted="false">These apply whichever preset is in use. The EQ and Sound tabs change the preset itself.</string>
+    <string name="ui_settings_scope" formatted="false">These apply whichever preset is in use. The Equaliser and Effects tabs change the preset itself.</string>
     <string name="ui_stereo_and_ears" formatted="false">Stereo and ears</string>
     <string name="ui_virtual_surround_short" formatted="false">Virtual surround</string>
     <string name="ui_surround_from_settings" formatted="false">Uses the phone\'s virtual surround, which is set in Settings</string>
+    <string name="ui_tab_headphones" formatted="false">Headphones</string>
+    <string name="ui_stereo" formatted="false">Stereo</string>
+    <string name="ui_your_ears" formatted="false">Your ears</string>
+    <string name="ui_quiet_listening" formatted="false">Quiet listening</string>
+    <string name="ui_hp_correction" formatted="false">Correction</string>
+    <string name="ui_hp_preset" formatted="false">Automatic preset</string>
+    <string name="ui_hp_scope" formatted="false">Kept for this output, and used again whenever it\'s connected.</string>
+    <string name="ui_saved_with" formatted="false">Saved with %1$s</string>
+    <string name="ui_loudness_tuned_per_output" formatted="false">Each pair of headphones has its own usual volume and strength, on the Headphones tab</string>
+    <string name="ui_quiet_off" formatted="false">Adapt to volume is off. Turn it on in Settings, under Volume, to tune it for %1$s.</string>
+    <string name="ui_advanced_controls" formatted="false">Advanced controls</string>
+    <string name="ui_advanced_on" formatted="false">Every control is shown</string>
+    <string name="ui_advanced_off" formatted="false">Showing what most people need. Anything you\'ve changed stays in view</string>
+    <string name="help_advanced_title" formatted="false">Advanced controls</string>
+    <string name="help_advanced_body" formatted="false">Eigentone is simple by default and powerful when needed. Turn this on to show every control: the parametric EQ, fader options and band count, preset strength and preamp, bass frequency and character, each compressor band, the limiter\'s timing, level-matched bypass, the audio route, per-app presets, the peak finder and sweep, and the status details.\n\nWith it off, a control still shows while its setting differs from the default, so nothing you\'ve changed is ever hidden.</string>
+    <string name="welcome_skip" formatted="false">Skip</string>
+    <string name="welcome_get_started" formatted="false">Get started</string>
+    <string name="welcome_continue" formatted="false">Continue</string>
+    <string name="welcome_finish" formatted="false">Start listening</string>
+    <string name="welcome_step_of" formatted="false">Step %1$d of %2$d</string>
+    <string name="welcome_hello_title" formatted="false">Welcome to Eigentone</string>
+    <string name="welcome_hello_body" formatted="false">An equaliser for everything your phone plays, that keeps the sound right as you switch headphones.</string>
+    <string name="welcome_feature_eq" formatted="false">Shape the sound with faders, or start from a shape</string>
+    <string name="welcome_feature_headphones" formatted="false">Correct your headphones and fit them to your ears</string>
+    <string name="welcome_feature_presets" formatted="false">Save sounds, and switch automatically for each pair</string>
+    <string name="welcome_hello_note" formatted="false">Setup takes about a minute. You can skip any step, and see this again from Settings, under Help.</string>
+    <string name="welcome_on_title" formatted="false">Turn it on</string>
+    <string name="welcome_on_body" formatted="false">Eigentone works in the background while anything plays. Android shows a notification while it runs, which also gives you quick controls.</string>
+    <string name="welcome_turn_on" formatted="false">Turn on Eigentone</string>
+    <string name="welcome_on_done" formatted="false">Eigentone is on and shaping the sound.</string>
+    <string name="welcome_headphones_title" formatted="false">Your headphones</string>
+    <string name="welcome_headphones_body" formatted="false">A correction evens out your headphones\' own peaks and dips, from published measurements. Most people then like a little more bass than that.</string>
+    <string name="welcome_headphones_none" formatted="false">%1$s is playing now. Connect your headphones to set them up, or do it later on the Headphones tab.</string>
+    <string name="welcome_headphones_using" formatted="false">Using %1$s.</string>
+    <string name="welcome_headphones_tune" formatted="false">Adjust bass and treble</string>
+    <string name="welcome_headphones_tune_note" formatted="false">Try the bass lift most people prefer, and hear it against the correction alone.</string>
+    <string name="welcome_headphones_find" formatted="false">Find a correction</string>
+    <string name="welcome_headphones_later" formatted="false">Everything for your headphones is on the Headphones tab.</string>
+    <string name="welcome_sound_title" formatted="false">Find your sound</string>
+    <string name="welcome_sound_note" formatted="false">Takes about two minutes. Play a song you know well before you start.</string>
+    <string name="welcome_sound_start" formatted="false">Start</string>
+    <string name="welcome_sound_later" formatted="false">Optional. It\'s also on the Headphones tab, under Listening tools.</string>
+    <string name="welcome_hands_title" formatted="false">How hands-on?</string>
+    <string name="welcome_hands_body" formatted="false">Choose whether to turn on Advanced controls, which show every setting. Simple suits most people, and anything you change always stays in view.</string>
+    <string name="welcome_simple" formatted="false">Simple (recommended)</string>
+    <string name="welcome_simple_body" formatted="false">What most people need. Anything you change stays in view.</string>
+    <string name="welcome_full" formatted="false">Advanced controls</string>
+    <string name="welcome_full_body" formatted="false">Every control, including the parametric EQ, each compressor band and the limiter\'s timing.</string>
+    <string name="welcome_hands_note" formatted="false">Switch Eigentone on and off from the quick settings tile or the home screen widget, and start a preset from the app icon by pressing and holding it.</string>
+    <string name="welcome_show_again" formatted="false">Show the welcome again</string>
+    <string name="help_welcome_title" formatted="false">Welcome</string>
+    <string name="help_welcome_body" formatted="false">The short setup shown on first run: turning Eigentone on, your headphones\' correction, finding your sound, and how much of the app to show. Nothing you\'ve set is lost by running it again.</string>
+    <string name="welcome_hands_where" formatted="false">You can change this any time: tap the gear at the top right, then Appearance, Advanced controls.</string>
+    <string name="tour_step_of" formatted="false">%1$d of %2$d</string>
+    <string name="tour_next" formatted="false">Next</string>
+    <string name="tour_done" formatted="false">Done</string>
+    <string name="tour_take" formatted="false">Take the tour</string>
+    <string name="tour_power_title" formatted="false">Power and Bypass</string>
+    <string name="tour_power_body" formatted="false">The switch turns Eigentone on and off. Bypass lets you hear the sound without it for a moment, at the same loudness, so the comparison is fair.</string>
+    <string name="tour_presets_title" formatted="false">Your presets</string>
+    <string name="tour_presets_body" formatted="false">Tap the name to switch preset. The one in use, your favourites and your own come first.</string>
+    <string name="tour_strip_title" formatted="false">What\'s on</string>
+    <string name="tour_strip_body" formatted="false">Shows what you\'re listening on and which effects are on. Tap it to see what each one is doing.</string>
+    <string name="tour_faders_title" formatted="false">Shape the sound</string>
+    <string name="tour_faders_body" formatted="false">Drag a fader\'s cap to move it. Double tap one to return it to the preset\'s saved setting. The shapes below are good places to start.</string>
+    <string name="tour_save_title" formatted="false">Keep or drop changes</string>
+    <string name="tour_save_body" formatted="false">Once you change a preset, a bar at the bottom offers Save and Discard. Your edits are kept until then, even if you switch to another preset and back.</string>
+    <string name="tour_tabs_title" formatted="false">Four tabs</string>
+    <string name="tour_tabs_body" formatted="false">Equaliser shapes the curve. Effects adds tone, space and more. Presets holds your sounds. Headphones fits them to what you\'re wearing.</string>
+    <string name="tour_settings_title" formatted="false">Settings</string>
+    <string name="tour_settings_body" formatted="false">Volume, the limiter and anything else that applies to every preset, plus Advanced controls. This tour is there too, under Help.</string>
+    <string name="tour_offer_title" formatted="false">Find your way around</string>
+    <string name="tour_offer_body" formatted="false">A 30-second tour of the main screen. Eigentone was recently reorganised, so it\'s worth a look even if you\'ve used it before.</string>
+    <string name="tour_offer_start" formatted="false">Take the tour</string>
+    <string name="help_tour_title" formatted="false">Tour</string>
+    <string name="help_tour_body" formatted="false">A short walk around the main screen, pointing out each part in turn. Nothing changes while it runs.</string>
+    <string name="ui_live_spectrum" formatted="false">Live spectrum</string>
 </resources>
