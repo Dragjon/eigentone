@@ -264,6 +264,10 @@ private val LocalOpenPresets = compositionLocalOf<() -> Unit> { error("No preset
 
 private val LocalOpenPeaks = compositionLocalOf<() -> Unit> { error("No peak finder") }
 
+private val LocalOpenConsole = compositionLocalOf<() -> Unit> { error("No debug console") }
+
+private const val SOURCE_URL = "https://github.com/Dragjon/eigentone"
+
 private val LocalOpenSweep = compositionLocalOf<() -> Unit> { error("No sweep") }
 
 private val LocalOpenCompare = compositionLocalOf<() -> Unit> { error("No comparison") }
@@ -281,11 +285,15 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
     var tab by rememberSaveable { mutableStateOf(Tab.EQ) }
     // Settings opens from the top bar, so Back returns to whichever tab it was opened from.
     var beforeSettings by rememberSaveable { mutableStateOf(Tab.EQ) }
+    // Each tab has its own position. Moving to one starts it at the top; Back from Settings returns to where you were.
+    val scrolls: Map<Tab, ScrollState> = Tab.entries.associateWith { rememberScrollState() }
+    val tabScope = rememberCoroutineScope()
     val toggleSettings = {
         if (tab == Tab.SYSTEM) {
             tab = beforeSettings
         } else {
             beforeSettings = tab
+            tabScope.launch { scrolls.getValue(Tab.SYSTEM).scrollTo(0) }
             tab = Tab.SYSTEM
         }
     }
@@ -297,14 +305,13 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
             PresetShortcuts.update(appContext, PresetOrganiser.shortcuts(state, available))
         }
     }
-    // Each tab keeps its own position, so switching never lands partway down another page.
-    val scrolls: Map<Tab, ScrollState> = Tab.entries.associateWith { rememberScrollState() }
     var finding by rememberSaveable { mutableStateOf(false) }
     var browsingShapes by rememberSaveable { mutableStateOf(false) }
     var checkingHearing by rememberSaveable { mutableStateOf(false) }
     var comparing by rememberSaveable { mutableStateOf(false) }
     var sweeping by rememberSaveable { mutableStateOf(false) }
     var findingPeaks by rememberSaveable { mutableStateOf(false) }
+    var consoleOpen by rememberSaveable { mutableStateOf(false) }
     var expandingFaders by rememberSaveable { mutableStateOf(false) }
 
     if (expandingFaders) {
@@ -314,6 +321,10 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
 
     if (findingPeaks) {
         PeakFinderScreen(onClose = { findingPeaks = false })
+        return
+    }
+    if (consoleOpen) {
+        DebugConsoleScreen(onClose = { consoleOpen = false })
         return
     }
 
@@ -410,8 +421,12 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
         LocalOpenCompare provides { comparing = true },
         LocalOpenSweep provides { sweeping = true },
         LocalOpenPeaks provides { findingPeaks = true },
+        LocalOpenConsole provides { consoleOpen = true },
         LocalOpenFaders provides { expandingFaders = true },
-        LocalOpenPresets provides { tab = Tab.PRESETS },
+        LocalOpenPresets provides {
+            tabScope.launch { scrolls.getValue(Tab.PRESETS).scrollTo(0) }
+            tab = Tab.PRESETS
+        },
     ) {
         Scaffold(
             containerColor = Palette.Background,
@@ -430,7 +445,15 @@ fun PhononsApp(onSetEnabled: (Boolean) -> Unit) {
                         .selectableGroup(),
                 ) {
                     Tab.entries.filter { it != Tab.SYSTEM }.forEach { t ->
-                        NavItem(t, selected = tab == t, modifier = Modifier.weight(1f)) { tab = t }
+                        NavItem(t, selected = tab == t, modifier = Modifier.weight(1f)) {
+                            // Moving to a tab starts it at the top, and tapping the one already open scrolls it back up.
+                            if (tab == t) {
+                                tabScope.launch { scrolls.getValue(t).animateScrollTo(0) }
+                            } else {
+                                tabScope.launch { scrolls.getValue(t).scrollTo(0) }
+                                tab = t
+                            }
+                        }
                     }
                 }
             },
@@ -2395,7 +2418,27 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
         )
     }
 
-    DiagnosticsSection(status, output)
+    DiagnosticsSection(status, output, onConsole = LocalOpenConsole.current)
+
+    SettingsSection(stringResource(R.string.ui_open_source)) {
+        val version = remember {
+            runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty()
+        }
+        Text(
+            stringResource(R.string.ui_open_source_body, version),
+            style = MaterialTheme.typography.bodyMedium,
+            color = Palette.TextDim,
+            modifier = Modifier.padding(16.dp),
+        )
+        RowDivider()
+        ActionRow(stringResource(R.string.ui_view_source), Help.openSource, detail = SOURCE_URL.removePrefix("https://")) {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(SOURCE_URL)))
+        }
+        RowDivider()
+        ActionRow(stringResource(R.string.ui_report_problem), Help.openSource, detail = stringResource(R.string.ui_report_problem_detail)) {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("$SOURCE_URL/issues")))
+        }
+    }
 
     if (Disclosure.status(state)) SettingsSection(stringResource(R.string.ui_status)) {
         Fact(stringResource(R.string.help_status_running_title), Help.statusRunning, if (status.running) stringResource(R.string.ui_yes) else stringResource(R.string.ui_no))

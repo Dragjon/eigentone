@@ -1,0 +1,5 @@
+- Stereo width no longer lowers the volume. It now only cuts, so the bass stays at full level and nothing is turned down to make room
+- Each tab opens at the top when you move to it, and tapping the tab you're on scrolls back up
+- The welcome asks to keep Eigentone running when the phone is locked
+- New debug console in Settings, Troubleshooting: Eigentone's live log, to copy or share with a bug report
+- New Open source section in Settings, with links to the code and issues on GitHub

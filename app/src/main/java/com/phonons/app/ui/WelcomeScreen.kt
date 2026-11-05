@@ -387,8 +387,41 @@ private fun TurnOn(state: AppState, onSetEnabled: (Boolean) -> Unit) {
             lit = status.running && status.hasControl && status.error == null,
         )
     }
+    BackgroundUse()
     Text(stringResource(R.string.ui_use_one_eq_at_a_time), style = MaterialTheme.typography.titleSmall, color = Palette.Text)
     Text(stringResource(R.string.ui_eq_in_a_headphone_app_such_2), style = MaterialTheme.typography.bodyMedium, color = Palette.TextDim)
+}
+
+/**
+ * Asks to be left out of battery optimisation, which otherwise can stop the EQ once the phone is locked. Rechecked
+ * on every return, since the system prompt can be declined.
+ */
+@android.annotation.SuppressLint("BatteryLife")
+@Composable
+private fun BackgroundUse() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var exempt by remember { mutableStateOf(true) }
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        exempt = context.getSystemService(android.os.PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
+        onPauseOrDispose { }
+    }
+    Text(stringResource(R.string.welcome_background_title), style = MaterialTheme.typography.titleSmall, color = Palette.Text)
+    if (exempt) {
+        Note(stringResource(R.string.welcome_background_done), lit = true)
+    } else {
+        Text(stringResource(R.string.welcome_background_body), style = MaterialTheme.typography.bodyMedium, color = Palette.TextDim)
+        FilledTonalButton(
+            onClick = {
+                context.startActivity(
+                    android.content.Intent(
+                        android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                        android.net.Uri.parse("package:${context.packageName}"),
+                    ),
+                )
+            },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        ) { Text(stringResource(R.string.ui_allow_background_use)) }
+    }
 }
 
 @Composable

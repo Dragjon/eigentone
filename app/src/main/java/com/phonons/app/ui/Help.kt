@@ -119,6 +119,8 @@ object Help {
     val lowLatency = Tip(R.string.help_low_latency_title, R.string.help_low_latency_body)
     val startOnBoot = Tip(R.string.help_start_on_boot_title, R.string.help_start_on_boot_body)
     val battery = Tip(R.string.help_battery_title, R.string.help_battery_body)
+    val console = Tip(R.string.help_console_title, R.string.help_console_body)
+    val openSource = Tip(R.string.help_open_source_title, R.string.help_open_source_body)
 
     val statusRunning = Tip(R.string.help_status_running_title, R.string.help_status_running_body)
     val statusMode = Tip(R.string.help_status_mode_title, R.string.help_status_mode_body)

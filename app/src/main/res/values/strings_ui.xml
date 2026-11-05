@@ -856,4 +856,26 @@
     <string name="ui_live_spectrum" formatted="false">Live spectrum</string>
     <string name="ui_use_latest_check" formatted="false">Update from your latest check</string>
     <string name="ui_correction_from_check_on" formatted="false">The correction in use is from an earlier check. This replaces it with one from your check on %1$s.</string>
+    <string name="welcome_background_title" formatted="false">Keep it running when locked</string>
+    <string name="welcome_background_body" formatted="false">Android\'s battery optimisation can stop Eigentone in the background, so the EQ cuts out when the screen is off. Allowing background use keeps it going.</string>
+    <string name="welcome_background_done" formatted="false">Background use is allowed, so the EQ keeps going with the screen off.</string>
+    <string name="ui_debug_console" formatted="false">Debug console</string>
+    <string name="ui_debug_console_detail" formatted="false">Eigentone\'s live log, to copy or share when reporting a problem.</string>
+    <string name="ui_console_eigentone" formatted="false">Eigentone</string>
+    <string name="ui_console_everything" formatted="false">Everything</string>
+    <string name="ui_console_note" formatted="false">Only what Eigentone\'s own process logged. Nothing is sent anywhere unless you share it.</string>
+    <string name="ui_console_empty" formatted="false">Nothing logged yet. Turn Eigentone on or play something, and messages appear here.</string>
+    <string name="ui_console_pause" formatted="false">Pause</string>
+    <string name="ui_console_resume" formatted="false">Resume</string>
+    <string name="ui_console_copy" formatted="false">Copy</string>
+    <string name="ui_console_share" formatted="false">Share</string>
+    <string name="help_console_title" formatted="false">Debug console</string>
+    <string name="help_console_body" formatted="false">Shows what Eigentone is doing as it happens: which apps it attached to, what the phone accepted, and any errors. Eigentone shows its own messages; Everything adds Android\'s messages from inside Eigentone, such as the audio system\'s. Copy or share it with a bug report.</string>
+    <string name="ui_open_source" formatted="false">Open source</string>
+    <string name="ui_open_source_body" formatted="false">Eigentone %1$s is free and open source under the GNU GPL v3. Anyone can read, change and share the code.</string>
+    <string name="ui_view_source" formatted="false">View the source on GitHub</string>
+    <string name="ui_report_problem" formatted="false">Report a problem or suggest an idea</string>
+    <string name="ui_report_problem_detail" formatted="false">Opens the issues page on GitHub.</string>
+    <string name="help_open_source_title" formatted="false">Open source</string>
+    <string name="help_open_source_body" formatted="false">Eigentone\'s code is public on GitHub, under the GNU General Public License version 3. You can check exactly what it does, build it yourself, or suggest changes.</string>
 </resources>

@@ -287,7 +287,7 @@ fun PerAppSection(state: AppState) {
 
 /** What to send when something goes wrong, and anything else that might be interfering. */
 @Composable
-fun DiagnosticsSection(status: EngineStatus, output: OutputInfo) {
+fun DiagnosticsSection(status: EngineStatus, output: OutputInfo, onConsole: () -> Unit) {
     val context = LocalContext.current
     var crash by remember { mutableStateOf(CrashLog.read(context)) }
     val rivals = remember { otherEffectApps(context) }
@@ -320,6 +320,8 @@ fun DiagnosticsSection(status: EngineStatus, output: OutputInfo) {
                 .setPrimaryClip(ClipData.newPlainText("Eigentone status", text))
             copied = true
         }
+        RowDivider()
+        ActionRow(stringResource(R.string.ui_debug_console), Help.console, detail = stringResource(R.string.ui_debug_console_detail), onClick = onConsole)
         crash?.let { report ->
             RowDivider()
             ActionRow(stringResource(R.string.ui_share_crash_report), Help.crashReport, detail = stringResource(R.string.ui_eigentone_crashed_recently_nothing_is_se)) {

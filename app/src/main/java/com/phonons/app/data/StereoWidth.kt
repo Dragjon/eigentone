@@ -8,8 +8,8 @@ import kotlin.math.sin
 /**
  * Widens stereo using only a separate EQ for each channel, so it works wherever the EQ does and doesn't
  * rely on Android's deprecated Virtualizer. Neighbouring frequency ranges lean slightly left and right
- * in turn, which spreads sounds that would otherwise sit in the centre. Each channel's rise is matched
- * by the other's fall, so the overall tone barely changes, and bass stays centred, where it belongs.
+ * in turn, which spreads sounds that would otherwise sit in the centre. It only ever cuts, so the volume
+ * isn't lowered to make room for boosts, and bass stays centred and untouched, where it belongs.
  *
  * It can't move sound between channels, which Android doesn't allow here, so this is a gentle widening
  * rather than a surround effect. Pure, so it can be unit tested.
@@ -46,11 +46,17 @@ object StereoWidth {
         return MAX_LEAN_DB * edges * sin(2 * PI * log2(hz / FADE_IN_START_HZ) / CYCLE_OCTAVES)
     }
 
-    /** Each channel's curve for an amount from 0 to 1. Remembered, as the engine asks for this very often. */
+    /**
+     * Each channel's curve for an amount from 0 to 1. Remembered, as the engine asks for this very often.
+     *
+     * Cut-only: a range leaning left is cut in the right channel by the whole difference, and left as it is in
+     * the left. Boosting one side instead would make automatic headroom lower everything, bass included.
+     */
     fun curves(amount: Double): Pair<List<ShapePoint>, List<ShapePoint>> {
         cached?.takeIf { it.amount == amount }?.let { return it.left to it.right }
-        val left = frequencies.map { ShapePoint(it, leanDb(it) * amount) }
-        val right = left.map { it.copy(db = -it.db) }
+        val leans = frequencies.map { it to 2 * leanDb(it) * amount }
+        val left = leans.map { (hz, lean) -> ShapePoint(hz, minOf(0.0, lean)) }
+        val right = leans.map { (hz, lean) -> ShapePoint(hz, minOf(0.0, -lean)) }
         cached = Cached(amount, left, right)
         return left to right
     }

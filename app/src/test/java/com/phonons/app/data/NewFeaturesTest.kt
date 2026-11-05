@@ -1205,17 +1205,28 @@ class NewFeaturesTest {
     }
 
     @Test
-    fun widthMirrorsTheChannelsAndFollowsTheAmount() {
+    fun widthOnlyCutsAndFollowsTheAmount() {
         val (left, right) = StereoWidth.curves(0.5)
         assertEquals(left.size, right.size)
         for (i in left.indices) {
             assertEquals(left[i].hz, right[i].hz, 0.0)
-            assertEquals(-left[i].db, right[i].db, 0.0)
-            assertTrue(abs(left[i].db) <= StereoWidth.MAX_LEAN_DB / 2 + 0.0001)
+            // Never a boost, so automatic headroom has nothing to make room for.
+            assertTrue(left[i].db <= 0.0 && right[i].db <= 0.0)
+            // Only the side a range leans away from is cut, by the whole difference between the channels.
+            assertEquals(0.0, maxOf(left[i].db, right[i].db), 0.0)
+            assertEquals(2 * StereoWidth.leanDb(left[i].hz) * 0.5, left[i].db - right[i].db, 0.0001)
         }
         assertEquals(left.map { it.hz }.sorted(), left.map { it.hz })
         // Asking for another amount doesn't get the remembered one.
-        assertEquals(left[10].db * 2, StereoWidth.curves(1.0).first[10].db, 0.0001)
+        val i = left.indexOfFirst { it.db < -0.5 }
+        assertEquals(left[i].db * 2, StereoWidth.curves(1.0).first[i].db, 0.0001)
+    }
+
+    @Test
+    fun widthDoesNotLowerTheVolume() {
+        val flat = Processing.target(AppState(useSystemSurround = false, current = widePreset.copy(tone = Tone(surround = 0.0))), 0.0)
+        val wide = Processing.target(AppState(useSystemSurround = false, current = widePreset), 0.0)
+        assertEquals(flat.inputDb, wide.inputDb, 0.0001)
     }
 
     @Test
@@ -1251,10 +1262,11 @@ class NewFeaturesTest {
     fun widthAndEarCorrectionAddTogether() {
         val state = AppState(useSystemSurround = false, current = widePreset, earCorrections = mapOf(BUDS to ears))
         val target = Processing.target(state, 0.0, outputKey = BUDS)
-        val (lean, _) = StereoWidth.curves(1.0)
-        val point = lean.first { it.hz > 900 }
-        assertEquals(point.db - 3.0, Eq.curveDb(target.filters, point.hz), 0.01)
-        assertEquals(-point.db + 3.0, Eq.curveDb(target.rightFilters, point.hz), 0.01)
+        val (leanLeft, leanRight) = StereoWidth.curves(1.0)
+        val i = leanLeft.indexOfFirst { it.hz > 900 }
+        val hz = leanLeft[i].hz
+        assertEquals(leanLeft[i].db - 3.0, Eq.curveDb(target.filters, hz), 0.01)
+        assertEquals(leanRight[i].db + 3.0, Eq.curveDb(target.rightFilters, hz), 0.01)
     }
 
     @Test
@@ -1265,11 +1277,11 @@ class NewFeaturesTest {
     }
 
     @Test
-    fun widthBarelyChangesTheOverallTone() {
+    fun widthLeavesTheBassAtFullLevel() {
         val target = Processing.target(AppState(useSystemSurround = false, current = widePreset), 0.0)
-        for (hz in listOf(600.0, 1000.0, 2000.0, 5000.0)) {
-            val sum = Eq.curveDb(target.filters, hz) + Eq.curveDb(target.rightFilters, hz)
-            assertEquals(0.0, sum, 0.001)
+        for (hz in listOf(40.0, 100.0, 200.0)) {
+            assertEquals(0.0, Eq.curveDb(target.filters, hz) + target.inputDb, 0.3)
+            assertEquals(0.0, Eq.curveDb(target.rightFilters, hz) + target.inputDb, 0.3)
         }
     }
 
