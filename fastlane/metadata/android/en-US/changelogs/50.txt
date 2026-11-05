@@ -1,0 +1,2 @@
+- After a new hearing check, Headphones, Your ears shows how each ear heard in that check, even with a correction already in use, and offers to update the correction from it
+- The Smoothen info box is titled Smoothen

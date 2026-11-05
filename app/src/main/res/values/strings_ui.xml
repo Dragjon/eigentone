@@ -95,7 +95,7 @@
     <string name="help_graphic_shapes_body" formatted="false">Ready-made curves to start from. Tap one, then adjust it to taste. It replaces the current faders, and your preset\'s headphone correction stays underneath, so it adds to that.</string>
     <string name="help_graphic_shapes_title" formatted="false">Shapes</string>
     <string name="help_graphic_smooth_body" formatted="false">Softens sharp steps between neighbouring faders, which often sounds more natural. Tap it again for a stronger effect.</string>
-    <string name="help_graphic_smooth_title" formatted="false">Smooth</string>
+    <string name="help_graphic_smooth_title" formatted="false">Smoothen</string>
     <string name="help_graphic_title" formatted="false">Graphic EQ</string>
     <string name="help_guide_body" formatted="false">A few short tips, in the order that makes the most difference.</string>
     <string name="help_guide_title" formatted="false">Getting the best sound</string>
@@ -854,4 +854,6 @@
     <string name="help_tour_title" formatted="false">Tour</string>
     <string name="help_tour_body" formatted="false">A short walk around the main screen, pointing out each part in turn. Nothing changes while it runs.</string>
     <string name="ui_live_spectrum" formatted="false">Live spectrum</string>
+    <string name="ui_use_latest_check" formatted="false">Update from your latest check</string>
+    <string name="ui_correction_from_check_on" formatted="false">The correction in use is from an earlier check. This replaces it with one from your check on %1$s.</string>
 </resources>

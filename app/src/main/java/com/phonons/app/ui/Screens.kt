@@ -1316,6 +1316,21 @@ private fun EarCorrectionRows(state: AppState) {
                 setEars(ears.copy(enabled = on))
             }
             EarCurvesGraph(ears, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), markers = true)
+            // The latest check is always shown, so a new one replaces the old graph even with a correction in use.
+            if (measured != null && record != null) {
+                val latest = remember(measured) { measured.earCorrection() }
+                val date = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(record.measuredAt))
+                RowDivider()
+                HearingGraph(measured, Modifier.padding(16.dp))
+                if (latest.hasChanges && (latest.left != ears.left || latest.right != ears.right)) {
+                    RowDivider()
+                    ActionRow(
+                        stringResource(R.string.ui_use_latest_check),
+                        Help.earCorrection,
+                        detail = stringResource(R.string.ui_correction_from_check_on, date),
+                    ) { setEars(latest.copy(enabled = ears.enabled)) }
+                }
+            }
             RowDivider()
             ActionRow(stringResource(R.string.ui_remove_ear_correction), Help.earCorrection) { setEars(null) }
         } else if (measured != null && record != null) {
