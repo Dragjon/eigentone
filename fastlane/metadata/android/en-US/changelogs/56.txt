@@ -1,0 +1,6 @@
+- Refine my EQ: compare pairs of sounds and it learns your taste, with a blind final check
+- Switching band counts and back keeps the finer curve
+- Fader levels shown above each fader
+- Peak tools only for headphones and earbuds
+- Discard shows what's lost and can be undone
+- Bypass no longer shifts the top bar

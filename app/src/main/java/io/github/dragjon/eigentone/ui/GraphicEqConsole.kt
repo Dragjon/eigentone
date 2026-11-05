@@ -8,6 +8,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.runtime.mutableStateOf
 import io.github.dragjon.eigentone.data.FaderView
+import io.github.dragjon.eigentone.data.BandSwitch
 import io.github.dragjon.eigentone.data.FaderLayer
 import io.github.dragjon.eigentone.data.Preset
 import androidx.compose.foundation.layout.fillMaxSize
@@ -293,12 +294,7 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, o
                         selected = bands == option,
                         onClick = {
                             if (bands != option) {
-                                val moved = GraphicEq.resample(gains, bands, option)
-                                Repo.editTone {
-                                    // Changing the layout isn't an edit, so an unedited shape stays that way.
-                                    val kept = it.shape?.let { shape -> if (shape.faders == gains) shape.copy(faders = moved) else shape }
-                                    it.copy(graphicDb = moved, graphicBands = option, shape = kept)
-                                }
+                                Repo.editTone { BandSwitch.switch(it, option) }
                                 Repo.commit()
                             }
                         },
@@ -439,7 +435,20 @@ private fun Faders(
             }
         }
 
-        val bankHeight = if (fill) (maxHeight - if (scrolling) OVERVIEW_HEIGHT_DP.dp else 0.dp).coerceAtLeast(196.dp) else 212.dp
+        // Each fader's level sits above it. With one decimal when it fits, whole dB when it doesn't, and in
+        // two staggered rows when even that is wider than a fader.
+        val slotPx = (contentPx - with(density) { DB_GUTTER_DP.dp.toPx() }) / bands
+        val gap = with(density) { 3.dp.toPx() }
+        val fitsDecimal = measurer.measure("+10.5", labelStyle).size.width + gap
+        val fitsWhole = measurer.measure("-10", labelStyle).size.width + gap
+        // The small fit-to-screen bank has no room for them; the selected band's level shows below it anyway.
+        val showValues = scrolling || fill
+        val valueRows = if (!showValues) 0 else if (slotPx >= fitsWhole) 1 else 2
+        val decimals = slotPx * valueRows >= fitsDecimal
+        val valueSpace = VALUE_ROW_DP.dp * valueRows
+        val railTopDp = RAIL_TOP_DP.dp + valueSpace
+
+        val bankHeight = if (fill) (maxHeight - if (scrolling) OVERVIEW_HEIGHT_DP.dp else 0.dp).coerceAtLeast(196.dp) else 212.dp + valueSpace
         Column {
             if (scrolling) FaderOverview(shown, selected, scroll, contentPx, viewPx)
             Box(Modifier.fillMaxWidth().then(if (scrolling) Modifier.horizontalScroll(scroll, enabled = !smooth) else Modifier)) {
@@ -451,12 +460,12 @@ private fun Faders(
                             contentDescription =
                                 appText(R.string.ui_band_faders_use_the_band_controls, bands)
                         }
-                        .pointerInput(bands, smooth, scrolling, viewPx) {
+                        .pointerInput(bands, smooth, scrolling, viewPx, railTopDp) {
                             val bottomLabels = LABEL_SPACE_DP.dp.toPx()
                             val gutter = DB_GUTTER_DP.dp.toPx()
                             fun bandAt(x: Float) = (((x - gutter) / (size.width - gutter)) * bands).toInt().coerceIn(0, bands - 1)
                             fun dbAt(y: Float): Double {
-                                val top = RAIL_TOP_DP.dp.toPx()
+                                val top = railTopDp.toPx()
                                 val height = size.height - bottomLabels - top
                                 return GraphicEq.snap(GraphicEq.MAX_DB * (1 - 2 * (y - top).coerceIn(0f, height) / height))
                             }
@@ -517,8 +526,8 @@ private fun Faders(
                                     // jump. A sideways swipe is left for scrolling, an upward or downward one moves it.
                                     val band = bandAt(down.position.x)
                                     val startDb = latest.getOrElse(band) { 0.0 }
-                                    val railHeight = size.height - bottomLabels - RAIL_TOP_DP.dp.toPx()
-                                    val capY = (RAIL_TOP_DP.dp.toPx() + (1 - startDb / GraphicEq.MAX_DB) / 2 * railHeight).toFloat()
+                                    val railHeight = size.height - bottomLabels - railTopDp.toPx()
+                                    val capY = (railTopDp.toPx() + (1 - startDb / GraphicEq.MAX_DB) / 2 * railHeight).toFloat()
                                     // Only a touch on the cap moves it, so a finger running along the rails does
                                     // nothing, and an up or down swipe there scrolls the page instead.
                                     val onCap = abs(down.position.y - capY) <= CAP_GRAB_DP.dp.toPx()
@@ -559,7 +568,7 @@ private fun Faders(
                 ) {
                     val bottomLabels = LABEL_SPACE_DP.dp.toPx()
                     // Room above the rails, so a fader at the top keeps clear of the overview above it.
-                    val railTop = RAIL_TOP_DP.dp.toPx()
+                    val railTop = railTopDp.toPx()
                     val height = size.height - bottomLabels - railTop
                     val gutter = DB_GUTTER_DP.dp.toPx()
                     val slot = (size.width - gutter) / bands
@@ -623,6 +632,28 @@ private fun Faders(
                             topLeft = Offset(
                                 (centre - measured.size.width / 2).coerceIn(0f, size.width - measured.size.width),
                                 railTop + height + 4.dp.toPx(),
+                            ),
+                        )
+                    }
+
+                    // Each fader's level above its line: brighter when it's set, brightest when selected.
+                    if (showValues) shown.forEachIndexed { i, gain ->
+                        val text = faderValue(gain, decimals)
+                        val style = labelStyle.copy(
+                            color = when {
+                                i == selected -> Palette.Text
+                                text == "0" -> Palette.TextDim.copy(alpha = 0.55f)
+                                else -> Palette.Lit
+                            },
+                        )
+                        val measured = measurer.measure(text, style)
+                        val centre = gutter + slot * i + slot / 2
+                        val row = if (valueRows > 1) i % valueRows else 0
+                        drawText(
+                            measured,
+                            topLeft = Offset(
+                                (centre - measured.size.width / 2).coerceIn(gutter, size.width - measured.size.width),
+                                VALUE_ROW_DP.dp.toPx() * row,
                             ),
                         )
                     }
@@ -868,6 +899,18 @@ private fun editFaders(before: List<Double>, moved: List<Double>) {
         it.copy(graphicDb = new, graphicBands = bands, shape = it.shape.takeUnless { GraphicEq.isFlat(new) })
     }
 }
+
+/** A fader's level in the fewest characters: "+3.5", "-2", "0", or whole dB when [decimals] is off. */
+internal fun faderValue(db: Double, decimals: Boolean): String {
+    val r = if (decimals) kotlin.math.round(db * 2) / 2 else kotlin.math.round(db)
+    return when {
+        r == 0.0 -> "0"
+        r == kotlin.math.floor(r) -> String.format(Locale.US, "%+d", r.toInt())
+        else -> String.format(Locale.US, "%+.1f", r)
+    }
+}
+
+private const val VALUE_ROW_DP = 13
 
 private fun formatLevel(db: Double) = String.format(Locale.US, "%+.1f dB", db).replace("-0.0", "+0.0")
 private const val DB_GUTTER_DP = 24

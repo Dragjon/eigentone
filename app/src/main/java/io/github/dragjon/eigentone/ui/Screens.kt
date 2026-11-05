@@ -153,6 +153,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
+import io.github.dragjon.eigentone.data.PresetChanges
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredWidth
@@ -200,6 +202,8 @@ private val LocalSnackbar = compositionLocalOf<SnackbarHostState> { error("No sn
 private val LocalOpenFinder = compositionLocalOf<() -> Unit> { error("No finder") }
 
 private val LocalOpenHearing = compositionLocalOf<() -> Unit> { error("No hearing check") }
+
+private val LocalOpenRefine = compositionLocalOf<() -> Unit> { error("No refine") }
 
 private const val SEARCH_FROM_PRESETS = 6
 private const val TAB_FADE_MS = 140
@@ -313,6 +317,7 @@ fun EigentoneApp(onSetEnabled: (Boolean) -> Unit) {
         }
     }
     var finding by rememberSaveable { mutableStateOf(false) }
+    var refining by rememberSaveable { mutableStateOf(false) }
     var browsingShapes by rememberSaveable { mutableStateOf(false) }
     var checkingHearing by rememberSaveable { mutableStateOf(false) }
     var comparing by rememberSaveable { mutableStateOf(false) }
@@ -352,6 +357,10 @@ fun EigentoneApp(onSetEnabled: (Boolean) -> Unit) {
 
     if (finding) {
         FinderScreen(onSetEnabled = onSetEnabled, onClose = { finding = false })
+        return
+    }
+    if (refining) {
+        RefineScreen(onSetEnabled = onSetEnabled, onClose = { refining = false })
         return
     }
     if (browsingShapes) {
@@ -423,6 +432,7 @@ fun EigentoneApp(onSetEnabled: (Boolean) -> Unit) {
     CompositionLocalProvider(
         LocalSnackbar provides snackbar,
         LocalOpenFinder provides { finding = true },
+        LocalOpenRefine provides { refining = true },
         LocalOpenShapes provides { browsingShapes = true },
         LocalOpenHearing provides { checkingHearing = true },
         LocalOpenCompare provides { comparing = true },
@@ -612,11 +622,14 @@ private fun TopBar(
             val version = remember {
                 runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty()
             }
+            // Neither wraps: when the bar is tight the version is clipped rather than pushed into the name.
             Row {
                 Text(
                     stringResource(R.string.app_name),
                     style = MaterialTheme.typography.titleLarge,
                     color = Palette.Text,
+                    maxLines = 1,
+                    softWrap = false,
                     modifier = Modifier.alignByBaseline(),
                 )
                 if (version.isNotEmpty()) {
@@ -625,8 +638,11 @@ private fun TopBar(
                         style = Readout.copy(fontSize = MaterialTheme.typography.labelMedium.fontSize),
                         color = Palette.TextDim,
                         maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Clip,
                         modifier = Modifier
                             .alignByBaseline()
+                            .weight(1f, fill = false)
                             .padding(start = 6.dp),
                     )
                 }
@@ -654,16 +670,23 @@ private fun TopBar(
     }
 }
 
-private val BypassPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+private val BypassPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
 
 /** Distinct from the power switch: neutral until engaged, when it's clearly a held state. */
 @Composable
 private fun BypassButton(bypassed: Boolean) {
     val toggle = { Repo.update { it.copy(bypass = !it.bypass) } }
+    // Both words are laid out and only one shows, so the button keeps one width and nothing beside it moves.
+    val label: @Composable () -> Unit = {
+        Box(contentAlignment = Alignment.Center) {
+            Text(stringResource(R.string.ui_bypassed), maxLines = 1, modifier = Modifier.alpha(if (bypassed) 1f else 0f))
+            Text(stringResource(R.string.ui_bypass), maxLines = 1, modifier = Modifier.alpha(if (bypassed) 0f else 1f))
+        }
+    }
     if (bypassed) {
-        Button(onClick = { toggle() }, contentPadding = BypassPadding) { Text(stringResource(R.string.ui_bypassed)) }
+        Button(onClick = { toggle() }, contentPadding = BypassPadding) { label() }
     } else {
-        FilledTonalButton(onClick = { toggle() }, contentPadding = BypassPadding) { Text(stringResource(R.string.ui_bypass)) }
+        FilledTonalButton(onClick = { toggle() }, contentPadding = BypassPadding) { label() }
     }
 }
 
@@ -875,6 +898,35 @@ private fun EqTab(state: AppState) {
     }
 }
 
+/** The unsaved changes in a few words, such as "1 added filter, faders and bass". */
+@Composable
+private fun changeSummary(parts: List<Pair<PresetChanges.Part, Int>>): String {
+    val words = parts.map { (part, count) ->
+        when (part) {
+            PresetChanges.Part.ADDED_FILTERS -> pluralStringResource(R.plurals.ui_changes_added_filters, count, count)
+            PresetChanges.Part.REMOVED_FILTERS -> pluralStringResource(R.plurals.ui_changes_removed_filters, count, count)
+            PresetChanges.Part.CHANGED_FILTERS -> pluralStringResource(R.plurals.ui_changes_changed_filters, count, count)
+            PresetChanges.Part.PREAMP -> stringResource(R.string.ui_changes_preamp)
+            PresetChanges.Part.FADERS -> stringResource(R.string.ui_changes_faders)
+            PresetChanges.Part.BASS -> stringResource(R.string.ui_changes_bass)
+            PresetChanges.Part.TREBLE -> stringResource(R.string.ui_changes_treble)
+            PresetChanges.Part.VOCALS -> stringResource(R.string.ui_changes_vocals)
+            PresetChanges.Part.STRENGTH -> stringResource(R.string.ui_changes_strength)
+            PresetChanges.Part.CORRECTION -> stringResource(R.string.ui_changes_correction)
+            PresetChanges.Part.WIDTH -> stringResource(R.string.ui_changes_width)
+            PresetChanges.Part.COMPRESSOR -> stringResource(R.string.ui_changes_compressor)
+            PresetChanges.Part.CLARITY -> stringResource(R.string.ui_changes_clarity)
+            PresetChanges.Part.REVERB -> stringResource(R.string.ui_changes_reverb)
+            PresetChanges.Part.OTHER -> stringResource(R.string.ui_changes_other)
+        }
+    }
+    return when (words.size) {
+        0 -> ""
+        1 -> words[0]
+        else -> stringResource(R.string.ui_changes_and, words.dropLast(1).joinToString(", "), words.last())
+    }
+}
+
 /** Shown while the preset has changes, so they can be kept or dropped without leaving the EQ. */
 @Composable
 private fun UnsavedBar(state: AppState, saved: Preset, modifier: Modifier = Modifier) {
@@ -891,17 +943,39 @@ private fun UnsavedBar(state: AppState, saved: Preset, modifier: Modifier = Modi
             .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            stringResource(R.string.ui_unsaved_changes, saved.name),
-            style = MaterialTheme.typography.bodyMedium,
-            color = Palette.Text,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
+        // Says what's unsaved, so it's plain what Discard would drop before it's tapped.
+        val changes = changeSummary(remember(saved, state.current) { PresetChanges.of(saved, state.current) })
+        Column(Modifier.weight(1f)) {
+            Text(
+                stringResource(R.string.ui_unsaved_changes, saved.name),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Palette.Text,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (changes.isNotEmpty()) {
+                Text(
+                    changes,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Palette.TextDim,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        val undoLabel = stringResource(R.string.ui_undo)
         TextButton(onClick = {
             Repo.discardEdits()
-            scope.notify(snackbar, appText(R.string.ui_edits_discarded, saved.name))
+            // Discard is a step in the undo history, so the message can offer it straight back.
+            scope.launch {
+                val result = snackbar.showSnackbar(
+                    appText(R.string.ui_edits_discarded, saved.name),
+                    actionLabel = undoLabel,
+                    withDismissAction = true,
+                    duration = SnackbarDuration.Long,
+                )
+                if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) Repo.undo()
+            }
         }) { Text(stringResource(R.string.ui_discard)) }
         Button(onClick = {
             if (own) {
@@ -2040,8 +2114,12 @@ private fun HeadphonesTab(state: AppState) {
     SettingsSection(stringResource(R.string.ui_listening_tools)) {
         ActionRow(stringResource(R.string.ui_find_my_sound), Help.finder, detail = stringResource(R.string.ui_a_short_guided_listening_test), onClick = LocalOpenFinder.current)
         RowDivider()
+        ActionRow(stringResource(R.string.ui_refine), Help.refine, detail = stringResource(R.string.ui_refine_detail), onClick = LocalOpenRefine.current)
+        RowDivider()
         ActionRow(stringResource(R.string.ui_compare_two_sounds), Help.compare, detail = stringResource(R.string.ui_switch_instantly_with_an_optional_blind), onClick = LocalOpenCompare.current)
-        if (Disclosure.measureTools(state)) {
+        // Both play tones into each ear and ask what you hear, so they're for headphones and earbuds.
+        // A speaker's peaks are mostly the room's, which the microphone measurement above handles.
+        if (kind.isWorn && Disclosure.measureTools(state)) {
             RowDivider()
             ActionRow(stringResource(R.string.ui_find_peaks_for_me), Help.peakFinder, detail = stringResource(R.string.ui_a_guided_test_that_finds_peaks_and_dips), onClick = LocalOpenPeaks.current)
             RowDivider()

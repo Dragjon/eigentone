@@ -2,6 +2,14 @@
 
 Changes since 0.33.0. Every release is a pre-release on [GitHub](https://github.com/Dragjon/eigentone/releases) until the first official one.
 
+## 0.38.0
+
+- **Refine my EQ.** The device tab can fine-tune your current sound by asking which of two versions you prefer. Each comparison is chosen to teach the most about your taste, a few come back with sides swapped to check your answers hold, and it stops once it's sure. A blind final A/B against your starting sound decides whether to keep the result.
+- **Switching band counts keeps detail.** Going from 31 to 10 bands and back restores the 31-band curve exactly; only parts you moved while on fewer bands take the coarser shape.
+- Each fader shows its level above it in the scrolling view and in landscape.
+- Find peaks and the frequency sweep only appear for headphones and earbuds.
+- Discarding changes says what will be lost, and can be undone.
+- Pressing Bypass no longer shifts the top bar.
 ## 0.37.0
 
 - **Measure a speaker with a microphone.** For a Bluetooth speaker or a car, the device tab can play a set of tones, listen with the microphone from three spots around where you sit, and save a gentle correction as a preset that loads whenever that speaker connects. It cuts peaks by up to 12 dB, lifts dips by no more than 4 dB, and leaves alone what the speaker can't really play. A USB measurement microphone is used when one is plugged in. Nothing is recorded or kept: only each tone's level is read.

@@ -139,6 +139,8 @@ object BackupCodec {
             correctionInfo = tone.correctionInfo?.let { info ->
                 info.copy(aim = ShapeText.cleanCurve(info.aim)).takeIf { it.aim.isNotEmpty() }
             },
+            graphicDetail = tone.graphicDetail?.takeIf { it.bands in GraphicEq.BAND_OPTIONS && it.bands > bands && it.gains.size == it.bands }
+                ?.let { FaderDetail(it.bands, it.gains.map { db -> GraphicEq.snap(safe(db, 0.0)) }) },
             shape = tone.shape?.takeIf { it.name.isNotBlank() }?.let { shape ->
                 AppliedShape(shape.name.take(Tone.MAX_SHAPE_LABEL), shape.faders.take(bands).map { GraphicEq.snap(safe(it, 0.0)) })
             },

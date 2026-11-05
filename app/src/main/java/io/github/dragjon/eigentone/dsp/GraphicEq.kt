@@ -80,6 +80,12 @@ object GraphicEq {
         return frequencies(toBands).map { snap(interpolate(points, it)) }
     }
 
+    /** Like [resample], for any values rather than fader gains, so nothing is rounded or limited. */
+    fun interpolated(values: List<Double>, fromBands: Int, toBands: Int): List<Double> {
+        val points = frequencies(fromBands).zip(List(fromBands) { values.getOrElse(it) { 0.0 } })
+        return frequencies(toBands).map { interpolate(points, it) }
+    }
+
     /** Returns exactly [bandCount] gains, adapting anything saved with a different layout. */
     fun normalized(gains: List<Double>, bandCount: Int): List<Double> = when {
         gains.size == bandCount -> gains

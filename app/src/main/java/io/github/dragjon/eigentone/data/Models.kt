@@ -79,6 +79,8 @@ data class Tone(
     val targetId: String? = null,
     /** What a measured correction was published to aim for, which [targetId] works from. */
     val correctionInfo: CorrectionInfo? = null,
+    /** The faders at a finer layout, kept while fewer show, so switching back to it loses nothing. See [BandSwitch]. */
+    val graphicDetail: FaderDetail? = null,
 ) {
     /**
      * Folds the old bass tuner into the bass control. A sound that used both keeps them separate, because
@@ -111,6 +113,8 @@ data class Tone(
         return copy(
             graphicDb = faders,
             graphicBands = bands,
+            // A new shape replaces the faders outright, so no finer detail from before carries over.
+            graphicDetail = null,
             shape = if (GraphicEq.isFlat(faders)) null else AppliedShape(label.take(MAX_SHAPE_LABEL), faders),
         )
     }

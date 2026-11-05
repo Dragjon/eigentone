@@ -803,6 +803,31 @@
     <string name="help_discard_edits_title" formatted="false">Discard edits</string>
     <string name="help_discard_edits_body" formatted="false">Puts this preset back as it was saved. Edits are kept when you switch to another preset and back, until the app closes, so this is how to drop them. To keep them for good, use Update, or Save as new for a built-in preset.</string>
     <string name="ui_unsaved_changes" formatted="false">Unsaved changes to %1$s</string>
+    <plurals name="ui_changes_added_filters">
+        <item quantity="one">%1$d added filter</item>
+        <item quantity="other">%1$d added filters</item>
+    </plurals>
+    <plurals name="ui_changes_removed_filters">
+        <item quantity="one">%1$d removed filter</item>
+        <item quantity="other">%1$d removed filters</item>
+    </plurals>
+    <plurals name="ui_changes_changed_filters">
+        <item quantity="one">%1$d changed filter</item>
+        <item quantity="other">%1$d changed filters</item>
+    </plurals>
+    <string name="ui_changes_preamp" formatted="false">preamp</string>
+    <string name="ui_changes_faders" formatted="false">faders</string>
+    <string name="ui_changes_bass" formatted="false">bass</string>
+    <string name="ui_changes_treble" formatted="false">treble</string>
+    <string name="ui_changes_vocals" formatted="false">vocals</string>
+    <string name="ui_changes_strength" formatted="false">strength</string>
+    <string name="ui_changes_correction" formatted="false">correction</string>
+    <string name="ui_changes_width" formatted="false">width</string>
+    <string name="ui_changes_compressor" formatted="false">compressor</string>
+    <string name="ui_changes_clarity" formatted="false">Clarity</string>
+    <string name="ui_changes_reverb" formatted="false">reverb</string>
+    <string name="ui_changes_other" formatted="false">other settings</string>
+    <string name="ui_changes_and" formatted="false">%1$s and %2$s</string>
     <string name="ui_saved_as" formatted="false">Saved as %1$s.</string>
     <string name="ui_strip_at" formatted="false">At %1$s</string>
     <string name="ui_strip_scheduled" formatted="false">At %1$s, from the night schedule</string>
@@ -935,4 +960,24 @@
     <string name="ui_report_problem_detail" formatted="false">Or suggest an idea, on GitHub.</string>
     <string name="help_open_source_title" formatted="false">Open source</string>
     <string name="help_open_source_body" formatted="false">Eigentone\'s code is public on GitHub, under the GNU General Public License version 3. You can check exactly what it does, build it yourself, or suggest changes.</string>
+    <string name="ui_refine" formatted="false">Refine my sound</string>
+    <string name="ui_refine_detail" formatted="false">Fine-tunes the sound you have by comparing pairs</string>
+    <string name="help_refine_title" formatted="false">Refine my sound</string>
+    <string name="help_refine_body" formatted="false">Fine-tunes the sound you have now. You hear two slightly different versions at the same loudness, in a random order, and pick the better one. One answer can be a fluke, so Refine never follows a single answer: it learns from all of them together, and each next pair is the one it\'s least sure about. Broad changes come first, finer ones later. It ends with a blind comparison against what you had, and changes nothing unless you pick the refined version.</string>
+    <string name="ui_refine_intro" formatted="false">Refine fine-tunes %1$s. You\'ll hear two versions, A and B, and pick the one that sounds better. They play at the same loudness and swap sides at random, so only the tone decides. It takes 12 to 24 comparisons, a few minutes.</string>
+    <string name="ui_refine_start" formatted="false">Start refining</string>
+    <string name="ui_refine_round" formatted="false">Comparison %1$d, up to %2$d</string>
+    <string name="ui_refine_question" formatted="false">Which sounds better?</string>
+    <string name="ui_refine_hint" formatted="false">The difference can be small. Go with your first impression, and say so when you can\'t tell: that\'s useful too.</string>
+    <string name="ui_refine_final" formatted="false">One blind comparison</string>
+    <string name="ui_refine_final_body" formatted="false">One of these is what you had and the other is the refined sound. Which do you prefer?</string>
+    <string name="ui_refine_nothing" formatted="false">No change found</string>
+    <string name="ui_refine_nothing_body" formatted="false">Your answers didn\'t point to any change worth making, so %1$s stays as it was.</string>
+    <string name="ui_refine_kept" formatted="false">You preferred what you had</string>
+    <string name="ui_refine_kept_body" formatted="false">In the blind comparison you picked your original sound, so nothing has changed.</string>
+    <string name="ui_refine_applied" formatted="false">Refined</string>
+    <string name="ui_refine_applied_body" formatted="false">In the blind comparison you picked the refined sound. It\'s now on the faders as an unsaved change to %1$s: save it, or discard it, from the bar at the bottom.</string>
+    <string name="ui_refine_change" formatted="false">What changed</string>
+    <string name="ui_refine_steady" formatted="false">You gave the same answer to %1$d of %2$d repeated pairs.</string>
+    <string name="ui_refine_unsteady" formatted="false">You answered %1$d of %2$d repeated pairs differently the second time, which is normal for small differences. The result leans on the answers that agreed.</string>
 </resources>
