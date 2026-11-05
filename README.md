@@ -14,6 +14,25 @@
   <a href="LICENSE"><img alt="Licence: GPL v3" src="https://img.shields.io/badge/licence-GPL--3.0-0D0C09"></a>
   <img alt="Android 13 and newer" src="https://img.shields.io/badge/Android-13%2B-3DDC84">
   <img alt="No root needed" src="https://img.shields.io/badge/root-not%20needed-EEEEEA">
+  <a href="https://github.com/Dragjon/eigentone/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/Dragjon/eigentone/total?color=FFC24A"></a>
+  <a href="https://github.com/Dragjon/eigentone/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Dragjon/eigentone?style=flat&color=FFC24A"></a>
+</p>
+
+<p align="center">
+  <img alt="No ads" src="https://img.shields.io/badge/ads-none-EEEEEA">
+  <img alt="No tracking" src="https://img.shields.io/badge/tracking-none-EEEEEA">
+  <img alt="No account" src="https://img.shields.io/badge/account-not%20needed-EEEEEA">
+  <img alt="Works system-wide" src="https://img.shields.io/badge/EQ-system--wide-FFC24A">
+  <img alt="AutoEq profiles" src="https://img.shields.io/badge/AutoEq-supported-FFC24A">
+</p>
+
+<p align="center">
+  <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&logoColor=white">
+  <img alt="Jetpack Compose" src="https://img.shields.io/badge/Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white">
+  <img alt="Material 3" src="https://img.shields.io/badge/Material%203-757575?logo=materialdesign&logoColor=white">
+  <img alt="Target SDK 36" src="https://img.shields.io/badge/target%20SDK-36-3DDC84">
+  <a href="https://github.com/Dragjon/eigentone/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/Dragjon/eigentone/main?color=0D0C09"></a>
+  <a href="https://github.com/Dragjon/eigentone/issues"><img alt="Open issues" src="https://img.shields.io/github/issues/Dragjon/eigentone?color=0D0C09"></a>
 </p>
 
 <p align="center">
