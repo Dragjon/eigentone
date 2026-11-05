@@ -1,0 +1,3 @@
+- Measure a Bluetooth speaker or car with the microphone, from three spots where you sit, and save a gentle correction that loads whenever it connects
+- The version shows beside the app's name
+- The spectrum's info button sits clear of the edge

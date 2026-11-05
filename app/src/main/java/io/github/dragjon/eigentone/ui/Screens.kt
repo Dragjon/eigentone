@@ -607,7 +607,30 @@ private fun TopBar(
                 .weight(1f)
                 .tourTarget(TourStop.PRESETS),
         ) {
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, color = Palette.Text)
+            // The version beside the name, small and quiet, so which build is running is plain at a glance.
+            val context = LocalContext.current
+            val version = remember {
+                runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty()
+            }
+            Row {
+                Text(
+                    stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Palette.Text,
+                    modifier = Modifier.alignByBaseline(),
+                )
+                if (version.isNotEmpty()) {
+                    Text(
+                        version,
+                        style = Readout.copy(fontSize = MaterialTheme.typography.labelMedium.fontSize),
+                        color = Palette.TextDim,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .alignByBaseline()
+                            .padding(start = 6.dp),
+                    )
+                }
+            }
         }
         Row(Modifier.tourTarget(TourStop.POWER), verticalAlignment = Alignment.CenterVertically) {
             if (state.enabled) BypassButton(state.bypass)
@@ -751,7 +774,9 @@ private fun EqTab(state: AppState) {
                 Box(
                     Modifier
                         .align(Alignment.TopStart)
-                        .offset(x = (-4).dp, y = (-6).dp)
+                        // Centres the icon over the column of dB labels below it, clear of the panel's edge,
+                        // and in line with the ear legend's row.
+                        .offset(x = (-10).dp, y = (-10).dp)
                         .alpha(SPECTRUM_INFO_ALPHA),
                 ) { InfoButton(Help.analyser) }
             }
@@ -976,7 +1001,7 @@ private fun AnalyserToggle(state: AppState, modifier: Modifier) {
     }
 }
 
-private const val SPECTRUM_INFO_INSET_DP = 30
+private const val SPECTRUM_INFO_INSET_DP = 24
 private const val SPECTRUM_INFO_ALPHA = 0.7f
 
 private fun updateFilter(id: Int, transform: (Filter) -> Filter) {
@@ -1923,6 +1948,7 @@ private fun HeadphonesTab(state: AppState) {
     val attenuation by Repo.attenuationDb.collectAsStateWithLifecycle()
     var finding by remember { mutableStateOf(false) }
     var tuning by remember { mutableStateOf(false) }
+    var measuringRoom by remember { mutableStateOf(false) }
     val preset = state.current
     val saved = savedPreset(state)?.tone
 
@@ -1950,12 +1976,18 @@ private fun HeadphonesTab(state: AppState) {
 
     // Headphone corrections are measured on heads, so finding one only makes sense for something worn.
     // Anything else still shows the strength of a correction its preset already has.
-    if (kind.isWorn || hasCorrection) SettingsSection(stringResource(R.string.ui_hp_correction)) {
+    // A speaker or a car can be measured where you listen. The phone's own speaker can't, since its
+    // microphone sits right beside it and would hear the phone rather than the room.
+    val canMeasure = kind == OutputKind.SPEAKER || kind == OutputKind.CAR
+    if (kind.isWorn || hasCorrection || canMeasure) SettingsSection(stringResource(R.string.ui_hp_correction)) {
         if (kind.isWorn) {
             ActionRow(stringResource(if (kind == OutputKind.EARBUDS) R.string.ui_find_earbuds else R.string.ui_find_headphones), Help.find) { finding = true }
         }
+        if (canMeasure) {
+            ActionRow(stringResource(R.string.ui_measure_action), Help.measure, detail = stringResource(R.string.ui_measure_action_detail)) { measuringRoom = true }
+        }
         if (hasCorrection) {
-            if (kind.isWorn) RowDivider()
+            if (kind.isWorn || canMeasure) RowDivider()
             SliderSetting(
                 title = stringResource(if (kind.isWorn) R.string.ui_headphone_correction else R.string.ui_hp_correction),
                 tip = Help.correction,
@@ -2026,6 +2058,12 @@ private fun HeadphonesTab(state: AppState) {
         }
     }
     if (tuning) CorrectionTuner(onDismiss = { tuning = false })
+    if (measuringRoom) {
+        RoomMeasureDialog(output, onDismiss = { measuringRoom = false }) { name ->
+            measuringRoom = false
+            scope.notify(snackbar, appText(R.string.ui_added, name))
+        }
+    }
 }
 
 @Composable
@@ -2543,6 +2581,7 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
             detail = stringResource(if (state.advancedControls) R.string.ui_advanced_on else R.string.ui_advanced_off),
         ) { on -> Repo.update { it.copy(advancedControls = on) } }
     }
+
 
     SettingsSection(stringResource(R.string.ui_engine), trailing = { InfoButton(Help.power) }) {
         if (Disclosure.engine(state)) {

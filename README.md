@@ -78,6 +78,7 @@ Where Wavelet is ahead: it's on Google Play, it has years of testing across mill
 - **Find my sound**, a guided A/B listening test that has to beat your current sound before you keep it.
 - **Hearing check** that builds a gentle curve for how you hear, with a separate EQ for each ear if they differ, saved per pair of headphones and drawn as a curve for each ear. It isn't a medical test.
 - **EQ files**: import ParametricEQ and GraphicEQ files, and export any sound as a 127-point GraphicEQ file. Imported GraphicEQ curves keep every point rather than being rounded to faders.
+- **Measure a speaker with a microphone**: for a Bluetooth speaker or a car, tones played and heard from three spots where you sit become a gentle correction that loads whenever it connects. A USB measurement microphone is used when plugged in.
 - **Find peaks for me**, a guided listening test that finds peaks and dips in your headphones and suggests narrow filters.
 - **Frequency sweep**, a climbing tone that lets you mark peaks and dips by ear and turns them into narrow filters.
 - **Presets** that load automatically per output, per earbud noise mode and per app.
@@ -99,7 +100,7 @@ Eigentone has no ads, analytics or account, and it sends nothing about you anywh
 | Permission | Why | When |
 |---|---|---|
 | Internet | Downloads headphone profiles from AutoEq's public GitHub repository | Only when you ask for a correction |
-| Microphone | Android requires it for the spectrum analyser, which reads the level of playing audio and doesn't record the microphone | Only if you turn the analyser on |
+| Microphone | Android requires it for the spectrum analyser, which reads the level of playing audio. Measuring a speaker also listens to test tones, reading only each tone's level. Nothing is recorded or kept | Only if you turn the analyser on or measure a speaker |
 | Notification access | The only way Android reveals which app is playing, for per-app presets. Notifications are ignored | Only if you grant it |
 | Notifications, background and start at boot | Keep the EQ running, with a visible notification | While Eigentone is on |
 
@@ -110,8 +111,10 @@ Crash reports stay on the phone. You choose whether to share one from the Settin
 Download the APK from [Releases](https://github.com/Dragjon/eigentone/releases), and open it on the phone. Eigentone is a pre-release, and has only been tested on a Galaxy A54 running Android 16. If something goes wrong on your phone, Settings, Troubleshooting has a debug console whose log you can attach to an [issue](https://github.com/Dragjon/eigentone/issues). Or install with USB debugging:
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.36.0.apk
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.37.0.apk
 ```
+
+What changed in each release is in the [changelog](CHANGELOG.md).
 
 ## Build
 

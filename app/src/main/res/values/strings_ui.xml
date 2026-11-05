@@ -507,6 +507,28 @@
     <string name="ui_slope" formatted="false">Slope</string>
     <string name="ui_channel" formatted="false">Channel</string>
     <string name="ui_output_level" formatted="false">Output level</string>
+    <string name="ui_measure_action" formatted="false">Measure with a microphone</string>
+    <string name="ui_measure_action_detail" formatted="false">Plays tones, listens, and evens out the sound where you sit</string>
+    <string name="ui_measure_title" formatted="false">Measure %1$s</string>
+    <string name="ui_measure_intro" formatted="false">Eigentone plays a set of tones through the speaker for about 15 seconds while the microphone listens, three times, from three spots a little apart around where you sit. Then it works out a gentle correction.\n\nSet the volume to how loud you usually listen, keep the room quiet, and hold the phone where your head would be, with its microphone facing the speaker. The EQ steps aside while the tones play.</string>
+    <string name="ui_measure_phone_mic" formatted="false">This uses the phone\'s own microphone, which hears some frequencies more than others, mostly the deepest bass and the highest treble. The correction leaves those ends alone and keeps boosts small, so it stays safe. A USB measurement microphone gives a more exact result.</string>
+    <string name="ui_measure_usb_mic" formatted="false">A USB microphone is plugged in, so it\'s used for the measurement.</string>
+    <string name="ui_measure_playing" formatted="false">Measuring spot %1$d of %2$d. Keep still and quiet.</string>
+    <string name="ui_measure_move" formatted="false">Spot %1$d of %2$d done. Move the phone about 30 cm, still around where you sit, then measure the next one.</string>
+    <string name="ui_measure_next_spot" formatted="false">Measure next spot</string>
+    <string name="ui_measure_result" formatted="false">The faint line is what the microphone heard, averaged over the three spots. The bright line is the correction: it cuts peaks by up to 12 dB and lifts dips by no more than 4 dB, and leaves alone anything the speaker can\'t really play. It\'s saved as a preset for this speaker, which loads whenever it connects, and its strength can be turned down like any correction.</string>
+    <string name="ui_measure_graph_description" formatted="false">The measured response and the correction, from 20 Hz to 20 kHz</string>
+    <string name="ui_measure_legend_measured" formatted="false">Measured</string>
+    <string name="ui_measure_legend_correction" formatted="false">Correction</string>
+    <string name="ui_measure_use" formatted="false">Use correction</string>
+    <string name="ui_try_again" formatted="false">Try again</string>
+    <string name="ui_measure_preset_name" formatted="false">Room correction: %1$s</string>
+    <string name="ui_measure_failed" formatted="false">The phone wouldn\'t play and record at the same time. Close any app using the microphone and try again.</string>
+    <string name="ui_measure_not_heard" formatted="false">The microphone didn\'t hear the tones. Check that the speaker is playing and turn the volume up, then try again.</string>
+    <string name="ui_measure_too_quiet" formatted="false">The tones were too quiet next to the room\'s noise. Turn the volume up or make the room quieter, then try again.</string>
+    <string name="ui_measure_needs_mic" formatted="false">Measuring needs the microphone. Nothing is recorded or kept: only the level of each tone is read.</string>
+    <string name="help_measure_title" formatted="false">Measure with a microphone</string>
+    <string name="help_measure_body" formatted="false">For a speaker or a car, where the room changes the sound as much as the speaker does. Eigentone plays steady tones from deep bass to high treble and the microphone reads how loud each one arrives where you sit. Three spots are averaged, because one exact spot has dips a step away doesn\'t.\n\nThe correction cuts peaks, which rooms are full of, and lifts dips only a little, since filling a dip mostly costs headroom without being heard. A phone\'s own microphone isn\'t even across the range, so treat the result as a good start rather than a lab measurement. A USB measurement microphone is used when one is plugged in.\n\nNothing is recorded or kept. Only each tone\'s level is read.</string>
     <string name="ui_dynamic" formatted="false">Dynamic</string>
     <string name="ui_dynamic_detail" formatted="false">Also turn this range down when it gets loud</string>
     <string name="ui_dynamic_no_room" formatted="false">Waiting for a free band. The compressor, Clarity and Bass character are using the ones it needs.</string>
