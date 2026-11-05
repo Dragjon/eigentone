@@ -2,6 +2,10 @@
 
 Changes since 0.33.0. Every release is a pre-release on [GitHub](https://github.com/Dragjon/eigentone/releases) until the first official one.
 
+## 0.38.1
+
+- More space between the version and the Bypass button, and the version still shows in full.
+
 ## 0.38.0
 
 - **Refine my EQ.** The device tab can fine-tune your current sound by asking which of two versions you prefer. Each comparison is chosen to teach the most about your taste, a few come back with sides swapped to check your answers hold, and it stops once it's sure. A blind final A/B against your starting sound decides whether to keep the result.

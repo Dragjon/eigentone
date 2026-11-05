@@ -648,13 +648,14 @@ private fun TopBar(
                 }
             }
         }
-        Row(Modifier.tourTarget(TourStop.POWER), verticalAlignment = Alignment.CenterVertically) {
+        // A clear gap so the version never sits against the Bypass button.
+        Row(Modifier.padding(start = 10.dp).tourTarget(TourStop.POWER), verticalAlignment = Alignment.CenterVertically) {
             if (state.enabled) BypassButton(state.bypass)
             Switch(
                 checked = state.enabled,
                 onCheckedChange = onSetEnabled,
                 modifier = Modifier
-                    .padding(start = 8.dp)
+                    .padding(start = 4.dp)
                     .semantics { contentDescription = "Eigentone" },
             )
         }
@@ -670,7 +671,7 @@ private fun TopBar(
     }
 }
 
-private val BypassPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
+private val BypassPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
 
 /** Distinct from the power switch: neutral until engaged, when it's clearly a held state. */
 @Composable

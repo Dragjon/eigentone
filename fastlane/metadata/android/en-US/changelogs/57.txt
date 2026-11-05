@@ -1,0 +1,1 @@
+- More space between the version and the Bypass button
