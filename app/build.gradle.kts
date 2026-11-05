@@ -14,15 +14,15 @@ val keystoreProps = Properties().apply {
 }
 
 android {
-    namespace = "com.phonons.app"
+    namespace = "io.github.dragjon.eigentone"
     compileSdk = 36
 
     defaultConfig {
         applicationId = "io.github.dragjon.eigentone"
         minSdk = 33
         targetSdk = 36
-        versionCode = 51
-        versionName = "0.33.0"
+        versionCode = 52
+        versionName = "0.34.0"
     }
 
     signingConfigs {

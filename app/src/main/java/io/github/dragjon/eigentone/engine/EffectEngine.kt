@@ -1,0 +1,529 @@
+package io.github.dragjon.eigentone.engine
+
+import android.media.AudioFormat
+import android.media.audiofx.DynamicsProcessing
+import android.media.audiofx.EnvironmentalReverb
+import android.media.audiofx.Virtualizer
+import android.util.Log
+import io.github.dragjon.eigentone.data.AppState
+import io.github.dragjon.eigentone.data.Compressor
+import io.github.dragjon.eigentone.data.Dynamics
+import io.github.dragjon.eigentone.data.EngineMode
+import io.github.dragjon.eigentone.data.EngineStatus
+import io.github.dragjon.eigentone.data.GainRamp
+import io.github.dragjon.eigentone.data.Processing
+import io.github.dragjon.eigentone.data.ProcessingTarget
+import io.github.dragjon.eigentone.data.ReverbRoom
+import io.github.dragjon.eigentone.data.Tamers
+import io.github.dragjon.eigentone.dsp.CurveMapper
+import kotlin.math.abs
+
+/**
+ * Drives android.media.audiofx.DynamicsProcessing.
+ *
+ * Global mode attaches to session 0, which is deprecated and varies by device. Per-app mode attaches
+ * to the sessions music players announce, and exists as the fallback. They never run together,
+ * because stacking them would apply the EQ twice.
+ *
+ * Not thread safe: all calls must come from the service's single engine dispatcher.
+ */
+class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
+
+    private class Chain(val dp: DynamicsProcessing, val session: Int, val label: String, bandCount: Int) {
+        var virtualizer: Virtualizer? = null
+        var lastSurround = Double.NaN
+        var lastLimiterThreshold = Double.NaN
+        var lastLimiterSettings: io.github.dragjon.eigentone.data.LimiterSettings? = null
+        val lastGains = FloatArray(bandCount) { Float.NaN }
+        val lastRightGains = FloatArray(bandCount) { Float.NaN }
+        var lastInput = Float.NaN
+        var lastBalance = Double.NaN
+        var lastDynamics: Compressor? = null
+        var lastTamers: Tamers? = null
+        var lastOff: Boolean? = null
+        var moving = false
+        var movingSince = 0L
+        var lastLimiter: Boolean? = null
+        var lastEnabled: Boolean? = null
+        var verified = false
+        var verifiedSeparately = false
+        /** Why the last update failed. Cleared by the next one that works, so a recovery isn't still shown as a problem. */
+        var failure: String? = null
+    }
+
+    private val chains = LinkedHashMap<Int, Chain>()
+
+    /**
+     * Reverbs on the sessions apps have announced. These run beside the EQ whichever route it uses, because
+     * Android only gives a working reverb on one app's session: on session 0 it gets one that hears nothing.
+     */
+    private val reverbs = HashMap<Int, EnvironmentalReverb>()
+    private val reverbSent = HashMap<Int, Pair<ReverbRoom, Short>>()
+    private val reverbRefused = HashSet<Int>()
+    private var reverbRoom = ReverbRoom.OFF
+    private var reverbLevel: Short = 0
+    private val pendingSessions = LinkedHashMap<Int, String>()
+    private var mapper: CurveMapper? = null
+    private var mbcBands: Int? = null
+    private var activeMode: EngineMode? = null
+    private var builtLowLatency: Boolean? = null
+    private var builtMode: EngineMode? = null
+    private var error: String? = null
+    private var spatialError: String? = null
+    private var latest: AppState? = null
+
+    private var rebuilds = 0
+    private var readback: String? = null
+
+    /** Set by the service before [apply]. */
+    var attenuationDb = 0.0
+
+    /** Set by the service before [apply]. Whether the time of day is inside the night mode schedule. */
+    var scheduledNight = false
+
+    /** Set by the service before [apply]. Takes the sound out of the path during the hearing check. */
+    var suspended = false
+
+    /** The phone refused its surround effect, so stereo width stands in until the service next starts. */
+    private var systemSurroundRefused = false
+
+    /** Set by the service before [apply]. Which output is in use, since ear correction belongs to one. */
+    var outputKey = ""
+
+    /** Set by the service before [apply]. Two sounds are being compared, so changes shouldn't blur together. */
+    var comparing = false
+
+    /** Whether the sound is still moving to its target, so [apply] needs calling again shortly. */
+    val settling: Boolean get() = chains.values.any { it.moving }
+
+    fun apply(state: AppState) {
+        latest = state
+        if (builtMode != state.engineMode || builtLowLatency != state.lowLatency) rebuild(state)
+        chains.values.forEach { push(it, state) }
+        reverbRoom = Processing.reverbFor(state, suspended)
+        reverbLevel = ReverbRoom.reverbLevel(state.current.tone.reverbAmount)
+        syncReverbs()
+        publish()
+    }
+
+    /**
+     * Matches the reverbs to the sessions and the chosen room. A session that refuses one isn't retried
+     * until it's announced again, because this runs many times a second during a change.
+     */
+    private fun syncReverbs() {
+        if (reverbRoom == ReverbRoom.OFF) {
+            reverbs.keys.toList().forEach(::releaseReverb)
+            return
+        }
+        for (session in pendingSessions.keys) {
+            if (session in reverbRefused) continue
+            try {
+                val reverb = reverbs[session] ?: EnvironmentalReverb(Int.MAX_VALUE, session).also {
+                    reverbs[session] = it
+                    Log.i(TAG, "Reverb on session $session for ${pendingSessions[session]}: ${it.descriptor.name}")
+                }
+                val wanted = reverbRoom to reverbLevel
+                if (reverbSent[session] != wanted) {
+                    reverb.roomLevel = 0
+                    reverb.roomHFLevel = reverbRoom.roomHfLevel
+                    reverb.decayTime = reverbRoom.decayMs
+                    reverb.decayHFRatio = reverbRoom.decayHfRatio
+                    reverb.diffusion = reverbRoom.diffusion
+                    reverb.density = reverbRoom.density
+                    reverb.reverbLevel = reverbLevel
+                    reverbSent[session] = wanted
+                    Log.i(TAG, "Reverb on session $session: $reverbRoom at level $reverbLevel, reads ${reverb.reverbLevel}")
+                }
+                if (!reverb.enabled) reverb.enabled = true
+            } catch (e: Exception) {
+                Log.w(TAG, "Session $session refused the reverb: ${e.message}")
+                releaseReverb(session)
+                reverbRefused += session
+            }
+        }
+    }
+
+    private fun releaseReverb(session: Int) {
+        reverbSent.remove(session)
+        reverbs.remove(session)?.let { reverb ->
+            runCatching {
+                reverb.enabled = false
+                reverb.release()
+            }
+        }
+    }
+
+    /** A music player opened a session. Remembered even in global mode, so switching works. */
+    fun sessionOpened(session: Int, packageName: String) {
+        if (session <= 0) return
+        pendingSessions[session] = packageName
+        reverbRefused -= session
+        if (activeMode == EngineMode.SESSIONS && session !in chains) attach(session, packageName)
+        latest?.let { state -> chains[session]?.let { push(it, state) } }
+        syncReverbs()
+        publish()
+    }
+
+    fun sessionClosed(session: Int) {
+        pendingSessions.remove(session)
+        releaseReverb(session)
+        reverbRefused -= session
+        if (activeMode == EngineMode.SESSIONS) {
+            chains.remove(session)?.let { releaseChain(it) }
+            // A failure for a session that has since gone is no longer worth showing.
+            error = null
+        }
+        publish()
+    }
+
+    /** Another app took or returned control of an effect, so resend everything. */
+    fun refresh() {
+        chains.values.forEach { chain ->
+            chain.lastGains.fill(Float.NaN)
+            chain.lastRightGains.fill(Float.NaN)
+            chain.lastInput = Float.NaN
+            chain.lastBalance = Double.NaN
+            chain.lastDynamics = null
+            chain.lastTamers = null
+            chain.moving = false
+            chain.lastLimiter = null
+            chain.lastEnabled = null
+            chain.lastLimiterThreshold = Double.NaN
+            chain.lastLimiterSettings = null
+            chain.lastSurround = Double.NaN
+        }
+        latest?.let { apply(it) }
+    }
+
+    /**
+     * Rebuilds the effect if it died, for example when Android's audio server restarted, or retries
+     * global attachment if it failed earlier. Without this, the EQ would silently stay off.
+     */
+    fun watchdog() {
+        val state = latest ?: return
+        val broken = chains.values.any { chain ->
+            runCatching { chain.dp.getPreEqBandByChannelIndex(0, 0) }.isFailure
+        }
+        val shouldBeAttached = activeMode != EngineMode.SESSIONS && chains.isEmpty()
+        if (broken || shouldBeAttached) {
+            Log.w(TAG, "Watchdog rebuilding effect: broken=$broken unattached=$shouldBeAttached")
+            rebuilds++
+            builtMode = null
+            apply(state)
+        }
+    }
+
+    fun release() {
+        reverbs.keys.toList().forEach(::releaseReverb)
+        releaseAll()
+        mapper = null
+        activeMode = null
+        builtMode = null
+        builtLowLatency = null
+        onStatus(EngineStatus())
+    }
+
+    private fun releaseAll() {
+        chains.values.forEach { releaseChain(it) }
+        chains.clear()
+    }
+
+    private fun releaseChain(chain: Chain) {
+        releaseVirtualizer(chain)
+        runCatching {
+            chain.dp.enabled = false
+            chain.dp.release()
+        }
+    }
+
+    private fun rebuild(state: AppState) {
+        releaseAll()
+        error = null
+        builtMode = state.engineMode
+        builtLowLatency = state.lowLatency
+        activeMode = null
+
+        if (state.engineMode != EngineMode.SESSIONS) {
+            if (attach(GLOBAL_SESSION, "All apps")) {
+                activeMode = EngineMode.GLOBAL
+                return
+            }
+            if (state.engineMode == EngineMode.GLOBAL) return
+        }
+        // Per-app mode. Any error from a failed Auto attempt stays visible in status.
+        activeMode = EngineMode.SESSIONS
+        pendingSessions.forEach { (session, name) -> attach(session, name) }
+    }
+
+    /** Tries the finest band count first, because support varies between devices. */
+    private fun attach(session: Int, label: String): Boolean {
+        val lowLatency = builtLowLatency == true
+        val counts = mapper?.let { listOf(it.bandCount) } ?: BAND_COUNTS
+        // Fewer compressor bands costs the tamers, which is far better than losing the whole EQ.
+        val mbcOptions = mbcBands?.let { listOf(it) } ?: listOf(Dynamics.FULL_BANDS, Dynamics.BASIC_BANDS)
+        var failure: Exception? = null
+        for (count in counts) for (mbc in mbcOptions) {
+            try {
+                val config = DynamicsProcessing.Config.Builder(
+                    DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION,
+                    CHANNELS,
+                    /* preEqInUse = */ true, count,
+                    /* mbcInUse = */ true, mbc,
+                    /* postEqInUse = */ false, 0,
+                    /* limiterInUse = */ true,
+                )
+                    .setPreferredFrameDuration(if (lowLatency) FRAME_MS_LOW_LATENCY else FRAME_MS_PRECISE)
+                    .build()
+                val dp = DynamicsProcessing(Int.MAX_VALUE, session, config)
+                dp.setControlStatusListener { _, _ -> refreshRequested?.invoke() }
+                if (mapper?.bandCount != count) mapper = CurveMapper(count)
+                mbcBands = mbc
+                chains[session] = Chain(dp, session, label, count)
+                Log.i(TAG, "Attached to session $session with $count bands and $mbc compressor bands")
+                return true
+            } catch (e: Exception) {
+                Log.w(TAG, "Session $session refused $count bands and $mbc compressor bands: ${e.message}")
+                failure = e
+            }
+        }
+        error = "Could not attach to $label: ${failure?.message ?: "unknown error"}"
+        return false
+    }
+
+    /** Set by the service so a control change hops back onto the engine dispatcher. */
+    var refreshRequested: (() -> Unit)? = null
+
+    /** Sends only what changed, because every parameter is a separate call into the audio system. */
+    private fun push(chain: Chain, state: AppState) {
+        val map = mapper ?: return
+        val dp = chain.dp
+        val allowed = if (systemSurroundRefused) state.copy(useSystemSurround = false) else state
+        val target = Processing.target(
+            if (suspended) allowed.copy(bypass = true, matchBypass = false) else allowed,
+            attenuationDb,
+            scheduledNight,
+            outputKey,
+        )
+        try {
+            val gains = map.gains(target.filters)
+            val rightGains = if (target.rightFilters === target.filters) gains else map.gains(target.rightFilters)
+            // Comparing with Bypass needs a clean switch, and the hearing check needs the EQ gone at once.
+            val off = suspended || state.bypass
+            val instant = suspended || comparing || chain.lastOff != off
+            val step = GainRamp.next(
+                chain.lastGains, chain.lastRightGains, chain.lastInput,
+                gains, rightGains, target.inputDb.toFloat(),
+                instant = instant,
+            )
+            val dynamicsStep = Dynamics.next(chain.lastDynamics, target.dynamics, instant)
+            chain.lastOff = off
+
+            // Each band is a separate call, so a boost could be heard before the level comes down for it.
+            // Lowering first and raising last keeps every moment during the update free of clipping.
+            val started = System.nanoTime()
+            val goingDown = chain.lastInput.isNaN() || step.inputDb < chain.lastInput
+            // Bypass is the plain sound to compare against, so it has no balance either.
+            val balance = if (off) 0.0 else state.balance
+            if (goingDown) pushInput(chain, step.inputDb, balance)
+            pushBands(dp, map, /* channel = */ 0, step.left, chain.lastGains)
+            pushBands(dp, map, /* channel = */ 1, step.right, chain.lastRightGains)
+            if (!goingDown) pushInput(chain, step.inputDb, balance)
+            logMove(chain, step.done && dynamicsStep.done)
+            val tookMs = (System.nanoTime() - started) / 1_000_000
+            if (comparing && tookMs >= LOG_SWITCH_MS) Log.i(TAG, "Compare switch on ${chain.label} took $tookMs ms")
+
+            if (!chain.verified) {
+                chain.verified = true
+                verifyBands(chain, map, gains, rightGains)
+            }
+            // Checked again the first time the channels differ, which a phone could handle differently.
+            if (step.done && !chain.verifiedSeparately && !gains.contentEquals(rightGains)) {
+                chain.verifiedSeparately = true
+                verifyBands(chain, map, gains, rightGains)
+            }
+
+            if (target.limiter != chain.lastLimiter || target.limiterSettings != chain.lastLimiterSettings) {
+                val limiter = target.limiterSettings
+                dp.setLimiterAllChannelsTo(
+                    DynamicsProcessing.Limiter(
+                        true, target.limiter, /* linkGroup = */ 0,
+                        limiter.attackMs.toFloat(), limiter.releaseMs.toFloat(), limiter.ratio.toFloat(),
+                        limiter.thresholdDb.toFloat(), limiter.postGainDb.toFloat(),
+                    ),
+                )
+                chain.lastLimiter = target.limiter
+                chain.lastLimiterThreshold = target.limiterThresholdDb
+                chain.lastLimiterSettings = limiter
+            }
+
+            if (dynamicsStep.compressor != chain.lastDynamics || target.tamers != chain.lastTamers) {
+                pushDynamics(chain, dynamicsStep.compressor, target.tamers, dynamicsStep.done)
+                chain.lastDynamics = dynamicsStep.compressor
+                chain.lastTamers = target.tamers
+            }
+
+            val wanted = target.effectEnabled
+            if (chain.lastEnabled != wanted) {
+                dp.enabled = wanted
+                chain.lastEnabled = wanted
+            }
+            chain.failure = null
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not update ${chain.label}", e)
+            chain.failure = "Lost connection to ${chain.label}: ${e.message}"
+            // Otherwise the settle loop would keep retrying a failing call many times a second.
+            chain.moving = false
+        }
+        pushSurround(chain, target)
+    }
+
+    private fun pushInput(chain: Chain, input: Float, balance: Double) {
+        if (input == chain.lastInput && balance == chain.lastBalance) return
+        chain.dp.setInputGainbyChannel(0, input + Processing.leftTrimDb(balance).toFloat())
+        chain.dp.setInputGainbyChannel(1, input + Processing.rightTrimDb(balance).toFloat())
+        chain.lastInput = input
+        chain.lastBalance = balance
+    }
+
+    /** Timed in the log, because how long a move takes depends on how fast the phone accepts bands. */
+    private fun logMove(chain: Chain, done: Boolean) {
+        if (!done && !chain.moving) chain.movingSince = System.nanoTime()
+        if (done && chain.moving) {
+            Log.i(TAG, "Sound moved on ${chain.label} in ${(System.nanoTime() - chain.movingSince) / 1_000_000} ms")
+        }
+        chain.moving = !done
+    }
+
+    private fun pushBands(dp: DynamicsProcessing, map: CurveMapper, channel: Int, gains: FloatArray, sent: FloatArray) {
+        for (i in gains.indices) {
+            val last = sent[i]
+            if (last.isNaN() || abs(last - gains[i]) >= GAIN_EPSILON) {
+                dp.setPreEqBandByChannelIndex(channel, i, DynamicsProcessing.EqBand(true, map.cutoffs[i], gains[i]))
+                sent[i] = gains[i]
+            }
+        }
+    }
+
+    /** Only exists while in use, so turning surround off fully removes it from the audio path. */
+    private fun pushSurround(chain: Chain, target: ProcessingTarget) {
+        if (target.surround == chain.lastSurround) return
+        chain.lastSurround = target.surround
+        if (target.surround <= 0.0) {
+            releaseVirtualizer(chain)
+            return
+        }
+        try {
+            val virtualizer = chain.virtualizer ?: Virtualizer(Int.MAX_VALUE, chain.session).also {
+                chain.virtualizer = it
+                spatialError = null
+            }
+            virtualizer.setStrength((target.surround * MAX_EFFECT_STRENGTH).toInt().toShort())
+            virtualizer.enabled = true
+            // Automatic mode can leave it inactive on Bluetooth, so ask for headphone processing.
+            val stereo = AudioFormat.CHANNEL_OUT_STEREO
+            val canBinaural = virtualizer.canVirtualize(stereo, Virtualizer.VIRTUALIZATION_MODE_BINAURAL)
+            val forced = virtualizer.forceVirtualizationMode(Virtualizer.VIRTUALIZATION_MODE_BINAURAL)
+            val mode = virtualizer.virtualizationMode
+            Log.i(
+                TAG,
+                "Surround on ${chain.label}: strength=${virtualizer.roundedStrength} canBinaural=$canBinaural " +
+                    "forced=$forced mode=$mode enabled=${virtualizer.enabled} control=${virtualizer.hasControl()}",
+            )
+            // Don't treat mode 0 as failure: on a Galaxy A54 it reads 0 while audibly working.
+        } catch (e: Exception) {
+            Log.w(TAG, "Surround unavailable on ${chain.label}", e)
+            spatialError = "This phone refused its virtual surround, so stereo width is being used instead."
+            releaseVirtualizer(chain)
+            systemSurroundRefused = true
+            latest?.let { push(chain, it) }
+        }
+    }
+
+    private fun releaseVirtualizer(chain: Chain) {
+        chain.virtualizer?.let { v ->
+            runCatching {
+                v.enabled = false
+                v.release()
+            }
+        }
+        chain.virtualizer = null
+    }
+
+    /** Reads bands back once, so a device that silently ignores them shows up as a visible error. */
+    private fun verifyBands(chain: Chain, map: CurveMapper, left: FloatArray, right: FloatArray) {
+        fun wrong(channel: Int, gains: FloatArray) = gains.indices.count { i ->
+            val band = chain.dp.getPreEqBandByChannelIndex(channel, i)
+            abs(band.cutoffFrequency - map.cutoffs[i]) > 1f || abs(band.gain - gains[i]) > 0.1f
+        }
+        val total = left.size + right.size
+        val rejected = wrong(0, left) + wrong(1, right)
+        Log.i(TAG, "Band readback on ${chain.label}: ${total - rejected}/$total match across both channels")
+        readback = "${total - rejected}/$total"
+        if (rejected > 0) error = "${chain.label} did not accept $rejected of $total EQ bands"
+    }
+
+    private fun pushDynamics(chain: Chain, dynamics: Compressor, tamers: Tamers, finished: Boolean) {
+        val slots = mbcBands ?: return
+        val plan = Dynamics.plan(dynamics, tamers, slots)
+        val on = plan.any { it.active }
+        val mbc = DynamicsProcessing.Mbc(true, on, slots)
+        plan.forEachIndexed { i, planned ->
+            val band = planned.band
+            mbc.setBand(
+                i,
+                DynamicsProcessing.MbcBand(
+                    planned.active, planned.cutoffHz.toFloat(), band.attackMs.toFloat(), band.releaseMs.toFloat(),
+                    band.ratio.toFloat(), band.thresholdDb.toFloat(), band.kneeDb.toFloat(),
+                    /* gate */ -90f, /* expander */ 1f, /* pre */ 0f, band.makeupDb.toFloat(),
+                ),
+            )
+        }
+        chain.dp.setMbcAllChannelsTo(mbc)
+        if (on && finished) logDynamics(chain, slots)
+    }
+
+    /** Reads back what the phone kept, so a device that changes these values shows up in the log. */
+    private fun logDynamics(chain: Chain, slots: Int) {
+        val bands = (0 until slots).map { chain.dp.getMbcBandByChannelIndex(1, it) }
+        val summary = bands.joinToString { b ->
+            "${b.cutoffFrequency.toInt()}Hz on=${b.isEnabled} ${b.threshold}dB ${b.ratio}:1 +${b.postGain}dB"
+        }
+        Log.i(TAG, "Compressor on ${chain.label}: $summary")
+    }
+
+    private fun publish() {
+        val control = chains.values.all { runCatching { it.dp.hasControl() }.getOrDefault(false) }
+        onStatus(
+            EngineStatus(
+                running = chains.isNotEmpty() || activeMode == EngineMode.SESSIONS,
+                mode = when (activeMode) {
+                    EngineMode.GLOBAL -> "Global"
+                    EngineMode.SESSIONS -> "Per app"
+                    else -> "Unavailable"
+                },
+                bandCount = mapper?.bandCount ?: 0,
+                hasControl = control,
+                sessions = if (activeMode == EngineMode.SESSIONS) chains.values.map { it.label } else emptyList(),
+                error = chains.values.firstNotNullOfOrNull { it.failure } ?: error,
+                spatialError = spatialError,
+                rebuilds = rebuilds,
+                readback = readback,
+                tamersUnavailable = mbcBands == Dynamics.BASIC_BANDS,
+                announcedApps = pendingSessions.values.distinct(),
+                reverbApps = reverbs.keys.mapNotNull { pendingSessions[it] }.distinct(),
+            ),
+        )
+    }
+
+    companion object {
+        private const val TAG = "EigentoneEngine"
+        private const val GLOBAL_SESSION = 0
+        private const val CHANNELS = 2
+        private const val GAIN_EPSILON = 0.02f
+        private const val FRAME_MS_PRECISE = 20f
+        private const val FRAME_MS_LOW_LATENCY = 10f
+        private const val MAX_EFFECT_STRENGTH = 1000
+        private val BAND_COUNTS = listOf(128, 64, 32, 16)
+        private const val LOG_SWITCH_MS = 5L
+    }
+}

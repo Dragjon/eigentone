@@ -14,7 +14,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Phonons"
+rootProject.name = "Eigentone"
 include(":app")
 // Shelved Studio mode experiment. Uncomment to build it.
 // include(":capturelab")

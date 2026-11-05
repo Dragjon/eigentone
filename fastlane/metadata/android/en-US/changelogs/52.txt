@@ -1,0 +1,4 @@
+- The code now uses the Eigentone name throughout, with the package io.github.dragjon.eigentone
+- After updating, add the Quick Settings tile and home-screen widget again, and grant notification access again if you use per-app presets. Your presets and settings are kept
+- Old share codes from before the name change no longer work. Share the preset again for a new code
+- Report a problem in Settings fits on one line

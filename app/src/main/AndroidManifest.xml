@@ -25,12 +25,12 @@
     </queries>
 
     <application
-        android:name=".PhononsApp"
+        android:name=".EigentoneApp"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Phonons">
+        android:theme="@style/Theme.Eigentone">
 
         <activity
             android:name=".ui.MainActivity"
@@ -63,9 +63,9 @@
         </receiver>
 
         <service
-            android:name=".engine.PhononsTile"
+            android:name=".engine.EigentoneTile"
             android:exported="true"
-            android:icon="@drawable/ic_phonons"
+            android:icon="@drawable/ic_eigentone"
             android:label="@string/app_name"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
@@ -75,7 +75,7 @@
 
         <!-- Inactive unless the user grants access. Only used to learn which app is playing. -->
         <service
-            android:name=".engine.PhononsListener"
+            android:name=".engine.EigentoneListener"
             android:exported="true"
             android:label="@string/media_access_label"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
@@ -85,7 +85,7 @@
         </service>
 
         <receiver
-            android:name=".engine.PhononsWidget"
+            android:name=".engine.EigentoneWidget"
             android:exported="true"
             android:label="@string/app_name">
             <intent-filter>

@@ -101,7 +101,7 @@ Crash reports stay on the phone. You choose whether to share one from the Settin
 Download the APK from [Releases](https://github.com/Dragjon/eigentone/releases), and open it on the phone. Eigentone is a pre-release, and has only been tested on a Galaxy A54 running Android 16. If something goes wrong on your phone, Settings, Troubleshooting has a debug console whose log you can attach to an [issue](https://github.com/Dragjon/eigentone/issues). Or install with USB debugging:
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.33.0.apk
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.34.0.apk
 ```
 
 ## Build
@@ -113,7 +113,7 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 
 The APK is written to `app\build\outputs\apk\release\app-release.apk`.
 
-Back up `phonons-release.jks` and `keystore.properties`. They are excluded from version control, and Android refuses updates signed with a different key, so losing them means uninstalling (and losing presets) to update.
+Back up `eigentone-release.jks` and `keystore.properties`. They are excluded from version control, and Android refuses updates signed with a different key, so losing them means uninstalling (and losing presets) to update.
 
 ## Translating
 
@@ -121,12 +121,16 @@ Most text is in `app/src/main/res/values/strings.xml` and `strings_ui.xml`. To a
 
 ## Layout
 
+Everything lives under `app/src/main/java/io/github/dragjon/eigentone/`:
+
 - `dsp/`: filter maths, the curve-to-band mapping, the AutoEq parser and the shape library. Pure Kotlin with unit tests.
 - `engine/`: the `DynamicsProcessing` wrapper, foreground service, tile, widget, hearing check tones and playing-app detection.
 - `data/`: saved state, presets, undo, share codes and the listening test logic.
 - `ui/`: the Compose interface.
 
-The app was first called Phonons, so the Kotlin package (`com.phonons.app`) and class names still use it. The application ID is `io.github.dragjon.eigentone`.
+The Kotlin package and the application ID are both `io.github.dragjon.eigentone`.
+
+**Updating from 0.33.0 or earlier:** 0.34.0 renames the app's internal classes, so Android forgets a few things tied to the old names. Add the Quick Settings tile and home-screen widget again, grant notification access again if you use per-app presets, and re-pin any preset shortcuts on your home screen. Share codes made before 0.34.0 no longer work, so share the preset again for a new code. Your presets and settings are kept.
 
 ## License
 

@@ -14,11 +14,11 @@ val keystoreProps = Properties().apply {
 // A throwaway experiment to decide whether Studio mode is viable. Separate app id, so it cannot
 // disturb the working equaliser.
 android {
-    namespace = "com.phonons.lab"
+    namespace = "io.github.dragjon.eigentone.lab"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.phonons.lab"
+        applicationId = "io.github.dragjon.eigentone.lab"
         minSdk = 34
         targetSdk = 36
         versionCode = 1
