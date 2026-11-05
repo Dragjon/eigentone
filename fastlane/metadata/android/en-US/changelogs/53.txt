@@ -1,0 +1,4 @@
+- The graphic EQ faders now show the whole sound: picking a preset moves them to its curve, so each fader reads the real dB at its band
+- Moving a fader sets the total level there. Only your difference from the preset is saved, so presets sound exactly as before
+- Reset puts the faders back on the preset's curve
+- Where a preset cuts deeper than a fader reaches, the fader rests at the bottom and the readout shows the real figure

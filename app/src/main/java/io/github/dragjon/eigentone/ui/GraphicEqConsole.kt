@@ -8,6 +8,8 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.runtime.mutableStateOf
 import io.github.dragjon.eigentone.data.FaderView
+import io.github.dragjon.eigentone.data.FaderLayer
+import io.github.dragjon.eigentone.data.Preset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.safeDrawing
@@ -154,10 +156,19 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, o
     }
 
     val appState by Repo.state.collectAsStateWithLifecycle()
+    val base = rememberFaderBase(appState.current, bands)
+    val faders = FaderLayer.shown(base, gains)
     // Remembered because matching older sounds against the whole library is too slow to do on every frame.
-    val shapeLabel = remember(gains, bands, tone.shape, appState.customShapes) {
+    val shapeLabel = remember(gains, bands, tone.shape, appState.customShapes, base, appState.current.name) {
         val yours = appState.customShapes.map { custom -> GraphicShape(custom.name, custom.points.map { it.hz to it.db }) }
-        tone.faderLabel(yours + GraphicEq.shapes + ShapeLibrary.all.map { it.shape })
+        val own = tone.faderLabel(yours + GraphicEq.shapes + ShapeLibrary.all.map { it.shape })
+        val name = appState.current.name
+        when {
+            !FaderLayer.isShaped(base) -> own
+            own == Tone.FLAT_LABEL -> name
+            own == Tone.CUSTOM_LABEL -> "$name, edited"
+            else -> "$name + $own"
+        }
     }
 
     val showFaderOptions = Disclosure.faderOptions(appState)
@@ -220,19 +231,17 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, o
             LandscapeButton(onExpand)
         }
         Faders(
-            gains = gains,
-            saved = savedFaders(appState, presetId, bands),
+            gains = faders,
+            saved = FaderLayer.shown(base, savedFaders(appState, presetId, bands)),
             area = Modifier.tourTarget(TourStop.FADERS),
             smooth = appState.faderMode == FaderMode.SMOOTH,
             scrollable = appState.faderView == FaderView.SCROLL,
-            shown = rememberMorphed(gains.toDoubleArray(), presetId to tone.shape?.name),
+            shown = rememberMorphed(faders.toDoubleArray(), presetId to tone.shape?.name),
             selected = band,
             onSelect = { selected = it },
             // Takes the band count from the faders themselves. A reference to setGains can be remembered
             // across recompositions, which kept the first band count and reset the layout to it.
-            onChange = { new ->
-                Repo.editTone { it.copy(graphicDb = new, graphicBands = new.size, shape = it.shape.takeUnless { GraphicEq.isFlat(new) }) }
-            },
+            onChange = { before, moved -> editFaders(before, moved) },
             onFinished = Repo::commit,
         )
 
@@ -247,10 +256,11 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, o
             }
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(GraphicEq.formatFrequency(freqs[band]), style = MaterialTheme.typography.bodyMedium, color = Palette.Text)
+                val actual = FaderLayer.actual(base, gains, band)
                 Text(
-                    String.format(Locale.US, "%+.1f dB", gains[band]),
+                    formatLevel(actual),
                     style = Readout,
-                    color = if (gains[band] != 0.0) Palette.Lit else Palette.TextDim,
+                    color = if (formatLevel(actual) != formatLevel(0.0)) Palette.Lit else Palette.TextDim,
                 )
             }
             IconButton(enabled = band < bands - 1, onClick = { selected = band + 1 }) {
@@ -258,7 +268,7 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, o
             }
             Spacer(Modifier.weight(0.15f))
             fun nudge(by: Double) {
-                setGains(gains.toMutableList().also { it[band] = GraphicEq.snap(it[band] + by) })
+                editFaders(faders, faders.toMutableList().also { it[band] = GraphicEq.snap(it[band] + by) })
                 Repo.commit()
             }
             FilledTonalIconButton(onClick = { nudge(-STEP_DB) }) {
@@ -380,7 +390,8 @@ private fun Faders(
     shown: DoubleArray,
     selected: Int,
     onSelect: (Int) -> Unit,
-    onChange: (List<Double>) -> Unit,
+    /** The faders before and after a move, in what they show. */
+    onChange: (before: List<Double>, moved: List<Double>) -> Unit,
     onFinished: () -> Unit,
 ) {
     val latest by rememberUpdatedState(gains)
@@ -458,7 +469,7 @@ private fun Faders(
                                 lastTapAt = at
                                 if (double) {
                                     val to = savedGains.getOrElse(band) { 0.0 }
-                                    change(latest.toMutableList().also { if (band in it.indices) it[band] = to })
+                                    change(latest, latest.toMutableList().also { if (band in it.indices) it[band] = to })
                                 }
                                 return double
                             }
@@ -471,7 +482,7 @@ private fun Faders(
                                     var lastBand = bandAt(down.position.x)
                                     var lastDb = dbAt(down.position.y)
                                     select(lastBand)
-                                    change(GraphicEq.drawLine(latest, lastBand, lastDb, lastBand, lastDb))
+                                    change(latest, GraphicEq.drawLine(latest, lastBand, lastDb, lastBand, lastDb))
                                     var moved = false
                                     while (true) {
                                         val pointer = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
@@ -490,7 +501,7 @@ private fun Faders(
                                             val band = bandAt(pointer.position.x)
                                             val db = dbAt(pointer.position.y)
                                             select(band)
-                                            change(GraphicEq.drawLine(latest, lastBand, lastDb, band, db))
+                                            change(latest, GraphicEq.drawLine(latest, lastBand, lastDb, band, db))
                                             lastBand = band
                                             lastDb = db
                                         }
@@ -537,7 +548,7 @@ private fun Faders(
                                         }
                                         if (dragging) {
                                             val db = GraphicEq.snap(startDb - (pointer.position.y - startY) / railHeight * 2 * GraphicEq.MAX_DB)
-                                            change(GraphicEq.drawLine(latest, band, db, band, db))
+                                            change(latest, GraphicEq.drawLine(latest, band, db, band, db))
                                             pointer.consume()
                                         }
                                     }
@@ -763,6 +774,8 @@ fun ExpandedFaders(onClose: () -> Unit) {
     val tone = state.current.tone
     val bands = tone.graphicBands
     val gains = GraphicEq.normalized(tone.graphicDb, bands)
+    val base = rememberFaderBase(state.current, bands)
+    val faders = FaderLayer.shown(base, gains)
     val freqs = GraphicEq.frequencies(bands)
     var selected by rememberSaveable(bands) { mutableIntStateOf(bands / 2) }
     val band = selected.coerceIn(0, bands - 1)
@@ -794,10 +807,11 @@ fun ExpandedFaders(onClose: () -> Unit) {
             }
             Text(GraphicEq.formatFrequency(freqs[band]), style = MaterialTheme.typography.titleMedium, color = Palette.Text)
             Spacer(Modifier.width(12.dp))
+            val actual = FaderLayer.actual(base, gains, band)
             Text(
-                String.format(Locale.US, "%+.1f dB", gains[band]),
+                formatLevel(actual),
                 style = Readout,
-                color = if (gains[band] != 0.0) Palette.Lit else Palette.TextDim,
+                color = if (formatLevel(actual) != formatLevel(0.0)) Palette.Lit else Palette.TextDim,
                 modifier = Modifier.weight(1f),
             )
             UndoRedoButtons()
@@ -813,23 +827,48 @@ fun ExpandedFaders(onClose: () -> Unit) {
             )
         }
         Faders(
-            gains = gains,
-            saved = savedFaders(state, state.current.id, gains.size),
+            gains = faders,
+            saved = FaderLayer.shown(base, savedFaders(state, state.current.id, gains.size)),
             smooth = state.faderMode == FaderMode.SMOOTH,
             scrollable = false,
             area = Modifier
                 .weight(1f)
                 .padding(top = 12.dp, bottom = 8.dp),
             fill = true,
-            shown = rememberMorphed(gains.toDoubleArray(), state.current.id to tone.shape?.name),
+            shown = rememberMorphed(faders.toDoubleArray(), state.current.id to tone.shape?.name),
             selected = band,
             onSelect = { selected = it },
-            onChange = { new ->
-                Repo.editTone { it.copy(graphicDb = new, graphicBands = new.size, shape = it.shape.takeUnless { GraphicEq.isFlat(new) }) }
-            },
+            onChange = { before, moved -> editFaders(before, moved) },
             onFinished = Repo::commit,
         )
     }
 }
+
+/** The preset's own curve under the faders, worked out again only when the preset's sound changes. */
+@Composable
+private fun rememberFaderBase(preset: Preset, bands: Int): List<Double> {
+    val tone = preset.tone
+    return remember(preset.filters, tone.strength, tone.correction, tone.importedCurve, tone.targetId, tone.correctionInfo, bands) {
+        FaderLayer.base(preset, bands)
+    }
+}
+
+/**
+ * Stores a move of the faders, given in what they show, as the change on top of the preset. Reads the
+ * preset fresh, so a gesture that outlives a recomposition still works from the current sound.
+ */
+private fun editFaders(before: List<Double>, moved: List<Double>) {
+    val bands = moved.size
+    val base = FaderLayer.base(Repo.state.value.current, bands)
+    Repo.editTone {
+        val current = GraphicEq.normalized(it.graphicDb, it.graphicBands).let { g ->
+            if (g.size == bands) g else GraphicEq.resample(g, g.size, bands)
+        }
+        val new = FaderLayer.change(base, before, current, moved)
+        it.copy(graphicDb = new, graphicBands = bands, shape = it.shape.takeUnless { GraphicEq.isFlat(new) })
+    }
+}
+
+private fun formatLevel(db: Double) = String.format(Locale.US, "%+.1f dB", db).replace("-0.0", "+0.0")
 private const val DB_GUTTER_DP = 24
 private val LABEL_FREQS = setOf(62.5, 63.0, 250.0, 1000.0, 4000.0, 16000.0)

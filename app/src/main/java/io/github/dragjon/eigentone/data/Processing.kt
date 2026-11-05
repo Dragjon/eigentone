@@ -80,16 +80,25 @@ object Processing {
     private fun sideTrimDb(amount: Double): Double =
         if (amount <= 0) 0.0 else 20 * log10(kotlin.math.max(1.0 - amount, MIN_SIDE_LEVEL))
 
-    /** Everything a preset contributes: its filters and its tone adjustments. */
-    fun presetFilters(preset: Preset): List<Filter> {
+    /**
+     * The preset's own sound, which the faders sit on: its filters, an imported curve and a headphone
+     * target, at the preset's strength. Not the faders or the tone controls, which are changes on top.
+     */
+    fun fixedFilters(preset: Preset): List<Filter> {
         val tone = preset.tone
-        val scale = tone.strength
-        val filterScale = scale * tone.correction
+        val filterScale = tone.strength * tone.correction
         return preset.filters.map { filter ->
             if (filterScale != 1.0 && filter.type.hasGain) filter.copy(gainDb = filter.gainDb * filterScale) else filter
         }.filterNot { tone.correction == 0.0 && !it.type.hasGain } +
             curveFilter(IMPORTED_CURVE_ID, tone.importedCurve, filterScale) +
-            curveFilter(TARGET_CURVE_ID, HeadphoneTargets.change(HeadphoneTarget.of(tone.targetId), tone.correctionInfo), filterScale) +
+            curveFilter(TARGET_CURVE_ID, HeadphoneTargets.change(HeadphoneTarget.of(tone.targetId), tone.correctionInfo), filterScale)
+    }
+
+    /** Everything a preset contributes: its filters and its tone adjustments. */
+    fun presetFilters(preset: Preset): List<Filter> {
+        val tone = preset.tone
+        val scale = tone.strength
+        return fixedFilters(preset) +
             GraphicEq.filters(
                 GraphicEq.normalized(tone.graphicDb, tone.graphicBands).map { it * scale },
                 tone.graphicBands,

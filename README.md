@@ -68,7 +68,7 @@ Where Wavelet is ahead: it's on Google Play, it has years of testing across mill
 
 ## Features
 
-- **Graphic EQ** with 10, 15 or 31 faders. Drag them or draw a curve with one sweep.
+- **Graphic EQ** with 10, 15 or 31 faders. Drag them or draw a curve with one sweep. The faders show the whole sound, the preset's own curve plus your change, so each one reads the real dB at its band.
 - **Parametric EQ** with up to 20 filters.
 - **Shape library** of 350 curves, searchable by genre, instrument, situation or problem. Some are worked out from published research, and say so. Hear each on your music before keeping it, and layer them.
 - **Headphone targets**: move a measured correction to Harman, more or less bass, no bass lift, or the diffuse-field reference, worked out from what that correction actually aims for.
@@ -108,7 +108,7 @@ Crash reports stay on the phone. You choose whether to share one from the Settin
 Download the APK from [Releases](https://github.com/Dragjon/eigentone/releases), and open it on the phone. Eigentone is a pre-release, and has only been tested on a Galaxy A54 running Android 16. If something goes wrong on your phone, Settings, Troubleshooting has a debug console whose log you can attach to an [issue](https://github.com/Dragjon/eigentone/issues). Or install with USB debugging:
 
 ```powershell
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.34.0.apk
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.35.0.apk
 ```
 
 ## Build
