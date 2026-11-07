@@ -60,16 +60,16 @@ data class ThemeColors(
 
 /** Warm graphite, where amber means one thing: lit or active, like a glowing meter. */
 val DarkColors = ThemeColors(
-    background = Color(0xFF16140F),
-    bar = Color(0xFF0D0C09),
+    background = Color(0xFF13110D),
+    bar = Color(0xFF0B0A07),
     strip = Color(0xFF174035),
     stripDim = Color(0xFFBFD3C9),
     stripText = Color(0xFFEEEEEA),
     stripOn = Color(0xFFFFC24A),
     stripDanger = Color(0xFFFF9A5C),
     stripPanel = Color(0xFF1F4B3F),
-    surface = Color(0xFF211E18),
-    surfaceHigh = Color(0xFF2F2B23),
+    surface = Color(0xFF24201A),
+    surfaceHigh = Color(0xFF332E25),
     tooltip = Color(0xFF38332A),
     line = Color(0xFF36322A),
     outline = Color(0xFF958D7E),
@@ -85,30 +85,31 @@ val DarkColors = ThemeColors(
 )
 
 /**
- * The same instrument in daylight: a warm putty faceplate. Amber can't be read on a light page, so lit
- * controls are a deep burnt amber carrying cream legends. The strip's green stays, and the ear colours
- * deepen so they read as ink on a chart, as an audiogram does on paper.
+ * The same instrument in daylight: white panels on a warm paper page, with ink-dark text, so nothing looks
+ * faded in sunlight. Amber can't glow on a light page, so lit controls are a deep amber carrying cream legends.
+ * The strip becomes a soft orange band with dark legends, in the same family as the amber keys, so it
+ * stands out as the status window without a dark slab across a light screen, and the ear colours deepen so they read as ink on a chart, as an audiogram does on paper.
  */
 val LightColors = ThemeColors(
-    background = Color(0xFFEDE7DA),
-    bar = Color(0xFFDED6C5),
-    strip = DarkColors.strip,
-    stripDim = DarkColors.stripDim,
-    stripText = DarkColors.stripText,
-    stripOn = DarkColors.stripOn,
-    stripDanger = DarkColors.stripDanger,
-    stripPanel = DarkColors.stripPanel,
-    surface = Color(0xFFF8F3E8),
-    surfaceHigh = Color(0xFFE6DDCB),
-    tooltip = Color(0xFFFFFDF7),
-    line = Color(0xFFDAD1BF),
-    outline = Color(0xFF7A7160),
-    track = Color(0xFF857B67),
-    text = Color(0xFF1D1A14),
-    textDim = Color(0xFF574F42),
-    lit = Color(0xFF8A4F00),
-    litPressed = Color(0xFF6E3F00),
-    onLit = Color(0xFFFFF4DC),
+    background = Color(0xFFF3F0E8),
+    bar = Color(0xFFE6E1D5),
+    strip = Color(0xFFFBC48A),
+    stripDim = Color(0xFF5C4530),
+    stripText = Color(0xFF1E1208),
+    stripOn = Color(0xFF7A3A00),
+    stripDanger = Color(0xFF7A1400),
+    stripPanel = Color(0xFFF6B577),
+    surface = Color(0xFFFFFFFF),
+    surfaceHigh = Color(0xFFECE7DC),
+    tooltip = Color(0xFFFFFDF8),
+    line = Color(0xFFE2DCCF),
+    outline = Color(0xFF766D5C),
+    track = Color(0xFF837965),
+    text = Color(0xFF17140E),
+    textDim = Color(0xFF514A3E),
+    lit = Color(0xFF925000),
+    litPressed = Color(0xFF7A4300),
+    onLit = Color(0xFFFFF6E5),
     danger = Color(0xFF8F3F00),
     leftEar = Color(0xFF0A5FAD),
     rightEar = Color(0xFFC4231A),
@@ -143,6 +144,12 @@ object Palette {
     val Danger get() = colors.danger
     val LeftEar get() = colors.leftEar
     val RightEar get() = colors.rightEar
+
+    /**
+     * The light a lit control gives off: amber on the dark faceplate. Nothing in daylight, where a lit
+     * control is dark ink and couldn't glow.
+     */
+    val Glow get() = if (colors == DarkColors) colors.lit else Color.Transparent
 }
 
 private val DarkScheme = darkColorScheme(

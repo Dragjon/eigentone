@@ -20,8 +20,12 @@ class SpectrumAnalyser(
     private var last = FloatArray(BAND_COUNT)
 
     /** Returns false if this phone refused to provide the analyser. */
-    fun start(): Boolean = try {
-        val v = Visualizer(0)
+    fun start(): Boolean {
+        // A second start, or one that fails partway, must not leave a Visualizer that nothing can release.
+        stop()
+        var created: Visualizer? = null
+        return try {
+        val v = Visualizer(0).also { created = it }
         v.enabled = false
         v.captureSize = Visualizer.getCaptureSizeRange()[1].coerceAtMost(MAX_CAPTURE)
         v.scalingMode = Visualizer.SCALING_MODE_NORMALIZED
@@ -51,8 +55,10 @@ class SpectrumAnalyser(
         true
     } catch (e: Exception) {
         Log.w(TAG, "Analyser unavailable", e)
+        if (visualizer == null) runCatching { created?.release() }
         stop()
         false
+    }
     }
 
     fun stop() {

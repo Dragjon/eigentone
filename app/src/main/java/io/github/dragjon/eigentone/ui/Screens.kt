@@ -2,6 +2,10 @@ package io.github.dragjon.eigentone.ui
 
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Animatable
@@ -100,7 +104,17 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import io.github.dragjon.eigentone.data.PresetOrganiser
 import io.github.dragjon.eigentone.engine.PresetShortcuts
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -163,6 +177,8 @@ import io.github.dragjon.eigentone.data.OutputKind
 import io.github.dragjon.eigentone.data.OutputLevel
 import androidx.compose.animation.togetherWith
 import kotlin.math.log10
+import kotlin.math.roundToInt
+import androidx.compose.runtime.mutableIntStateOf
 import kotlin.math.pow
 
 private enum class Tab(@StringRes val label: Int, @DrawableRes val icon: Int) {
@@ -198,6 +214,9 @@ private const val MAX_BACKUP_BYTES = 1024 * 1024
 /** Brief feedback for actions, shown by the screen's snackbar. */
 private val LocalSnackbar = compositionLocalOf<SnackbarHostState> { error("No snackbar host") }
 
+/** Messages run on the app's scope, so one shown by a bar that then goes away, such as Undo after Discard, stays. */
+private val LocalSnackScope = compositionLocalOf<CoroutineScope> { error("No snackbar scope") }
+
 /** Opens the guided listening test from anywhere in the main screens. */
 private val LocalOpenFinder = compositionLocalOf<() -> Unit> { error("No finder") }
 
@@ -206,9 +225,9 @@ private val LocalOpenHearing = compositionLocalOf<() -> Unit> { error("No hearin
 private val LocalOpenRefine = compositionLocalOf<() -> Unit> { error("No refine") }
 
 private const val SEARCH_FROM_PRESETS = 6
-private const val TAB_FADE_MS = 140
+private const val TAB_SLIDE_MS = 260
 private const val OPEN_MS = 1500
-/** When, as a share of the opening, the app starts to unfold out of the line. */
+/** When, as a share of the opening, the app starts to fade in behind the line. */
 private const val OPEN_UNFOLD_AT = 0.52f
 private const val OPEN_BARS = 41
 
@@ -218,7 +237,7 @@ private fun phase(progress: Float, start: Float, end: Float) = ((progress - star
 /**
  * The power-on drawn over the app as it opens: the lit line, two pulses ringing out from its middle, and a
  * spectrum that bursts out of the line from the centre outward, moves like live sound, then settles back
- * into the line, edges first, as the app unfolds.
+ * into the line, edges first, as the app fades in.
  */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPowerOn(p: Float) {
     val centre = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
@@ -326,52 +345,100 @@ fun EigentoneApp(onSetEnabled: (Boolean) -> Unit) {
     var consoleOpen by rememberSaveable { mutableStateOf(false) }
     var expandingFaders by rememberSaveable { mutableStateOf(false) }
 
-    if (expandingFaders) {
-        ExpandedFaders(onClose = { expandingFaders = false })
-        return
+    // Which full screen is open over the app, if any. Each slides in from the right and back out the way it came.
+    val screen = when {
+        expandingFaders -> Overlay.FADERS
+        findingPeaks -> Overlay.PEAKS
+        consoleOpen -> Overlay.CONSOLE
+        sweeping -> Overlay.SWEEP
+        comparing -> Overlay.COMPARE
+        checkingHearing -> Overlay.HEARING
+        finding -> Overlay.FINDER
+        refining -> Overlay.REFINE
+        browsingShapes -> Overlay.SHAPES
+        // After the tools above, so Find your sound opens over the welcome and returns to it.
+        !state.welcomeDone -> Overlay.WELCOME
+        else -> null
     }
+    AnimatedContent(
+        targetState = screen,
+        transitionSpec = {
+            // The landscape faders turn the phone, which a slide would only make look broken.
+            if (initialState == Overlay.FADERS || targetState == Overlay.FADERS) {
+                EnterTransition.None togetherWith ExitTransition.None
+            } else if (targetState != null && initialState == null || targetState == Overlay.WELCOME) {
+                (slideInHorizontally(screenSlide()) { it } + fadeIn(screenFade())) togetherWith
+                    (slideOutHorizontally(screenSlide()) { -it / 4 } + fadeOut(screenFade()))
+            } else {
+                (slideInHorizontally(screenSlide()) { -it / 4 } + fadeIn(screenFade())) togetherWith
+                    (slideOutHorizontally(screenSlide()) { it } + fadeOut(screenFade()))
+            }
+        },
+        label = "screen",
+    ) { shown ->
+    when (shown) {
+        Overlay.FADERS -> ExpandedFaders(onClose = { expandingFaders = false })
+        Overlay.PEAKS -> PeakFinderScreen(onClose = { findingPeaks = false })
+        Overlay.CONSOLE -> DebugConsoleScreen(onClose = { consoleOpen = false })
+        Overlay.SWEEP -> SweepScreen(onClose = { sweeping = false })
+        Overlay.COMPARE -> CompareScreen(onSetEnabled = onSetEnabled, onClose = { comparing = false })
+        Overlay.HEARING -> HearingScreen(onClose = { checkingHearing = false })
+        Overlay.FINDER -> FinderScreen(onSetEnabled = onSetEnabled, onClose = { finding = false })
+        Overlay.REFINE -> RefineScreen(onSetEnabled = onSetEnabled, onClose = { refining = false })
+        Overlay.SHAPES -> ShapeBrowser(onClose = { browsingShapes = false })
+        Overlay.WELCOME -> WelcomeScreen(onSetEnabled = onSetEnabled, onFindSound = { finding = true })
+        null -> AppScreen(state, status, tab, { tab = it }, beforeSettings, { beforeSettings = it }, scrolls, tabScope, toggleSettings, snackbar, onSetEnabled,
+            open = OverlayOpeners(
+                finder = { finding = true },
+                refine = { refining = true },
+                shapes = { browsingShapes = true },
+                hearing = { checkingHearing = true },
+                compare = { comparing = true },
+                sweep = { sweeping = true },
+                peaks = { findingPeaks = true },
+                console = { consoleOpen = true },
+                faders = { expandingFaders = true },
+            ),
+        )
+    }
+    }
+}
 
-    if (findingPeaks) {
-        PeakFinderScreen(onClose = { findingPeaks = false })
-        return
-    }
-    if (consoleOpen) {
-        DebugConsoleScreen(onClose = { consoleOpen = false })
-        return
-    }
+private enum class Overlay { FADERS, PEAKS, CONSOLE, SWEEP, COMPARE, HEARING, FINDER, REFINE, SHAPES, WELCOME }
 
-    if (sweeping) {
-        SweepScreen(onClose = { sweeping = false })
-        return
-    }
+/** Opens each full screen; passed down, since the screens are chosen above the app's own content. */
+private class OverlayOpeners(
+    val finder: () -> Unit,
+    val refine: () -> Unit,
+    val shapes: () -> Unit,
+    val hearing: () -> Unit,
+    val compare: () -> Unit,
+    val sweep: () -> Unit,
+    val peaks: () -> Unit,
+    val console: () -> Unit,
+    val faders: () -> Unit,
+)
 
-    if (comparing) {
-        CompareScreen(onClose = { comparing = false })
-        return
-    }
+private fun <T> screenSlide() = tween<T>(SCREEN_MS, easing = FastOutSlowInEasing)
+private fun <T> screenFade() = tween<T>(SCREEN_MS)
+private const val SCREEN_MS = 300
 
-    if (checkingHearing) {
-        HearingScreen(onClose = { checkingHearing = false })
-        return
-    }
-
-    if (finding) {
-        FinderScreen(onSetEnabled = onSetEnabled, onClose = { finding = false })
-        return
-    }
-    if (refining) {
-        RefineScreen(onSetEnabled = onSetEnabled, onClose = { refining = false })
-        return
-    }
-    if (browsingShapes) {
-        ShapeBrowser(onClose = { browsingShapes = false })
-        return
-    }
-    // After the tools above, so Find your sound opens over the welcome and returns to it.
-    if (!state.welcomeDone) {
-        WelcomeScreen(onSetEnabled = onSetEnabled, onFindSound = { finding = true })
-        return
-    }
+/** The app itself: the bars, the strip, and the tab that's open. */
+@Composable
+private fun AppScreen(
+    state: AppState,
+    status: EngineStatus,
+    tab: Tab,
+    setTab: (Tab) -> Unit,
+    beforeSettings: Tab,
+    setBeforeSettings: (Tab) -> Unit,
+    scrolls: Map<Tab, ScrollState>,
+    tabScope: CoroutineScope,
+    toggleSettings: () -> Unit,
+    snackbar: SnackbarHostState,
+    onSetEnabled: (Boolean) -> Unit,
+    open: OverlayOpeners,
+) {
 
     // The tour runs on the Equaliser tab, scrolled so the control it points at is in view.
     val tourStop = Tour.stop
@@ -379,7 +446,7 @@ fun EigentoneApp(onSetEnabled: (Boolean) -> Unit) {
     val navRoom = with(LocalDensity.current) { 140.dp.toPx() }
     LaunchedEffect(tourStop) {
         if (tourStop == null) return@LaunchedEffect
-        if (tab != Tab.EQ) tab = Tab.EQ
+        if (tab != Tab.EQ) setTab(Tab.EQ)
         when (tourStop) {
             TourStop.FADERS -> {
                 kotlinx.coroutines.delay(60)
@@ -393,7 +460,7 @@ fun EigentoneApp(onSetEnabled: (Boolean) -> Unit) {
     }
 
     // Straight after the welcome, the app powers on out of the lit line it closed into: a pulse rings out,
-    // a spectrum bursts from the line, and the app unfolds as the bars settle back into it.
+    // a spectrum bursts from the line, and the app fades in as the bars settle back into it.
     val opening = remember { Animatable(if (openingFromWelcome.value) 0f else 1f) }
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     LaunchedEffect(Unit) {
@@ -408,9 +475,19 @@ fun EigentoneApp(onSetEnabled: (Boolean) -> Unit) {
             if (!Repo.state.value.tourSeen) Tour.start()
         }
     }
+    // Back, or a tap anywhere outside the strip, closes its drawer. The tap still does what it was for,
+    // such as switching tab, so closing the drawer never costs an extra tap.
+    androidx.activity.compose.BackHandler(enabled = StripDrawer.open) { StripDrawer.open = false }
     Box(
         Modifier
             .fillMaxSize()
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    if (!StripDrawer.open || StripDrawer.bounds.contains(down.position)) return@awaitEachGesture
+                    StripDrawer.open = false
+                }
+            }
             .drawWithContent {
                 val p = opening.value
                 if (p >= 1f) {
@@ -423,26 +500,39 @@ fun EigentoneApp(onSetEnabled: (Boolean) -> Unit) {
             }
             .graphicsLayer {
                 val unfold = phase(opening.value, OPEN_UNFOLD_AT, 1f)
-                // Opens quickly and settles gently.
-                val eased = 1f - (1f - unfold) * (1f - unfold) * (1f - unfold)
-                scaleY = 0.006f + 0.994f * eased
-                alpha = (unfold * 3f).coerceIn(0f, 1f)
+                // The app fades up in place as the line and bars die away, quickly at first and settling gently.
+                alpha = 1f - (1f - unfold) * (1f - unfold) * (1f - unfold)
             },
     ) {
     CompositionLocalProvider(
         LocalSnackbar provides snackbar,
-        LocalOpenFinder provides { finding = true },
-        LocalOpenRefine provides { refining = true },
-        LocalOpenShapes provides { browsingShapes = true },
-        LocalOpenHearing provides { checkingHearing = true },
-        LocalOpenCompare provides { comparing = true },
-        LocalOpenSweep provides { sweeping = true },
-        LocalOpenPeaks provides { findingPeaks = true },
-        LocalOpenConsole provides { consoleOpen = true },
-        LocalOpenFaders provides { expandingFaders = true },
+        LocalSnackScope provides tabScope,
+        LocalOpenFinder provides open.finder,
+        LocalOpenRefine provides open.refine,
+        LocalOpenShapes provides open.shapes,
+        LocalOpenHearing provides open.hearing,
+        LocalOpenCompare provides open.compare,
+        LocalOpenSweep provides open.sweep,
+        LocalOpenPeaks provides open.peaks,
+        LocalOpenConsole provides open.console,
+        LocalOpenFaders provides open.faders,
         LocalOpenPresets provides {
             tabScope.launch { scrolls.getValue(Tab.PRESETS).scrollTo(0) }
-            tab = Tab.PRESETS
+            setTab(Tab.PRESETS)
+        },
+        // A row in the strip's drawer goes to the tab and section where that effect is set.
+        LocalOpenEffect provides { name ->
+            val (target, section) = when (name) {
+                "Night", "Level" -> Tab.SYSTEM to R.string.ui_dynamics
+                "Surround" -> Tab.SYSTEM to R.string.ui_stereo
+                "Ears" -> Tab.HEADPHONES to R.string.ui_your_ears
+                "Comp" -> Tab.SOUND to R.string.ui_compressor
+                "Tame" -> Tab.SOUND to R.string.ui_dynamic_eq
+                else -> Tab.SOUND to R.string.ui_space
+            }
+            if (target == Tab.SYSTEM && tab != Tab.SYSTEM) setBeforeSettings(tab)
+            setTab(target)
+            SectionFocus.request = appText(section)
         },
     ) {
         Scaffold(
@@ -469,21 +559,31 @@ fun EigentoneApp(onSetEnabled: (Boolean) -> Unit) {
                                 tabScope.launch { scrolls.getValue(t).animateScrollTo(0) }
                             } else {
                                 tabScope.launch { scrolls.getValue(t).scrollTo(0) }
-                                tab = t
+                                setTab(t)
                             }
                         }
                     }
                 }
             },
         ) { padding ->
-            androidx.activity.compose.BackHandler(enabled = tab == Tab.SYSTEM) { tab = beforeSettings }
+            androidx.activity.compose.BackHandler(enabled = tab == Tab.SYSTEM) { setTab(beforeSettings) }
             Box(
                 Modifier
                     .fillMaxSize()
                     .padding(padding),
                 contentAlignment = Alignment.TopCenter,
             ) {
-                Crossfade(targetState = tab, animationSpec = tween(TAB_FADE_MS), label = "tab") { shownTab ->
+                // Tabs slide towards where they sit in the bar, so moving right slides the page left, and back.
+                AnimatedContent(
+                    targetState = tab,
+                    transitionSpec = {
+                        val forward = targetState.ordinal > initialState.ordinal
+                        val sign = if (forward) 1 else -1
+                        (slideInHorizontally(tween(TAB_SLIDE_MS, easing = FastOutSlowInEasing)) { sign * it / 3 } + fadeIn(tween(TAB_SLIDE_MS))) togetherWith
+                            (slideOutHorizontally(tween(TAB_SLIDE_MS, easing = FastOutSlowInEasing)) { -sign * it / 3 } + fadeOut(tween(TAB_SLIDE_MS / 2)))
+                    },
+                    label = "tab",
+                ) { shownTab ->
                     // The whole width scrolls, so the space beside the page works too, as on a tablet or in landscape.
                     Box(
                         Modifier
@@ -512,15 +612,24 @@ fun EigentoneApp(onSetEnabled: (Boolean) -> Unit) {
                 // Floats over the page rather than sitting in it, so appearing can never move anything,
                 // such as a fader under a finger that's still dragging it.
                 val savedVersion = Repo.allPresets(state).firstOrNull { it.id == state.current.id }
-                if (savedVersion != null && savedVersion != state.current) {
-                    UnsavedBar(
-                        state,
-                        savedVersion,
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .widthIn(max = 640.dp)
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                    )
+                // Shown as an example while the tour explains it, so that stop has something to point at.
+                val touring = Tour.stop == TourStop.SAVE
+                val unsaved = (savedVersion != null && savedVersion != state.current) || touring
+                // Kept while the bar slides away, so it leaves showing what it said rather than going blank.
+                var lastSaved by remember { mutableStateOf(savedVersion) }
+                if (unsaved) lastSaved = savedVersion ?: state.current
+                // Rises from the bottom when there's something to save, and sinks back the same way.
+                AnimatedVisibility(
+                    visible = unsaved,
+                    enter = slideInVertically(tween(SCREEN_MS, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(SCREEN_MS)),
+                    exit = slideOutVertically(tween(SCREEN_MS, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(SCREEN_MS)),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .widthIn(max = 640.dp)
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .tourTarget(TourStop.SAVE),
+                ) {
+                    lastSaved?.let { UnsavedBar(state, it) }
                 }
             }
         }
@@ -599,7 +708,7 @@ private fun TopBar(
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+            .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val connectedNames = rememberConnectedOutputNames()
@@ -611,6 +720,7 @@ private fun TopBar(
             problem = state.enabled && (status.error != null || !status.hasControl),
             presets = quickPresets,
             currentId = state.current.id,
+            favorites = state.favorites,
             onPick = Repo::loadPreset,
             onAll = LocalOpenPresets.current,
             modifier = Modifier
@@ -648,22 +758,30 @@ private fun TopBar(
                 }
             }
         }
-        // A clear gap so the version never sits against the Bypass button.
-        Row(Modifier.padding(start = 10.dp).tourTarget(TourStop.POWER), verticalAlignment = Alignment.CenterVertically) {
+        // Even gaps: version, Bypass, switch and settings sit 12 dp apart (the settings icon carries its own 12 dp).
+        Row(Modifier.padding(start = 12.dp).tourTarget(TourStop.POWER), verticalAlignment = Alignment.CenterVertically) {
             if (state.enabled) BypassButton(state.bypass)
+            val view = androidx.compose.ui.platform.LocalView.current
             Switch(
                 checked = state.enabled,
-                onCheckedChange = onSetEnabled,
+                // Felt as well as seen, since it's the switch that matters most.
+                onCheckedChange = { on ->
+                    Haptics.toggle(view, on)
+                    onSetEnabled(on)
+                },
                 modifier = Modifier
-                    .padding(start = 4.dp)
+                    .litGlow(state.enabled && !state.bypass)
+                    .padding(start = 12.dp)
                     .semantics { contentDescription = "Eigentone" },
             )
         }
-        IconButton(onClick = onSettings, modifier = Modifier.tourTarget(TourStop.SETTINGS)) {
+        IconButton(onClick = onSettings) {
             Icon(
                 Icons.Outlined.Settings,
                 contentDescription = stringResource(R.string.ui_tab_system),
                 tint = if (settingsOpen) Palette.Lit else Palette.TextDim,
+                // The tour outlines the gear itself rather than its whole touch area, which would reach the switch.
+                modifier = Modifier.tourTarget(TourStop.SETTINGS),
             )
         }
     }
@@ -676,7 +794,11 @@ private val BypassPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
 /** Distinct from the power switch: neutral until engaged, when it's clearly a held state. */
 @Composable
 private fun BypassButton(bypassed: Boolean) {
-    val toggle = { Repo.update { it.copy(bypass = !it.bypass) } }
+    val view = androidx.compose.ui.platform.LocalView.current
+    val toggle = {
+        Haptics.toggle(view, !bypassed)
+        Repo.update { it.copy(bypass = !it.bypass) }
+    }
     // Both words are laid out and only one shows, so the button keeps one width and nothing beside it moves.
     val label: @Composable () -> Unit = {
         Box(contentAlignment = Alignment.Center) {
@@ -693,7 +815,12 @@ private fun BypassButton(bypassed: Boolean) {
 
 private fun statusLine(state: AppState, status: EngineStatus): String {
     val saved = Repo.allPresets(state).firstOrNull { it.id == state.current.id }
-    val name = if (saved == state.current) state.current.name else appText(R.string.ui_edited, state.current.name)
+    // A preset deleted while in use isn't "edited": there's nothing left to compare it with.
+    val name = when (saved) {
+        null -> appText(R.string.ui_not_saved, state.current.name)
+        state.current -> state.current.name
+        else -> appText(R.string.ui_edited, state.current.name)
+    }
     return when {
         !state.enabled -> appText(R.string.ui_mode_off)
         status.error != null -> appText(R.string.ui_problem_see_the_system_tab)
@@ -715,6 +842,8 @@ private fun EqTab(state: AppState) {
     LaunchedEffect(selected?.id) { if (selected?.id != selectedId) selectedId = selected?.id }
     val showParametric = Disclosure.parametric(state)
     val inGraphic = graphicMode || !showParametric
+    // The graph grows for parametric editing and shrinks back above the faders, rather than jumping.
+    val graphHeight = androidx.compose.animation.core.animateDpAsState(if (inGraphic) 170.dp else 260.dp, tween(TAB_SLIDE_MS, easing = FastOutSlowInEasing), label = "graphHeight")
     val attenuation by Repo.attenuationDb.collectAsStateWithLifecycle()
     val curveFilters = remember(state, attenuation, Repo.output.value.key) { Processing.effectiveFilters(state, attenuation, Repo.output.value.key) }
     val graphOutput by Repo.output.collectAsStateWithLifecycle()
@@ -778,7 +907,7 @@ private fun EqTab(state: AppState) {
             legendInsetDp = if (state.analyser) SPECTRUM_INFO_INSET_DP else 0,
             // Graphic mode has its own faders, so the parametric nodes would only get in the way.
             filters = if (inGraphic) emptyList() else filters,
-            heightDp = if (inGraphic) 170 else 260,
+            heightDp = graphHeight.value.value.toInt(),
             curveFilters = earCurves?.first ?: curveFilters,
             rightCurveFilters = earCurves?.second,
             ghostFilters = savedCurve,
@@ -844,9 +973,22 @@ private fun EqTab(state: AppState) {
         if (showParametric) InfoButton(Help.eqMode)
     }
 
-    if (inGraphic) {
+    // The faders and the filter list swap with a slide that follows the switch above: Graphic is on the
+    // left, so it comes in from the left, and Parametric from the right.
+    AnimatedContent(
+        targetState = inGraphic,
+        transitionSpec = {
+            val sign = if (targetState) -1 else 1
+            (slideInHorizontally(tween(TAB_SLIDE_MS, easing = FastOutSlowInEasing)) { sign * it / 4 } + fadeIn(tween(TAB_SLIDE_MS))) togetherWith
+                (slideOutHorizontally(tween(TAB_SLIDE_MS, easing = FastOutSlowInEasing)) { -sign * it / 4 } + fadeOut(tween(TAB_SLIDE_MS / 2))) using
+                androidx.compose.animation.SizeTransform(clip = false)
+        },
+        label = "eqMode",
+    ) { graphic ->
+    Column(verticalArrangement = SectionSpacing) {
+    if (graphic) {
         GraphicEqConsole(state.current.tone, state.current.id, onBrowseShapes = LocalOpenShapes.current, onExpand = LocalOpenFaders.current)
-        return
+        return@Column
     }
 
     Row(
@@ -857,8 +999,12 @@ private fun EqTab(state: AppState) {
         FilledTonalButton(
             enabled = filters.size < MAX_FILTERS,
             onClick = {
-                val id = (filters.maxOfOrNull { it.id } ?: 0) + 1
-                Repo.edit { it.copy(filters = it.filters + Filter(id)) }
+                // The id comes from the filters at the moment of adding, so two quick taps can't share one.
+                var id = 0
+                Repo.edit { p ->
+                    id = (p.filters.maxOfOrNull { it.id } ?: 0) + 1
+                    p.copy(filters = p.filters + Filter(id))
+                }
                 Repo.commit()
                 selectedId = id
             },
@@ -879,23 +1025,58 @@ private fun EqTab(state: AppState) {
             style = MaterialTheme.typography.bodyMedium,
         )
     } else {
+        val snackbar = LocalSnackbar.current
+        val snackScope = LocalSnackScope.current
+        val undoLabel = stringResource(R.string.ui_undo)
+        val filterDeleted = stringResource(R.string.ui_filter_deleted)
         val dynamicPlaced = remember(state) {
             val target = Processing.target(state.copy(bypass = false), 0.0)
             io.github.dragjon.eigentone.data.Dynamics.placedIds(target.dynamics, target.tamers)
         }
+        // Moving to another filter slides its editor in from the side it sits on, by its place in the list.
+        AnimatedContent(
+            targetState = selected.id,
+            transitionSpec = {
+                val forward = filters.indexOfFirst { it.id == targetState } >= filters.indexOfFirst { it.id == initialState }
+                val sign = if (forward) 1 else -1
+                (slideInHorizontally(tween(TAB_SLIDE_MS, easing = FastOutSlowInEasing)) { sign * it / 5 } + fadeIn(tween(TAB_SLIDE_MS))) togetherWith
+                    (slideOutHorizontally(tween(TAB_SLIDE_MS, easing = FastOutSlowInEasing)) { -sign * it / 5 } + fadeOut(tween(TAB_SLIDE_MS / 2))) using
+                    androidx.compose.animation.SizeTransform(clip = false)
+            },
+            label = "filter",
+        ) { shownId ->
+        val shown = filters.firstOrNull { it.id == shownId } ?: return@AnimatedContent
         FilterEditor(
-            filter = selected,
+            filter = shown,
             filters = filters,
             dynamicPlaced = dynamicPlaced,
             onSelect = { selectedId = it },
             onDelete = {
-                val index = filters.indexOf(selected)
-                Repo.edit { p -> p.copy(filters = p.filters.filterNot { it.id == selected.id }) }
+                val index = filters.indexOf(shown)
+                val deletedId = shown.id
+                Repo.commit()
+                Repo.edit { p -> p.copy(filters = p.filters.filterNot { it.id == deletedId }) }
                 Repo.commit()
                 val remaining = Repo.state.value.current.filters
                 selectedId = remaining.getOrNull(index.coerceAtMost(remaining.lastIndex))?.id
+                // Deleting a preset offers Undo, and so does deleting a filter.
+                snackScope.launch {
+                    val result = snackbar.showSnackbar(
+                        filterDeleted,
+                        actionLabel = undoLabel,
+                        withDismissAction = true,
+                        duration = SnackbarDuration.Short,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        Repo.undo()
+                        selectedId = deletedId
+                    }
+                }
             },
         )
+        }
+    }
+    }
     }
 }
 
@@ -931,7 +1112,7 @@ private fun changeSummary(parts: List<Pair<PresetChanges.Part, Int>>): String {
 /** Shown while the preset has changes, so they can be kept or dropped without leaving the EQ. */
 @Composable
 private fun UnsavedBar(state: AppState, saved: Preset, modifier: Modifier = Modifier) {
-    val scope = rememberCoroutineScope()
+    val scope = LocalSnackScope.current
     val snackbar = LocalSnackbar.current
     var naming by remember { mutableStateOf(false) }
     val own = state.presets.any { it.id == saved.id }
@@ -951,7 +1132,8 @@ private fun UnsavedBar(state: AppState, saved: Preset, modifier: Modifier = Modi
                 stringResource(R.string.ui_unsaved_changes, saved.name),
                 style = MaterialTheme.typography.bodyMedium,
                 color = Palette.Text,
-                maxLines = 1,
+                // Two lines, so the preset's name isn't cut to its first letter beside the two keys.
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             if (changes.isNotEmpty()) {
@@ -978,8 +1160,10 @@ private fun UnsavedBar(state: AppState, saved: Preset, modifier: Modifier = Modi
                 if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) Repo.undo()
             }
         }) { Text(stringResource(R.string.ui_discard)) }
+        val view = androidx.compose.ui.platform.LocalView.current
         Button(onClick = {
             if (own) {
+                Haptics.confirm(view)
                 Repo.overwriteCurrent()
                 scope.notify(snackbar, appText(R.string.ui_updated, saved.name))
             } else {
@@ -1305,7 +1489,7 @@ private fun formatHz(hz: Double): String =
 
 private fun formatDb(db: Double): String = String.format(Locale.US, "%+.1f dB", db)
 
-private fun formatPercent(amount: Double): String = "${(amount * 100).toInt()}%"
+private fun formatPercent(amount: Double): String = "${(amount * 100).roundToInt()}%"
 
 /** Half-dB steps, which also makes it easy to land on exactly zero. */
 private fun snapTone(value: Float): Double = kotlin.math.round(value * 2.0) / 2.0
@@ -1333,7 +1517,8 @@ private fun ScopeNote(text: String) {
 private fun SoundTab(state: AppState) {
     val saved = savedPreset(state)?.tone
     ScopeNote(stringResource(R.string.ui_sound_scope, state.current.name))
-    if (Disclosure.presetLevel(state)) SettingsSection(state.current.name) {
+    // The note above already names the preset, so the legend says what the group is.
+    if (Disclosure.presetLevel(state)) SettingsSection(stringResource(R.string.ui_preset_level)) {
         SliderSetting(
             title = stringResource(R.string.ui_preset_strength),
             tip = Help.strength,
@@ -1384,9 +1569,31 @@ private fun ToneSection(state: AppState, saved: Tone?) {
         stringResource(R.string.ui_tone),
         trailing = {
             if (modified) {
+                val snackbar = LocalSnackbar.current
+                val snackScope = LocalSnackScope.current
                 TextButton(onClick = {
-                    Repo.editTone { it.copy(bassDb = 0.0, bassHz = Tone.DEFAULT_BASS_HZ, trebleDb = 0.0, vocalsDb = 0.0, bassTunerDb = 0.0) }
                     Repo.commit()
+                    Repo.editTone {
+                        it.copy(
+                            bassDb = 0.0,
+                            bassHz = Tone.DEFAULT_BASS_HZ,
+                            trebleDb = 0.0,
+                            vocalsDb = 0.0,
+                            bassTunerDb = 0.0,
+                            bassCharacter = Tone().bassCharacter,
+                        )
+                    }
+                    Repo.commit()
+                    // This tab has no undo key of its own, so the reset offers one.
+                    snackScope.launch {
+                        val result = snackbar.showSnackbar(
+                            appText(R.string.ui_tone_reset),
+                            actionLabel = appText(R.string.ui_undo),
+                            withDismissAction = true,
+                            duration = SnackbarDuration.Short,
+                        )
+                        if (result == SnackbarResult.ActionPerformed) Repo.undo()
+                    }
                 }) { Text(stringResource(R.string.ui_reset_tone)) }
             }
         },
@@ -1394,6 +1601,7 @@ private fun ToneSection(state: AppState, saved: Tone?) {
         ToneSlider(stringResource(R.string.ui_bass), Help.bass, tone.bassDb, saved?.bassDb ?: 0.0) { v -> Repo.editTone { it.copy(bassDb = v) } }
         // Only means something once there's a bass change to place.
         if (tone.bassDb != 0.0 && Disclosure.bassDetail(state)) {
+            RowDivider()
             SliderSetting(
                 title = stringResource(R.string.ui_bass_frequency),
                 tip = Help.bassFrequency,
@@ -1408,6 +1616,7 @@ private fun ToneSection(state: AppState, saved: Tone?) {
         }
         // Only shapes bass that's been added, so it only shows then.
         if (tone.bassDb > 0.0 && Disclosure.bassDetail(state)) {
+            RowDivider()
             Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.ui_bass_character), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
@@ -1508,8 +1717,8 @@ private fun StereoSection(state: AppState) {
             title = stringResource(R.string.ui_balance),
             tip = Help.balance,
             readout = when {
-                state.balance < -0.005 -> "L ${formatPercent(-state.balance)}"
-                state.balance > 0.005 -> "R ${formatPercent(state.balance)}"
+                state.balance < -0.005 -> stringResource(R.string.ui_balance_left, formatPercent(-state.balance))
+                state.balance > 0.005 -> stringResource(R.string.ui_balance_right, formatPercent(state.balance))
                 else -> stringResource(R.string.ui_centre)
             },
             value = state.balance.toFloat(),
@@ -1549,19 +1758,6 @@ private fun ReverbRow(state: AppState, status: EngineStatus, saved: Tone?) {
                 )
             }
         }
-        if (chosen != ReverbRoom.OFF) {
-            SliderSetting(
-                title = stringResource(R.string.ui_reverb_amount),
-                tip = Help.reverbAmount,
-                readout = formatPercent(state.current.tone.reverbAmount),
-                value = state.current.tone.reverbAmount.toFloat(),
-                range = 0f..1f,
-                default = 0.6f,
-                onChange = { v -> Repo.editTone { it.copy(reverbAmount = v.toDouble()) } },
-                onFinished = Repo::commit,
-                resetTo = (saved?.takeIf { it.reverb != ReverbRoom.OFF }?.reverbAmount ?: 0.6).toFloat(),
-            )
-        }
         fun names(packages: List<String>) = packages.joinToString { appLabel(context, it) }
         Text(
             when {
@@ -1573,6 +1769,22 @@ private fun ReverbRow(state: AppState, status: EngineStatus, saved: Tone?) {
             },
             style = MaterialTheme.typography.bodySmall,
             color = Palette.TextDim,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+    // Inset like every other slider, rather than twice over inside the chips' column.
+    if (chosen != ReverbRoom.OFF) {
+        RowDivider()
+        SliderSetting(
+            title = stringResource(R.string.ui_reverb_amount),
+            tip = Help.reverbAmount,
+            readout = formatPercent(state.current.tone.reverbAmount),
+            value = state.current.tone.reverbAmount.toFloat(),
+            range = 0f..1f,
+            default = 0.6f,
+            onChange = { v -> Repo.editTone { it.copy(reverbAmount = v.toDouble()) } },
+            onFinished = Repo::commit,
+            resetTo = (saved?.takeIf { it.reverb != ReverbRoom.OFF }?.reverbAmount ?: 0.6).toFloat(),
         )
     }
 }
@@ -1598,6 +1810,19 @@ private fun EarCorrectionRows(state: AppState) {
     fun setEars(new: io.github.dragjon.eigentone.data.EarCorrection?) = Repo.update {
         it.copy(earCorrections = if (new == null) it.earCorrections - key else it.earCorrections + (key to new))
     }
+    val snackbar = LocalSnackbar.current
+    val snackScope = LocalSnackScope.current
+    val undoLabel = stringResource(R.string.ui_undo)
+
+    /** Replacing or removing a correction acts at once, so it can be taken back for a moment. */
+    fun replaceEars(new: io.github.dragjon.eigentone.data.EarCorrection?, message: String) {
+        val old = state.earCorrections[key]
+        setEars(new)
+        snackScope.launch {
+            val result = snackbar.showSnackbar(message, actionLabel = undoLabel, withDismissAction = true, duration = SnackbarDuration.Short)
+            if (result == SnackbarResult.ActionPerformed) setEars(old)
+        }
+    }
 
     if (Profiles.supportsModes(key)) {
         if (ears != null) {
@@ -1618,11 +1843,14 @@ private fun EarCorrectionRows(state: AppState) {
                         stringResource(R.string.ui_use_latest_check),
                         Help.earCorrection,
                         detail = stringResource(R.string.ui_correction_from_check_on, date),
-                    ) { setEars(latest.copy(enabled = ears.enabled)) }
+                        opens = false,
+                    ) { replaceEars(latest.copy(enabled = ears.enabled), appText(R.string.ui_ear_correction_updated)) }
                 }
             }
             RowDivider()
-            ActionRow(stringResource(R.string.ui_remove_ear_correction), Help.earCorrection) { setEars(null) }
+            ActionRow(stringResource(R.string.ui_remove_ear_correction), Help.earCorrection, opens = false, danger = true) {
+                replaceEars(null, appText(R.string.ui_ear_correction_removed))
+            }
         } else if (measured != null && record != null) {
             // Offered until it's used, so leaving the hearing check without choosing doesn't lose it.
             val correction = remember(measured) { measured.earCorrection() }
@@ -1640,6 +1868,7 @@ private fun EarCorrectionRows(state: AppState) {
                     } else {
                         stringResource(R.string.ui_for_from_your_check_on, output.label, date, earsCloseNote(measured))
                     },
+                    opens = false,
                 ) { setEars(correction) }
             } else {
                 Text(
@@ -1761,6 +1990,7 @@ private fun EqualLoudnessRows(state: AppState, attenuation: Double) {
         color = if (added.isEmpty()) Palette.TextDim else Palette.Text,
         modifier = Modifier.padding(horizontal = 16.dp),
     )
+    RowDivider()
     SliderSetting(
         title = stringResource(R.string.ui_usual_volume),
         tip = Help.usualVolume,
@@ -1771,9 +2001,16 @@ private fun EqualLoudnessRows(state: AppState, attenuation: Double) {
         detail = stringResource(R.string.ui_usual_volume_for, output.label, formatAmount(attenuation)),
         onChange = { v -> setUsual(kotlin.math.round(v * 2.0) / 2.0) },
     )
-    Row(Modifier.padding(horizontal = 16.dp)) {
-        FilledTonalButton(onClick = { setUsual(attenuation) }) { Text(stringResource(R.string.ui_use_current_volume)) }
-    }
+    // A row like the others, and only usable when it would change something.
+    RowDivider()
+    ActionRow(
+        stringResource(R.string.ui_use_current_volume),
+        Help.usualVolume,
+        detail = stringResource(R.string.ui_db_below_full, formatAmount(attenuation)),
+        enabled = kotlin.math.abs(usual - attenuation) > 0.25,
+        opens = false,
+    ) { setUsual(kotlin.math.round(attenuation * 2.0) / 2.0) }
+    RowDivider()
     SliderSetting(
         title = stringResource(R.string.ui_strength),
         tip = Help.loudnessStrength,
@@ -1925,7 +2162,7 @@ private fun TimeSetting(title: String, tip: Tip, minute: Int, onChange: (Int) ->
     ActionRow(title, tip, detail = NightSchedule.formatTime(minute, is24Hour)) { picking = true }
     if (picking) {
         val clock = rememberTimePickerState(initialHour = minute / 60, initialMinute = minute % 60, is24Hour = is24Hour)
-        AlertDialog(
+        MotionDialog(
             onDismissRequest = { picking = false },
             containerColor = Palette.Tooltip,
             title = { Text(title) },
@@ -2007,6 +2244,13 @@ private fun LevelSection(state: AppState, attenuation: Double) {
 }
 
 /** Shows a message through the screen's snackbar. */
+/** Why something failed, in words, never "null" when an error carries no message. */
+private fun reason(error: Throwable?): String = error?.message ?: error?.javaClass?.simpleName ?: "unknown error"
+
+/** Opens another app's screen, without crashing when no app on this phone can handle it. */
+private fun android.content.Context.openSafely(intent: Intent): Boolean =
+    runCatching { startActivity(intent) }.isSuccess
+
 private fun CoroutineScope.notify(snackbar: SnackbarHostState, message: String) {
     launch { snackbar.showSnackbar(message, withDismissAction = true, duration = SnackbarDuration.Short) }
 }
@@ -2017,7 +2261,7 @@ private fun CoroutineScope.notify(snackbar: SnackbarHostState, message: String) 
  */
 @Composable
 private fun HeadphonesTab(state: AppState) {
-    val scope = rememberCoroutineScope()
+    val scope = LocalSnackScope.current
     val snackbar = LocalSnackbar.current
     val output by Repo.output.collectAsStateWithLifecycle()
     val attenuation by Repo.attenuationDb.collectAsStateWithLifecycle()
@@ -2103,12 +2347,13 @@ private fun HeadphonesTab(state: AppState) {
         if (state.loudness) {
             EqualLoudnessRows(state, attenuation)
         } else {
-            Text(
-                stringResource(R.string.ui_quiet_off, output.label),
-                style = MaterialTheme.typography.bodyMedium,
-                color = Palette.TextDim,
-                modifier = Modifier.padding(16.dp),
-            )
+            // The switch itself, rather than directions to it in a folded section of Settings.
+            SwitchSetting(
+                stringResource(R.string.ui_adapt_to_volume),
+                Help.loudness,
+                false,
+                detail = stringResource(R.string.ui_quiet_turn_on, output.label),
+            ) { on -> Repo.update { it.copy(loudness = on) } }
         }
     }
 
@@ -2236,7 +2481,7 @@ fun segmentColors() = SegmentedButtonDefaults.colors(
 @Composable
 private fun PresetListSection(state: AppState) {
     val snackbar = LocalSnackbar.current
-    val scope = rememberCoroutineScope()
+    val scope = LocalSnackScope.current
     val connected = rememberConnectedOutputNames()
     val editedIds by Repo.editedIds.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
@@ -2370,7 +2615,7 @@ private fun PresetRow(preset: Preset, selected: Boolean, edited: Boolean, favori
 @Composable
 private fun ManageSection(state: AppState) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val scope = LocalSnackScope.current
     val snackbar = LocalSnackbar.current
     var saving by remember { mutableStateOf(false) }
     val saved = state.presets.firstOrNull { it.id == state.current.id }
@@ -2391,7 +2636,7 @@ private fun ManageSection(state: AppState) {
                 }
             }
             val (parsed, curve, name) = result.getOrElse {
-                notify(snackbar, appText(R.string.ui_could_not_read_that_file, it.message))
+                notify(snackbar, appText(R.string.ui_could_not_read_that_file, reason(it)))
                 return@launch
             }
             val title = name?.substringBeforeLast('.')?.removeSuffix(" ParametricEQ")?.removeSuffix(" GraphicEQ")?.ifBlank { null }
@@ -2417,7 +2662,7 @@ private fun ManageSection(state: AppState) {
             val written = withContext(Dispatchers.IO) {
                 runCatching { context.contentResolver.openOutputStream(uri)!!.use { it.write(text.encodeToByteArray()) } }
             }
-            notify(snackbar, if (written.isSuccess) appText(R.string.ui_backup_saved) else appText(R.string.ui_could_not_save_backup, written.exceptionOrNull()?.message))
+            notify(snackbar, if (written.isSuccess) appText(R.string.ui_backup_saved) else appText(R.string.ui_could_not_save_backup, reason(written.exceptionOrNull())))
         }
     }
     val eqExporter = rememberLauncherForActivityResult(
@@ -2429,7 +2674,7 @@ private fun ManageSection(state: AppState) {
             val written = withContext(Dispatchers.IO) {
                 runCatching { context.contentResolver.openOutputStream(uri)!!.use { it.write(text.encodeToByteArray()) } }
             }
-            notify(snackbar, if (written.isSuccess) appText(R.string.ui_eq_file_saved) else appText(R.string.ui_could_not_save_file, written.exceptionOrNull()?.message))
+            notify(snackbar, if (written.isSuccess) appText(R.string.ui_eq_file_saved) else appText(R.string.ui_could_not_save_file, reason(written.exceptionOrNull())))
         }
     }
     val parametricExporter = rememberLauncherForActivityResult(
@@ -2443,7 +2688,7 @@ private fun ManageSection(state: AppState) {
             val written = withContext(Dispatchers.IO) {
                 runCatching { context.contentResolver.openOutputStream(uri)!!.use { it.write(text.encodeToByteArray()) } }
             }
-            notify(snackbar, if (written.isSuccess) appText(R.string.ui_eq_file_saved) else appText(R.string.ui_could_not_save_file, written.exceptionOrNull()?.message))
+            notify(snackbar, if (written.isSuccess) appText(R.string.ui_eq_file_saved) else appText(R.string.ui_could_not_save_file, reason(written.exceptionOrNull())))
         }
     }
     val restorer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -2454,14 +2699,21 @@ private fun ManageSection(state: AppState) {
                     context.contentResolver.openInputStream(uri)!!.use { it.readNBytes(MAX_BACKUP_BYTES).decodeToString() }
                 }.getOrNull()
             }
-            notify(
-                snackbar,
-                when {
-                    text == null -> appText(R.string.ui_could_not_read_that_file_2)
-                    Repo.restoreBackup(text) -> appText(R.string.ui_backup_restored)
-                    else -> appText(R.string.ui_that_isn_t_an_eigentone_backup)
-                },
-            )
+            // A restore replaces presets with the same names, so it can be taken back for a while.
+            val before = Repo.state.value
+            when {
+                text == null -> notify(snackbar, appText(R.string.ui_could_not_read_that_file_2))
+                Repo.restoreBackup(text) -> {
+                    val result = snackbar.showSnackbar(
+                        appText(R.string.ui_backup_restored),
+                        actionLabel = appText(R.string.ui_undo),
+                        withDismissAction = true,
+                        duration = SnackbarDuration.Long,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) Repo.update { before }
+                }
+                else -> notify(snackbar, appText(R.string.ui_that_isn_t_an_eigentone_backup))
+            }
         }
     }
 
@@ -2492,7 +2744,7 @@ private fun ManageSection(state: AppState) {
     }
 
     if (saving) {
-        SaveDialog(onDismiss = { saving = false }) { name ->
+        SaveDialog(initial = state.current.name, onDismiss = { saving = false }) { name ->
             Repo.saveCurrentAs(name)
             saving = false
         }
@@ -2506,8 +2758,9 @@ fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     var entries by remember { mutableStateOf<List<CatalogEntry>?>(null) }
     var problem by remember { mutableStateOf<String?>(null) }
-    var query by remember { mutableStateOf("") }
+    var query by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    var attempt by remember { mutableIntStateOf(0) }
     var measurements by remember { mutableStateOf<List<CatalogEntry>?>(null) }
 
     measurements?.let { options ->
@@ -2522,14 +2775,16 @@ fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
         return
     }
 
-    LaunchedEffect(Unit) {
+    // Runs again from Try again, so a failed download isn't a dead end.
+    LaunchedEffect(attempt) {
+        problem = null
         val loaded = withContext(Dispatchers.IO) { runCatching { AutoEqCatalog.loadIndex(context.cacheDir) } }
         entries = loaded.getOrNull()
-        problem = loaded.exceptionOrNull()?.let { appText(R.string.ui_could_not_load_the_headphone_list, it.message) }
+        problem = loaded.exceptionOrNull()?.let { appText(R.string.ui_could_not_load_the_headphone_list, reason(it)) }
     }
 
     val results = remember(entries, query) { AutoEqCatalog.search(entries.orEmpty(), query) }
-    AlertDialog(
+    MotionDialog(
         onDismissRequest = onDismiss,
         containerColor = Palette.Tooltip,
         title = { Text(stringResource(R.string.ui_find_headphones)) },
@@ -2537,13 +2792,20 @@ fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = query,
-                    onValueChange = { query = it },
+                    onValueChange = {
+                        query = it
+                        // A failed download belongs to the earlier search, so it goes once the search changes.
+                        if (entries != null) problem = null
+                    },
                     singleLine = true,
                     label = { Text(stringResource(R.string.ui_headphone_model)) },
                     enabled = entries != null && !busy,
                 )
                 when {
-                    problem != null -> Text(problem.orEmpty(), color = Palette.Danger, style = MaterialTheme.typography.bodySmall)
+                    problem != null -> Column {
+                        Text(problem.orEmpty(), color = Palette.Danger, style = MaterialTheme.typography.bodySmall)
+                        if (entries == null) TextButton(onClick = { attempt++ }) { Text(stringResource(R.string.ui_try_again)) }
+                    }
                     entries == null -> Text(stringResource(R.string.ui_loading_the_list), color = Palette.TextDim)
                     busy -> Text(stringResource(R.string.ui_downloading), color = Palette.TextDim)
                     query.isNotBlank() && results.isEmpty() -> Text(stringResource(R.string.ui_no_matches), color = Palette.TextDim)
@@ -2563,6 +2825,7 @@ fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
                                         return@clickable
                                     }
                                     busy = true
+                                    problem = null
                                     scope.launch {
                                         val text = withContext(Dispatchers.IO) {
                                             runCatching { AutoEqCatalog.loadProfile(entry) }
@@ -2599,7 +2862,7 @@ private fun SaveDialog(
     val state by Repo.state.collectAsStateWithLifecycle()
     var name by remember { mutableStateOf(io.github.dragjon.eigentone.data.PresetOrganiser.freeName(state, initial).takeIf { initial.isNotBlank() } ?: "") }
     val taken = io.github.dragjon.eigentone.data.PresetOrganiser.nameTaken(state, name)
-    AlertDialog(
+    MotionDialog(
         onDismissRequest = onDismiss,
         containerColor = Palette.Tooltip,
         title = { Text(title) },
@@ -2694,12 +2957,9 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
         if (!exempt) {
             RowDivider()
             ActionRow(stringResource(R.string.ui_allow_background_use), Help.battery, detail = stringResource(R.string.ui_battery_optimisation_may_stop_the_eq_whe)) {
-                context.startActivity(
-                    Intent(
-                        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                        Uri.parse("package:${context.packageName}"),
-                    ),
-                )
+                // Some phones don't offer the direct request, so their battery list opens instead.
+                context.openSafely(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${context.packageName}"))) ||
+                    context.openSafely(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
             }
         }
     }
@@ -2719,7 +2979,7 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
     }
     if (showGuide) GuideDialog(onDismiss = { showGuide = false })
     if (confirmReset) {
-        AlertDialog(
+        MotionDialog(
             onDismissRequest = { confirmReset = false },
             containerColor = Palette.Tooltip,
             title = { Text(stringResource(R.string.ui_reset_sound_settings)) },
@@ -2748,11 +3008,11 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
         )
         RowDivider()
         ActionRow(stringResource(R.string.ui_view_source), Help.openSource, detail = SOURCE_URL.removePrefix("https://")) {
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(SOURCE_URL)))
+            context.openSafely(Intent(Intent.ACTION_VIEW, Uri.parse(SOURCE_URL)))
         }
         RowDivider()
-        ActionRow(stringResource(R.string.ui_report_problem), Help.openSource, detail = stringResource(R.string.ui_report_problem_detail)) {
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("$SOURCE_URL/issues")))
+        ActionRow(stringResource(R.string.ui_report_problem), Help.reportProblem, detail = stringResource(R.string.ui_report_problem_detail)) {
+            context.openSafely(Intent(Intent.ACTION_VIEW, Uri.parse("$SOURCE_URL/issues")))
         }
     }
 
@@ -2779,7 +3039,7 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
             Text(
                 stringResource(R.string.ui_this_phone_only_allowed_bands_so, status.bandCount),
                 style = MaterialTheme.typography.bodySmall,
-                color = Palette.Lit,
+                color = Palette.TextDim,
                 modifier = Modifier.padding(16.dp),
             )
         }
@@ -2806,7 +3066,7 @@ private fun GuideDialog(onDismiss: () -> Unit) {
         stringResource(R.string.ui_compare_with_bypass) to stringResource(R.string.ui_your_ears_adapt_within_minutes_so),
         stringResource(R.string.ui_try_several_songs) to stringResource(R.string.ui_one_track_can_mislead_you_test),
     )
-    AlertDialog(
+    MotionDialog(
         onDismissRequest = onDismiss,
         containerColor = Palette.Tooltip,
         title = { Text(stringResource(R.string.ui_getting_the_best_sound)) },
@@ -2832,18 +3092,21 @@ private fun Fact(label: String, tip: Tip, value: String) {
     Row(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = 48.dp)
+            .heightIn(min = 56.dp)
             .padding(start = 16.dp, end = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = Palette.Text)
+        // The same size and height as every other setting row.
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
         InfoButton(tip)
+        // Mono digits are for numbers that change; words such as a mode or a device name read as text.
+        val numeric = value.all { it.isDigit() || it == '/' || it == ' ' || it == '.' }
         Text(
             value,
             Modifier
                 .weight(1f)
                 .padding(start = 8.dp),
-            style = Readout,
+            style = if (numeric) Readout else MaterialTheme.typography.bodyMedium,
             color = Palette.TextDim,
             textAlign = androidx.compose.ui.text.style.TextAlign.End,
             maxLines = 2,

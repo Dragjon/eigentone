@@ -102,7 +102,9 @@ fun FinderScreen(onSetEnabled: (Boolean) -> Unit, onClose: () -> Unit) {
 
     val roundProgress = finder?.takeIf { step == FinderStep.COMPARE }?.let { progress.toFloat() / it.totalRounds }
     ToolScreen(title = stringResource(R.string.ui_find_my_sound), onBack = ::cancel, spacing = 16.dp, progress = roundProgress) {
-        when (step) {
+        // Each step slides in as the last one leaves.
+        ToolSteps(step) { shown ->
+        when (shown) {
             FinderStep.INTRO -> Intro(
                 outputLabel = output.label,
                 // Read directly, because the service's output isn't known while Eigentone is off.
@@ -116,6 +118,7 @@ fun FinderScreen(onSetEnabled: (Boolean) -> Unit, onClose: () -> Unit) {
                     finder = active,
                     progress = progress,
                     start = start,
+                    autoHeadroom = state.autoHeadroom,
                     onAnswered = {
                         progress++
                         if (active.isDone) step = FinderStep.FINAL
@@ -149,6 +152,7 @@ fun FinderScreen(onSetEnabled: (Boolean) -> Unit, onClose: () -> Unit) {
                     onDiscard = ::cancel,
                 )
             }
+        }
         }
     }
 
@@ -190,27 +194,27 @@ private fun Intro(
     // A sound the listener has already shaped is a better base than a fresh correction it may replace.
     val hasOwnSound = current.filters.any { it.gainDb != 0.0 } || current.tone != io.github.dragjon.eigentone.data.Tone()
     if (hasOwnSound) {
-        Button(onClick = { onStart(current) }, modifier = Modifier.fillMaxWidth()) {
+        Button(onClick = { onStart(current) }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
             Text(stringResource(R.string.ui_my_current_sound_recommended, current.name))
         }
     }
     if (correction != null) {
         if (hasOwnSound) {
-            FilledTonalButton(onClick = { onStart(correction) }, modifier = Modifier.fillMaxWidth()) {
+            FilledTonalButton(onClick = { onStart(correction) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                 Text(stringResource(R.string.ui_correction, correction.name))
             }
         } else {
-            Button(onClick = { onStart(correction) }, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = { onStart(correction) }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
                 Text(stringResource(R.string.ui_correction_recommended, correction.name))
             }
         }
     } else if (hasOwnSound) {
-        FilledTonalButton(onClick = onFind, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.ui_find_my_headphones_first)) }
+        FilledTonalButton(onClick = onFind, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_find_my_headphones_first)) }
     } else {
-        Button(onClick = onFind, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.ui_find_my_headphones_first_recommended)) }
+        Button(onClick = onFind, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.ui_find_my_headphones_first_recommended)) }
     }
     if (!hasOwnSound) {
-        FilledTonalButton(onClick = { onStart(current) }, modifier = Modifier.fillMaxWidth()) {
+        FilledTonalButton(onClick = { onStart(current) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
             Text(stringResource(R.string.ui_my_current_sound_2, current.name))
         }
     }
@@ -226,6 +230,7 @@ private fun Compare(
     finder: SoundFinder,
     progress: Int,
     start: Preset,
+    autoHeadroom: Boolean,
     onAnswered: () -> Unit,
     onCancel: () -> Unit,
 ) {
@@ -235,7 +240,7 @@ private fun Compare(
     fun play(choice: Choice) {
         side = choice
         // Level matched, so the choice is about tone rather than which one is louder.
-        val matched = SoundFinder.levelMatched(start, finder.preview(choice), start)
+        val matched = SoundFinder.levelMatched(start, finder.preview(choice), start, autoHeadroom)
         Repo.edit { matched }
     }
 
@@ -285,7 +290,7 @@ private fun Compare(
 fun SideCard(label: String, selected: Boolean, musicActive: Boolean, modifier: Modifier, onClick: () -> Unit) {
     Box(
         modifier
-            .height(140.dp)
+            .heightIn(min = 140.dp)
             .clip(PanelShape)
             .background(if (selected) Palette.Lit else Palette.Surface)
             .border(1.dp, if (selected) Palette.Lit else Palette.Outline, PanelShape)
@@ -325,12 +330,13 @@ private fun FinalChoice(
     onKeepPrevious: () -> Unit,
     onUseNew: () -> Unit,
 ) {
-    var hearingNew by remember { mutableStateOf(true) }
+    // Starts on the left card, as every comparison does.
+    var hearingNew by remember { mutableStateOf(false) }
     fun hear(new: Boolean) {
         hearingNew = new
         Repo.edit { if (new) SoundFinder.levelMatched(result, result.tone, previous, autoHeadroom) else previous }
     }
-    LaunchedEffect(Unit) { hear(true) }
+    LaunchedEffect(Unit) { hear(false) }
 
     Text(stringResource(R.string.ui_one_last_comparison), style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
     Text(
@@ -344,18 +350,13 @@ private fun FinalChoice(
         SideCard(stringResource(R.string.ui_what_i_had), !hearingNew, musicActive, Modifier.weight(1f)) { hear(false) }
         SideCard(stringResource(R.string.ui_new), hearingNew, musicActive, Modifier.weight(1f)) { hear(true) }
     }
-    FilledTonalButton(
-        onClick = onKeepPrevious,
+    // One answer, for the sound that's playing, as in the other comparisons.
+    Button(
+        onClick = if (hearingNew) onUseNew else onKeepPrevious,
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 52.dp),
-    ) { Text(stringResource(R.string.ui_keep_what_i_had)) }
-    FilledTonalButton(
-        onClick = onUseNew,
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 52.dp),
-    ) { Text(stringResource(R.string.ui_use_the_new_sound)) }
+    ) { Text(stringResource(if (hearingNew) R.string.ui_use_the_new_sound else R.string.ui_keep_what_i_had)) }
 }
 
 private fun describe(trait: Trait, value: Double): String {
@@ -372,14 +373,19 @@ private fun Result(
     onDone: () -> Unit,
     onDiscard: () -> Unit,
 ) {
-    var name by remember { mutableStateOf(appText(R.string.ui_my_sound)) }
+    // A name that isn't taken yet, so the field doesn't open in error on a second run.
+    var name by remember {
+        val base = appText(R.string.ui_my_sound)
+        val taken = state.presets.map { it.name }.toSet()
+        mutableStateOf(generateSequence(1) { it + 1 }.map { if (it == 1) base else "$base $it" }.first { it !in taken })
+    }
     var comparingOriginal by remember { mutableStateOf(false) }
     val finished = start.copy(tone = finder.result())
 
     fun compare(original: Boolean) {
         comparingOriginal = original
         val tone = if (original) start.tone else finished.tone
-        Repo.edit { SoundFinder.levelMatched(start, tone, finished) }
+        Repo.edit { SoundFinder.levelMatched(start, tone, finished, state.autoHeadroom) }
     }
 
     Text(stringResource(R.string.ui_your_sound), style = MaterialTheme.typography.headlineSmall, color = Palette.Text)

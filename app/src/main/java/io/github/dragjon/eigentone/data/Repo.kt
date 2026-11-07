@@ -25,7 +25,14 @@ object Repo {
     private const val TAG = "EigentoneRepo"
     private const val MAX_UNDO = 50
 
-    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    // A value this version doesn't know, such as a filter type from a newer one, falls back to its default
+    // instead of making the whole file unreadable. Non-finite numbers are written rather than stopping every save.
+    private val json = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+        coerceInputValues = true
+        allowSpecialFloatingPointValues = true
+    }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _state = MutableStateFlow(AppState())
@@ -124,7 +131,9 @@ object Repo {
             null
         }
     } catch (e: Exception) {
+        // Kept aside before anything saves over it, so the presets can still be recovered.
         Log.w(TAG, "Saved state unreadable, using defaults", e)
+        runCatching { atomic.baseFile.copyTo(File(atomic.baseFile.parentFile, "state.json.bad"), overwrite = true) }
         null
     }
 
@@ -193,11 +202,12 @@ object Repo {
     /** Switches preset. Unsaved edits to the one being left are kept, and the new one's are brought back. */
     @Synchronized
     fun loadPreset(preset: Preset) {
-        commit()
         val leaving = _state.value.current
-        if (leaving.id != preset.id) keepEditsOf(leaving)
-        val arriving = if (leaving.id != preset.id) unsaved[preset.id] ?: preset else preset
-        _state.update { it.copy(current = arriving) }
+        // Loading the preset already in use would throw its edits away; Discard is the way to do that.
+        if (leaving.id == preset.id) return
+        commit()
+        keepEditsOf(leaving)
+        _state.update { it.copy(current = unsaved[preset.id] ?: preset) }
         commit()
     }
 
@@ -216,16 +226,21 @@ object Repo {
 
     fun findPreset(id: String): Preset? = allPresets().firstOrNull { it.id == id }
 
+    @Synchronized
     fun saveCurrentAs(name: String) {
-        val preset = _state.value.current.copy(id = "user:${UUID.randomUUID()}", name = name)
+        // A preview's level trim is never part of what's saved.
+        val current = _state.value.current
+        val preset = current.copy(id = "user:${UUID.randomUUID()}", name = name, tone = current.tone.copy(trimDb = 0.0))
         _state.update { it.copy(current = preset, presets = it.presets + preset) }
         commit()
     }
 
     /** Overwrites the user preset the working copy came from. Built-ins cannot be overwritten. */
+    @Synchronized
     fun overwriteCurrent() {
         _state.update { s ->
-            s.copy(presets = s.presets.map { if (it.id == s.current.id) s.current else it })
+            val saved = s.current.copy(tone = s.current.tone.copy(trimDb = 0.0))
+            s.copy(presets = s.presets.map { if (it.id == s.current.id) saved else it })
         }
         forgetEdits(_state.value.current.id)
     }
@@ -243,6 +258,7 @@ object Repo {
             for (i in stack.indices) if (stack[i].id == id) stack[i] = change(stack[i])
         }
         if (committed.id == id) committed = change(committed)
+        unsaved[id]?.let { unsaved[id] = change(it) }
     }
 
     /** Files a user preset in a folder, including the working copy if it's the one in use. */
@@ -258,6 +274,7 @@ object Repo {
     }
 
     /** Returns the sound to a clean start. Presets and output choices are kept. */
+    @Synchronized
     fun resetSound() {
         unsaved.clear()
         _editedIds.value = emptySet()
@@ -266,12 +283,31 @@ object Repo {
         commit()
     }
 
+    /**
+     * Copies a saved preset, just below the original and in the same folder, as it was saved rather than
+     * with any edits waiting on it. Returns the copy, or null if there's no such preset.
+     */
+    @Synchronized
+    fun duplicatePreset(id: String, name: String): Preset? {
+        val original = findPreset(id) ?: return null
+        val copy = original.copy(id = "user:${UUID.randomUUID()}", name = name, tone = original.tone.copy(trimDb = 0.0))
+        _state.update { s ->
+            val at = s.presets.indexOfFirst { it.id == id }
+            val presets = if (at < 0) s.presets + copy else s.presets.toMutableList().apply { add(at + 1, copy) }
+            s.copy(presets = presets)
+        }
+        return copy
+    }
+
+    @Synchronized
     fun deletePreset(id: String) {
         forgetEdits(id)
         _state.update { s ->
             s.copy(
                 presets = s.presets.filterNot { it.id == id },
                 outputProfiles = s.outputProfiles.filterValues { it != id },
+                appProfiles = s.appProfiles.filterValues { it != id },
+                favorites = s.favorites - id,
             )
         }
     }
@@ -348,9 +384,10 @@ object Repo {
 
     /** A different app started playing, so load its preset if it has one. */
     fun onPlayingAppChanged(packageName: String?) {
+        // Not noted while a tool is open, so the next report after it closes still loads the app's preset.
+        if (toolBusy) return
         if (playingApp.value == packageName) return
         playingApp.value = packageName
-        if (toolBusy) return
         val state = _state.value
         val preset = packageName?.let { state.appProfiles[it] }?.let(::findPreset) ?: return
         if (state.current.id != preset.id) loadPreset(preset)
@@ -377,6 +414,8 @@ object Repo {
     /** Returns false if the text was not a valid backup. Settings outside presets aren't included. */
     fun restoreBackup(text: String): Boolean {
         val backup = BackupCodec.decode(text) ?: return false
+        // Edits waiting on a preset the backup replaces belong to the old version.
+        synchronized(this) { backup.presets.forEach { forgetEdits(it.id) } }
         _state.update { BackupCodec.merge(it, backup) }
         return true
     }

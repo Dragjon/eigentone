@@ -87,7 +87,7 @@ fun MeasurementCompare(options: List<CatalogEntry>, onDismiss: () -> Unit, onCho
         }
     }
 
-    AlertDialog(
+    MotionDialog(
         onDismissRequest = onDismiss,
         containerColor = Palette.Tooltip,
         title = { Text(stringResource(R.string.ui_compare_measurements)) },

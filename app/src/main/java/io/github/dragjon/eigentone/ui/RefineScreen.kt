@@ -102,11 +102,35 @@ fun RefineScreen(onSetEnabled: (Boolean) -> Unit, onClose: () -> Unit) {
         }
     }
 
-    BackHandler { cancel() }
+    // A back swipe partway through would throw away every answer, so it asks first.
+    var confirmingStop by remember { mutableStateOf(false) }
+    fun back() {
+        val answering = (step == RefineStep.COMPARE && progress > 0) || step == RefineStep.FINAL
+        if (answering) confirmingStop = true else cancel()
+    }
+    BackHandler { back() }
+    if (confirmingStop) {
+        StopTestDialog(
+            onStop = {
+                confirmingStop = false
+                cancel()
+            },
+            onKeepGoing = { confirmingStop = false },
+        )
+    }
 
-    val compareProgress = if (step == RefineStep.COMPARE) progress.toFloat() / Refiner.MAX_ROUNDS else null
-    ToolScreen(title = stringResource(R.string.ui_refine), onBack = ::cancel, progress = compareProgress) {
-        when (step) {
+    // Most runs end soon after the minimum, so the bar is three quarters full by then and fills the rest only
+    // if more comparisons are needed, rather than sitting at half and jumping to the end.
+    val compareProgress = if (step == RefineStep.COMPARE) {
+        if (progress <= Refiner.MIN_ROUNDS) 0.75f * progress / Refiner.MIN_ROUNDS
+        else 0.75f + 0.25f * (progress - Refiner.MIN_ROUNDS) / (Refiner.MAX_ROUNDS - Refiner.MIN_ROUNDS)
+    } else {
+        null
+    }
+    ToolScreen(title = stringResource(R.string.ui_refine), onBack = ::back, progress = compareProgress) {
+        // Each step slides in as the last one leaves.
+        ToolSteps(step) { shown ->
+        when (shown) {
             RefineStep.INTRO -> {
                 Text(stringResource(R.string.ui_refine_intro, start.name), style = MaterialTheme.typography.bodyLarge, color = Palette.TextDim)
                 Column(
@@ -216,6 +240,16 @@ fun RefineScreen(onSetEnabled: (Boolean) -> Unit, onClose: () -> Unit) {
                         .fillMaxWidth()
                         .heightIn(min = 52.dp),
                 ) { Text(stringResource(if (side == Choice.B) R.string.ui_i_prefer_b else R.string.ui_i_prefer_a)) }
+                // Not hearing a difference is an answer here too; it keeps the sound that was there.
+                FilledTonalButton(
+                    onClick = {
+                        restore()
+                        step = RefineStep.KEPT
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp),
+                ) { Text(stringResource(R.string.ui_i_can_t_hear_a_difference)) }
                 TextButton(onClick = ::cancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_stop_and_undo)) }
             }
 
@@ -242,6 +276,7 @@ fun RefineScreen(onSetEnabled: (Boolean) -> Unit, onClose: () -> Unit) {
                 change = refiner.result(),
                 onDone = onClose,
             )
+        }
         }
     }
 }
@@ -336,4 +371,19 @@ private fun ChangeCurve(change: List<Double>) {
             drawText(measured, topLeft = Offset((xOf(freqs[i]) - measured.size.width / 2).coerceIn(0f, size.width - measured.size.width), y.coerceIn(0f, size.height - measured.size.height)))
         }
     }
+}
+
+/** Asks before a back swipe ends a listening test partway, since every answer so far would be lost. */
+@Composable
+internal fun StopTestDialog(onStop: () -> Unit, onKeepGoing: () -> Unit) {
+    MotionDialog(
+        onDismissRequest = onKeepGoing,
+        containerColor = Palette.Tooltip,
+        titleContentColor = Palette.Text,
+        textContentColor = Palette.TextDim,
+        title = { Text(stringResource(R.string.ui_stop_test_title)) },
+        text = { Text(stringResource(R.string.ui_stop_test_body)) },
+        confirmButton = { TextButton(onClick = onStop, danger = true) { Text(stringResource(R.string.ui_stop)) } },
+        dismissButton = { TextButton(onClick = onKeepGoing) { Text(stringResource(R.string.ui_keep_going)) } },
+    )
 }

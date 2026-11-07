@@ -71,7 +71,7 @@ fun SweepScreen(onClose: () -> Unit) {
     var marks by rememberSaveable(stateSaver = MarksSaver) { mutableStateOf(emptyList<SweepMark>()) }
     var failed by remember { mutableStateOf(false) }
     var comparing by rememberSaveable { mutableStateOf(false) }
-    var heardTone by remember { mutableDoubleStateOf(0.0) }
+    var heardTone by remember { mutableDoubleStateOf(Sweep.hzAt(position)) }
     val hz = Sweep.hzAt(position)
     val room = Sweep.roomFor(state.current.filters)
 
@@ -79,6 +79,8 @@ fun SweepScreen(onClose: () -> Unit) {
         Repo.hearingCheckRunning.value = !hearEq
         onDispose { Repo.hearingCheckRunning.value = false }
     }
+    // Leaving the app stops the tone, rather than letting it play on behind everything else.
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_STOP) { playing = false }
     DisposableEffect(playing) {
         if (playing && !player.start()) {
             failed = true

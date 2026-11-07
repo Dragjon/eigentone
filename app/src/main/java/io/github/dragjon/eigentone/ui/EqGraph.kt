@@ -1,5 +1,6 @@
 package io.github.dragjon.eigentone.ui
 
+
 import io.github.dragjon.eigentone.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Canvas
@@ -173,6 +174,7 @@ fun EqGraph(
 
         spectrum()?.let { bands ->
             val barWidth = w / bands.size
+            // Quiet grey, so the spectrum reads as one moving shape behind the curve rather than competing with it.
             bands.forEachIndexed { i, level ->
                 if (level > 0f) {
                     val barHeight = level * h
@@ -231,6 +233,22 @@ fun EqGraph(
             drawPath(single, Palette.TextDim, style = Stroke(width = 1.5.dp.toPx()))
         }
 
+        // A faint wash between the curve and 0 dB, strongest far from the line and fading towards it, so how
+        // much the EQ changes reads at a glance. Left out when the ears differ, to keep their colours apart.
+        if (rightCurve == null) {
+            // Full strength by FILL_FULL_DB either way, which everyday curves reach, rather than at the
+            // graph's edges, which they rarely do.
+            drawPath(
+                fill,
+                Brush.verticalGradient(
+                    0f to accent.copy(alpha = FILL_ALPHA),
+                    0.5f to accent.copy(alpha = FILL_ZERO_ALPHA),
+                    1f to accent.copy(alpha = FILL_ALPHA),
+                    startY = yOf(FILL_FULL_DB, h, rangeDb),
+                    endY = yOf(-FILL_FULL_DB, h, rangeDb),
+                ),
+            )
+        }
         drawPath(curvePath, accent, style = Stroke(width = 2.dp.toPx()))
 
         if (rightCurve != null) shownRight.let { points ->
@@ -346,3 +364,8 @@ fun EarCurvesGraph(ears: EarCorrection, modifier: Modifier = Modifier, rangeDb: 
 }
 
 private const val EAR_GRAPH_RANGE_DB = 8.0
+
+/** How strong the wash under the main curve is at the graph's top and bottom edges. */
+private const val FILL_ALPHA = 0.32f
+private const val FILL_ZERO_ALPHA = 0.04f
+private const val FILL_FULL_DB = 8.0

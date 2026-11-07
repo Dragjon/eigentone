@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -53,8 +54,8 @@ fun CompressorSection(state: AppState) {
     val scheduledNight by Repo.scheduledNight.collectAsStateWithLifecycle()
     val compressor = state.current.tone.compressor
     val nightActive = state.nightMode > 0.001 || scheduledNight
-    var selected by remember { mutableIntStateOf(0) }
-    var details by remember { mutableStateOf(false) }
+    var selected by rememberSaveable { mutableIntStateOf(0) }
+    var details by rememberSaveable { mutableStateOf(false) }
     fun change(transform: (Compressor) -> Compressor) = Repo.editTone { it.copy(compressor = transform(it.compressor)) }
 
     val status by Repo.status.collectAsStateWithLifecycle()

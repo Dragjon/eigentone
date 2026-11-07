@@ -17,8 +17,11 @@ class SweepPlayer(context: Context) {
         .setUsage(AudioAttributes.USAGE_MEDIA)
         .setContentType(AudioAttributes.CONTENT_TYPE_UNKNOWN)
         .build()
+    /** Another app took the audio, such as a call or music started again, so the tone goes quiet until it's back. */
+    @Volatile private var focusLost = false
     private val focus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
         .setAudioAttributes(attributes)
+        .setOnAudioFocusChangeListener { change -> focusLost = change < 0 }
         .build()
 
     @Volatile var hz = Sweep.hzAt(0.0)
@@ -48,6 +51,7 @@ class SweepPlayer(context: Context) {
             Log.w(TAG, "Could not create the tone", e)
             return false
         }
+        focusLost = false
         audio.requestAudioFocus(focus)
         sounding = true
         thread = Thread({ run(track) }, "SweepTone").also { it.start() }
@@ -68,7 +72,7 @@ class SweepPlayer(context: Context) {
         try {
             track.play()
             while (sounding || !oscillator.isSilent) {
-                oscillator.fill(buffer, hz, levelDb, sounding && !muted)
+                oscillator.fill(buffer, hz, levelDb, sounding && !muted && !focusLost)
                 if (track.write(buffer, 0, buffer.size, AudioTrack.WRITE_BLOCKING) < 0) break
             }
             track.stop()

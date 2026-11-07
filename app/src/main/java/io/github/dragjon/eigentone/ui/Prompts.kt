@@ -27,6 +27,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,7 +60,7 @@ private fun correctionPrompt(outputKey: String) = "correction:$outputKey"
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun PromptCard(title: String, body: String, actions: @Composable () -> Unit) {
+private fun PromptCard(title: String, body: String, problem: String? = null, actions: @Composable () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -68,6 +71,7 @@ private fun PromptCard(title: String, body: String, actions: @Composable () -> U
     ) {
         Text(title, style = MaterialTheme.typography.titleMedium, color = Palette.Text)
         Text(body, style = MaterialTheme.typography.bodyMedium, color = Palette.TextDim)
+        problem?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.Danger) }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) { actions() }
     }
 }
@@ -79,6 +83,16 @@ private fun PromptCard(title: String, body: String, actions: @Composable () -> U
 @Composable
 fun OutputPrompts(state: AppState) {
     val output by Repo.output.collectAsStateWithLifecycle()
+    // Held here rather than in the card: picking a target changes the sound, which stops the card being
+    // offered, and the tuner must stay open through that.
+    var tuning by rememberSaveable { mutableStateOf(false) }
+    if (tuning) {
+        CorrectionTuner(onDismiss = {
+            tuning = false
+            // Once the targets have been compared, the card has done its job.
+            Repo.dismissPrompt(targetPrompt(output.key))
+        })
+    }
     if (!state.enabled || !Profiles.supportsModes(output.key)) return
     val needsCorrection = correctionPrompt(output.key) !in state.dismissedPrompts &&
         Profiles.presetIdFor(state, output.key) == null &&
@@ -86,7 +100,7 @@ fun OutputPrompts(state: AppState) {
     when {
         needsCorrection -> CorrectionPrompt(output)
         targetPrompt(output.key) !in state.dismissedPrompts &&
-            HeadphoneTargets.worthSuggesting(state.current.tone, state.current.id) -> TargetPrompt(output)
+            HeadphoneTargets.worthSuggesting(state.current.tone, state.current.id) && !tuning -> TargetPrompt(output) { tuning = true }
         output.key.startsWith("Bluetooth") && EARBUD_EQ_PROMPT !in state.dismissedPrompts -> {
             PromptCard(
                 stringResource(R.string.ui_your_headphones_may_have_their_own_eq),
@@ -100,13 +114,11 @@ fun OutputPrompts(state: AppState) {
 
 /** Corrections are applied as published, so this says when that leaves far less bass than most people prefer. */
 @Composable
-private fun TargetPrompt(output: OutputInfo) {
-    var tuning by remember { mutableStateOf(false) }
+private fun TargetPrompt(output: OutputInfo, onTune: () -> Unit) {
     PromptCard(stringResource(R.string.ui_target_prompt_title), stringResource(R.string.ui_target_prompt_body)) {
-        Button(onClick = { tuning = true }) { Text(stringResource(R.string.ui_target_prompt_action)) }
+        Button(onClick = onTune) { Text(stringResource(R.string.ui_target_prompt_action)) }
         TextButton(onClick = { Repo.dismissPrompt(targetPrompt(output.key)) }) { Text(stringResource(R.string.ui_not_now)) }
     }
-    if (tuning) CorrectionTuner(onDismiss = { tuning = false })
 }
 
 private fun targetPrompt(outputKey: String) = "target:$outputKey"
@@ -149,7 +161,8 @@ private fun CorrectionPrompt(output: OutputInfo) {
 
     PromptCard(
         stringResource(R.string.ui_correct, output.label),
-        problem ?: stringResource(R.string.ui_a_correction_evens_out_these_headphones),
+        stringResource(R.string.ui_a_correction_evens_out_these_headphones),
+        problem = problem,
     ) {
         Button(
             enabled = !busy,
@@ -190,7 +203,7 @@ fun ShareRows(snack: (String) -> Unit) {
     if (pasting) {
         var code by remember { mutableStateOf("") }
         var failed by remember { mutableStateOf(false) }
-        AlertDialog(
+        MotionDialog(
             onDismissRequest = { pasting = false },
             containerColor = Palette.Tooltip,
             title = { Text(stringResource(R.string.ui_add_a_shared_sound)) },
@@ -279,7 +292,7 @@ fun PerAppSection(state: AppState) {
                         color = Palette.TextDim,
                     )
                 }
-                TextButton(onClick = { Repo.assignToApp(packageName, null) }) { Text(stringResource(R.string.ui_clear)) }
+                TextButton(onClick = { Repo.assignToApp(packageName, null) }, danger = true) { Text(stringResource(R.string.ui_clear)) }
             }
         }
     }
@@ -292,6 +305,13 @@ fun DiagnosticsSection(status: EngineStatus, output: OutputInfo, onConsole: () -
     var crash by remember { mutableStateOf(CrashLog.read(context)) }
     val rivals = remember { otherEffectApps(context) }
     var copied by remember { mutableStateOf(false) }
+    // "Copied" is a moment's confirmation, so the row goes back to saying what it does.
+    LaunchedEffect(copied) {
+        if (copied) {
+            delay(2000)
+            copied = false
+        }
+    }
 
     SettingsSection(stringResource(R.string.ui_troubleshooting)) {
         if (!status.hasControl && rivals.isNotEmpty()) {
@@ -306,6 +326,7 @@ fun DiagnosticsSection(status: EngineStatus, output: OutputInfo, onConsole: () -
         ActionRow(
             if (copied) stringResource(R.string.ui_copied) else stringResource(R.string.ui_copy_status_details),
             Help.diagnostics,
+            opens = false,
         ) {
             val text = buildList {
                 add(CrashLog.deviceSummary(context))
@@ -331,7 +352,7 @@ fun DiagnosticsSection(status: EngineStatus, output: OutputInfo, onConsole: () -
                 context.startActivity(Intent.createChooser(send, appText(R.string.ui_share_crash_report)))
             }
             RowDivider()
-            ActionRow(stringResource(R.string.ui_delete_crash_report), Help.crashReport) {
+            ActionRow(stringResource(R.string.ui_delete_crash_report), Help.crashReport, opens = false, danger = true) {
                 CrashLog.clear(context)
                 crash = null
             }

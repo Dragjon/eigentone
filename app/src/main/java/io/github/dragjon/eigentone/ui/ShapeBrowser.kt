@@ -55,6 +55,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -148,7 +149,7 @@ fun ShapeBrowser(onClose: () -> Unit) {
     LaunchedEffect(query, category, trait, favouritesOnly) { list.scrollToItem(0) }
 
     fun toneFor(shape: LibraryShape, level: Float) = before.tone.withShape(
-        name = if (level == 1f) shape.shape.name else "${shape.shape.name} at ${kotlin.math.round(level * 100).toInt()}%",
+        name = if (level == 1f) shape.shape.name else appText(R.string.ui_shape_at, shape.shape.name, "${kotlin.math.round(level * 100).toInt()}%"),
         faders = if (layering) {
             GraphicEq.layered(
                 GraphicEq.normalized(before.tone.graphicDb, before.tone.graphicBands).let {
@@ -166,6 +167,21 @@ fun ShapeBrowser(onClose: () -> Unit) {
     // Matched to the sound before, so a shape isn't favoured just for being louder.
     fun hear(shape: LibraryShape, level: Float) = Repo.edit {
         SoundFinder.levelMatched(before, toneFor(shape, level), before, state.autoHeadroom)
+    }
+
+    var used by remember { mutableStateOf(false) }
+    // A preview changes the live sound, so nothing automatic may switch preset meanwhile, and leaving
+    // any way at all, other than Use, puts the sound back.
+    DisposableEffect(Unit) {
+        Repo.comparing.value = true
+        onDispose {
+            Repo.comparing.value = false
+            if (!used) Repo.edit { before }
+        }
+    }
+    // Deleting the shape being previewed ends the preview too.
+    LaunchedEffect(pickedId, picked) {
+        if (pickedId != null && picked == null) Repo.edit { before }
     }
 
     fun restore() {
@@ -211,7 +227,7 @@ fun ShapeBrowser(onClose: () -> Unit) {
     ) {
         Row(Modifier.padding(start = 4.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { goBack() }) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.ui_back))
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.ui_back), tint = Palette.Text)
             }
             Text(
                 title,
@@ -379,6 +395,7 @@ fun ShapeBrowser(onClose: () -> Unit) {
                     // Without the comparison's temporary level trim.
                     Repo.edit { before.copy(tone = toneFor(picked, amount)) }
                     Repo.commit()
+                    used = true
                     onClose()
                 },
             )
@@ -397,7 +414,7 @@ private fun ShapeEditorDialog(draft: ShapeDraft, onDismiss: () -> Unit) {
     var name by remember { mutableStateOf(draft.name) }
     var text by remember { mutableStateOf(draft.text) }
     val parsed = remember(text) { ShapeText.parse(text) }
-    AlertDialog(
+    MotionDialog(
         onDismissRequest = onDismiss,
         containerColor = Palette.Tooltip,
         title = { Text(if (draft.id == null) stringResource(R.string.ui_new_shape) else stringResource(R.string.ui_edit_shape)) },

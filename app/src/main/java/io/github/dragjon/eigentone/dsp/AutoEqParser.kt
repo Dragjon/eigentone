@@ -8,10 +8,10 @@ data class ParsedEq(val preampDb: Double, val filters: List<Filter>)
 object AutoEqParser {
     const val MAX_FILTERS = 20
 
-    private val preampRegex = Regex("""^\s*Preamp:\s*([-+]?[\d.]+)\s*dB""", RegexOption.IGNORE_CASE)
+    private val preampRegex = Regex("""^\s*Preamp:\s*([-+]?[\d.,]+)\s*dB""", RegexOption.IGNORE_CASE)
     private val filterRegex = Regex(
-        """^\s*Filter(?:\s+\d+)?:\s*(ON|OFF)\s+(PK|PEQ|LSC|LS|HSC|HS|LPQ|LP|HPQ|HP|NO|BP)\s+Fc\s+([\d.,]+)\s*Hz""" +
-            """(?:\s+Gain\s+([-+]?[\d.]+)\s*dB)?(?:\s+Q\s+([\d.]+))?""",
+        """^\s*Filter(?:\s+\d+)?:\s*(ON|OFF)\s+(PK|PEQ|LSC|LS|HSC|HS|LPQ|LP|HPQ|HP|NO|BP)(?:\s+\d+\s*dB)?\s+Fc\s+([\d.,]+)\s*Hz""" +
+            """(?:\s+Gain\s+([-+]?[\d.,]+)\s*dB)?(?:\s+Q\s+([\d.,]+))?""",
         RegexOption.IGNORE_CASE,
     )
 
@@ -63,7 +63,7 @@ object AutoEqParser {
         var preamp = 0.0
         val filters = mutableListOf<Filter>()
         for (line in text.lineSequence()) {
-            preampRegex.find(line)?.let { preamp = (it.groupValues[1].toDoubleOrNull() ?: preamp).coerceIn(-MAX_IMPORT_GAIN, MAX_IMPORT_GAIN) }
+            preampRegex.find(line)?.let { preamp = (number(it.groupValues[1]) ?: preamp).coerceIn(-MAX_IMPORT_GAIN, MAX_IMPORT_GAIN) }
             val m = filterRegex.find(line) ?: continue
             if (filters.size == MAX_FILTERS) break
             val type = when (m.groupValues[2].uppercase()) {
@@ -75,17 +75,26 @@ object AutoEqParser {
                 "BP" -> FilterType.BAND_PASS
                 else -> FilterType.HIGH_PASS
             }
-            val freq = m.groupValues[3].replace(",", "").toDoubleOrNull() ?: continue
+            val freq = number(m.groupValues[3]) ?: continue
             filters += Filter(
                 id = filters.size + 1,
                 type = type,
                 freq = freq.coerceIn(Eq.MIN_FREQ, Eq.MAX_FREQ),
-                gainDb = (m.groupValues[4].toDoubleOrNull() ?: 0.0).coerceIn(-MAX_IMPORT_GAIN, MAX_IMPORT_GAIN),
-                q = (m.groupValues[5].toDoubleOrNull() ?: DEFAULT_Q).coerceIn(Eq.MIN_Q, Eq.MAX_Q),
+                gainDb = (number(m.groupValues[4]) ?: 0.0).coerceIn(-MAX_IMPORT_GAIN, MAX_IMPORT_GAIN),
+                q = (number(m.groupValues[5]) ?: DEFAULT_Q).coerceIn(Eq.MIN_Q, Eq.MAX_Q),
                 enabled = m.groupValues[1].equals("ON", ignoreCase = true),
             )
         }
         return if (filters.isEmpty()) null else ParsedEq(preamp, filters)
+    }
+
+    /**
+     * Reads a number written either way: a comma before exactly three digits groups thousands, as in
+     * "1,000", and any other comma is a decimal point, as files saved in many languages write "105,5".
+     */
+    private fun number(text: String): Double? {
+        val thousands = Regex("""^\d{1,3}(,\d{3})+(\.\d+)?$""").matches(text)
+        return (if (thousands) text.replace(",", "") else text.replace(',', '.')).toDoubleOrNull()
     }
 
     private const val DEFAULT_Q = 0.71

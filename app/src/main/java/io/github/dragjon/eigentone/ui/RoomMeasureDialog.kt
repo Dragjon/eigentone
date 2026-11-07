@@ -121,7 +121,7 @@ fun RoomMeasureDialog(output: OutputInfo, onDismiss: () -> Unit, onSaved: (Strin
         }
     }
 
-    AlertDialog(
+    MotionDialog(
         onDismissRequest = { if (step !is Step.Measuring) onDismiss() },
         containerColor = Palette.Tooltip,
         title = { Text(stringResource(R.string.ui_measure_title, output.label)) },

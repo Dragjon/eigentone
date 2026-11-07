@@ -4,7 +4,7 @@ import io.github.dragjon.eigentone.R
 import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -58,7 +58,7 @@ private const val CURRENT = "current"
  * is rebuilt, when the sound is applied again from the saved choices.
  */
 @Composable
-fun CompareScreen(onClose: () -> Unit) {
+fun CompareScreen(onSetEnabled: (Boolean) -> Unit, onClose: () -> Unit) {
     val state by Repo.state.collectAsStateWithLifecycle()
     val before = remember { Repo.state.value }
     var finished by remember { mutableStateOf(false) }
@@ -99,16 +99,33 @@ fun CompareScreen(onClose: () -> Unit) {
     fun use(preset: Preset) {
         finished = true
         Repo.update { it.copy(current = before.current, bypass = before.bypass) }
-        if (preset != before.current) Repo.loadPreset(preset)
+        if (preset != before.current) {
+            Repo.loadPreset(preset)
+            // What was heard is what's kept, even when that preset also has edits waiting from earlier.
+            if (Repo.state.value.current != preset) {
+                Repo.edit { preset }
+                Repo.commit()
+            }
+        }
         onClose()
     }
 
-    BackHandler {
-        if (step == CompareStep.CHOOSE) cancel() else step = CompareStep.CHOOSE
+    /** Back from listening returns to choosing, with the sound that was in use playing again meanwhile. */
+    fun back() {
+        if (step == CompareStep.CHOOSE) {
+            cancel()
+        } else {
+            step = CompareStep.CHOOSE
+            Repo.update { it.copy(current = before.current, bypass = before.bypass) }
+        }
     }
 
-    ToolScreen(title = stringResource(R.string.ui_compare_two_sounds), onBack = { if (step == CompareStep.CHOOSE) cancel() else step = CompareStep.CHOOSE }, spacing = 16.dp) {
-        when (step) {
+    BackHandler(onBack = ::back)
+
+    ToolScreen(title = stringResource(R.string.ui_compare_two_sounds), onBack = ::back, spacing = 16.dp) {
+        // Each step slides in as the last one leaves.
+        ToolSteps(step) { shown ->
+        when (shown) {
             CompareStep.CHOOSE -> Choose(
                 current = before.current,
                 firstId = firstId,
@@ -127,6 +144,8 @@ fun CompareScreen(onClose: () -> Unit) {
                 onBlind = { blind = it },
                 canStart = comparison != null && first != second,
                 onStart = {
+                    // Comparing with the EQ off would play the same sound twice.
+                    if (!state.enabled) onSetEnabled(true)
                     flipped = Random.nextBoolean()
                     playing = 0
                     step = CompareStep.LISTEN
@@ -160,6 +179,7 @@ fun CompareScreen(onClose: () -> Unit) {
                     onCancel = ::cancel,
                 )
             }
+        }
         }
     }
 }
@@ -238,7 +258,9 @@ private fun Slot(label: String, name: String, active: Boolean, modifier: Modifie
         modifier
             .clip(PanelShape)
             .background(if (active) Palette.SurfaceHigh else Palette.Surface)
-            .clickable(role = Role.Button, onClick = onClick)
+            // The slot being chosen for is outlined too, so it isn't told apart by tone alone.
+            .border(1.dp, if (active) Palette.Lit else Palette.Line, PanelShape)
+            .selectable(selected = active, role = Role.Tab, onClick = onClick)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -281,18 +303,14 @@ private fun Listen(
             SideCard(comparison.label(button), playing == button, musicActive, Modifier.weight(1f)) { onPlay(button) }
         }
     }
-    for (button in 0..1) {
-        val name = comparison.nameFor(button)
-        FilledTonalButton(
-            onClick = { onPrefer(button) },
-            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-        ) {
-            Text(
-                if (name != null) stringResource(R.string.ui_use, comparison.label(button), name) else stringResource(R.string.ui_i_prefer, comparison.label(button)),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+    // One answer, for the sound that's playing, as in the other listening tools.
+    val name = comparison.nameFor(playing)
+    Button(onClick = { onPrefer(playing) }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+        Text(
+            if (name != null) stringResource(R.string.ui_use, comparison.label(playing), name) else stringResource(R.string.ui_i_prefer, comparison.label(playing)),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
     TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_keep_what_i_had)) }
 }

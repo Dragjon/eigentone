@@ -20,8 +20,10 @@ class TonePlayer(context: android.content.Context) {
         .setUsage(AudioAttributes.USAGE_MEDIA)
         .setContentType(AudioAttributes.CONTENT_TYPE_UNKNOWN)
         .build()
+    // A tone stops when another app takes the audio, so it never plays over a call or music.
     private val focus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
         .setAudioAttributes(attributes)
+        .setOnAudioFocusChangeListener { change -> if (change < 0) stop() }
         .build()
     private var track: AudioTrack? = null
 

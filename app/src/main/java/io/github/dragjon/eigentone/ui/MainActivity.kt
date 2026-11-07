@@ -93,7 +93,8 @@ class MainActivity : ComponentActivity() {
         if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
         val preset = intent.getStringExtra(PresetShortcuts.EXTRA_PRESET_ID)?.let(Repo::findPreset)
         intent.action = null
-        if (preset == null) return
+        // An open listening tool puts its own sound back when it closes, which would undo the switch.
+        if (preset == null || Repo.toolBusy) return
         Repo.loadPreset(preset)
         if (!Repo.state.value.enabled) setEnabled(true)
     }

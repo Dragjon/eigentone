@@ -55,8 +55,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -160,15 +160,19 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, o
     val base = rememberFaderBase(appState.current, bands)
     val faders = FaderLayer.shown(base, gains)
     // Remembered because matching older sounds against the whole library is too slow to do on every frame.
-    val shapeLabel = remember(gains, bands, tone.shape, appState.customShapes, base, appState.current.name) {
+    // A saved preset is called by its own name: what it was built from only matters while it's being edited.
+    val savedUnchanged = Repo.allPresets(appState).firstOrNull { it.id == presetId } == appState.current
+    val shapeLabel = remember(gains, bands, tone.shape, appState.customShapes, base, appState.current.name, savedUnchanged) {
+        if (savedUnchanged) return@remember appState.current.name
         val yours = appState.customShapes.map { custom -> GraphicShape(custom.name, custom.points.map { it.hz to it.db }) }
         val own = tone.faderLabel(yours + GraphicEq.shapes + ShapeLibrary.all.map { it.shape })
         val name = appState.current.name
         when {
             !FaderLayer.isShaped(base) -> own
             own == Tone.FLAT_LABEL -> name
-            own == Tone.CUSTOM_LABEL -> "$name, edited"
-            else -> "$name + $own"
+            // Worded as the top bar words it, so an edited preset reads the same everywhere.
+            own == Tone.CUSTOM_LABEL -> appText(R.string.ui_edited, name)
+            else -> appText(R.string.ui_shape_on_preset, name, own)
         }
     }
 
@@ -195,12 +199,11 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, o
             // Without the fader options row, the landscape key joins this one rather than sitting alone.
             if (!showFaderOptions) LandscapeButton(onExpand)
             InfoButton(Help.graphic)
-            if (!GraphicEq.isFlat(gains)) {
-                TextButton(onClick = {
-                    setGains(emptyList())
-                    Repo.commit()
-                }) { Text(stringResource(R.string.ui_reset)) }
-            }
+            // Always there, and dimmed when there's nothing to reset, so the keys beside it don't shift.
+            TextButton(enabled = !GraphicEq.isFlat(gains), onClick = {
+                setGains(emptyList())
+                Repo.commit()
+            }) { Text(stringResource(R.string.ui_reset)) }
         }
         // Small and right above the faders, so how they behave can be changed without leaving them.
         if (showFaderOptions) Row(
@@ -253,10 +256,10 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, o
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(enabled = band > 0, onClick = { selected = band - 1 }) {
-                Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.ui_previous_band))
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.ui_previous_band))
             }
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(GraphicEq.formatFrequency(freqs[band]), style = MaterialTheme.typography.bodyMedium, color = Palette.Text)
+                Text(GraphicEq.formatFrequency(freqs[band]), style = Readout, color = Palette.Text)
                 val actual = FaderLayer.actual(base, gains, band)
                 Text(
                     formatLevel(actual),
@@ -265,18 +268,19 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, o
                 )
             }
             IconButton(enabled = band < bands - 1, onClick = { selected = band + 1 }) {
-                Icon(Icons.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.ui_next_band))
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.ui_next_band))
             }
             Spacer(Modifier.weight(0.15f))
             fun nudge(by: Double) {
                 editFaders(faders, faders.toMutableList().also { it[band] = GraphicEq.snap(it[band] + by) })
                 Repo.commit()
             }
-            FilledTonalIconButton(onClick = { nudge(-STEP_DB) }) {
+            // Each key is dimmed at the end of the fader's travel, where a press would do nothing.
+            FilledTonalIconButton(enabled = faders[band] > -GraphicEq.MAX_DB, onClick = { nudge(-STEP_DB) }) {
                 Icon(painterResource(R.drawable.ic_minus), contentDescription = stringResource(R.string.ui_lower, GraphicEq.formatFrequency(freqs[band])))
             }
-            Spacer(Modifier.height(0.dp).padding(start = 8.dp))
-            FilledTonalIconButton(onClick = { nudge(STEP_DB) }) {
+            Spacer(Modifier.width(8.dp))
+            FilledTonalIconButton(enabled = faders[band] < GraphicEq.MAX_DB, onClick = { nudge(STEP_DB) }) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.ui_raise, GraphicEq.formatFrequency(freqs[band])))
             }
         }
@@ -392,7 +396,20 @@ private fun Faders(
 ) {
     val latest by rememberUpdatedState(gains)
     val savedGains by rememberUpdatedState(saved)
-    val change by rememberUpdatedState(onChange)
+    val changeOnly by rememberUpdatedState(onChange)
+    val view = androidx.compose.ui.platform.LocalView.current
+    // A tick when a fader passes 0 dB and a firmer one at the top or bottom of its travel, at most once a move.
+    val change: (List<Double>, List<Double>) -> Unit = { before, moved ->
+        val limit = GraphicEq.MAX_DB.toFloat()
+        val felt = moved.indices.firstOrNull { i ->
+            val from = before.getOrElse(i) { 0.0 }
+            from != moved[i]
+        }
+        if (felt != null) {
+            Haptics.crossing(view, before.getOrElse(felt) { 0.0 }.toFloat(), moved[felt].toFloat(), 0f, -limit..limit)
+        }
+        changeOnly(before, moved)
+    }
     val select by rememberUpdatedState(onSelect)
     val finished by rememberUpdatedState(onFinished)
     val measurer = rememberTextMeasurer()
@@ -493,6 +510,8 @@ private fun Faders(
                                     select(lastBand)
                                     change(latest, GraphicEq.drawLine(latest, lastBand, lastDb, lastBand, lastDb))
                                     var moved = false
+                                    // Cleared however the sweep ends, so a cancelled one can't leave the bank sliding.
+                                    try {
                                     while (true) {
                                         val pointer = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
                                         if (scrolling) {
@@ -517,8 +536,10 @@ private fun Faders(
                                         pointer.consume()
                                         if (!pointer.pressed) break
                                     }
-                                    sweeping = false
-                                    edgePush = 0f
+                                    } finally {
+                                        sweeping = false
+                                        edgePush = 0f
+                                    }
                                     if (!moved) tapped(lastBand, down.uptimeMillis) else lastTapBand = -1
                                     finished()
                                 } else {
@@ -602,6 +623,20 @@ private fun Faders(
                         val width = if (isSelected) capWidth.coerceAtLeast(14.dp.toPx()) else capWidth
                         val tall = if (isSelected) capHeight + 6.dp.toPx() else capHeight
                         val y = yOf(gain)
+                        // Each lit cap gives off a little amber light, and the one in hand a little more.
+                        val glow = Palette.Glow
+                        if (glow.alpha > 0f) {
+                            val reach = width * if (isSelected) 1.4f else 1f
+                            drawCircle(
+                                androidx.compose.ui.graphics.Brush.radialGradient(
+                                    listOf(glow.copy(alpha = if (isSelected) 0.16f else 0.07f), androidx.compose.ui.graphics.Color.Transparent),
+                                    center = Offset(centre, y),
+                                    radius = reach,
+                                ),
+                                radius = reach,
+                                center = Offset(centre, y),
+                            )
+                        }
                         if (isSelected) {
                             drawRoundRect(
                                 Palette.Surface,
@@ -836,8 +871,15 @@ fun ExpandedFaders(onClose: () -> Unit) {
             IconButton(onClick = onClose) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.ui_back), tint = Palette.Text)
             }
-            Text(GraphicEq.formatFrequency(freqs[band]), style = MaterialTheme.typography.titleMedium, color = Palette.Text)
-            Spacer(Modifier.width(12.dp))
+            // The same band arrows and nudge keys as below the faders in portrait, so this view has a
+            // screen reader alternative and fine steps too.
+            IconButton(enabled = band > 0, onClick = { selected = band - 1 }) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.ui_previous_band), tint = Palette.Text)
+            }
+            Text(GraphicEq.formatFrequency(freqs[band]), style = Readout, color = Palette.Text)
+            IconButton(enabled = band < bands - 1, onClick = { selected = band + 1 }) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.ui_next_band), tint = Palette.Text)
+            }
             val actual = FaderLayer.actual(base, gains, band)
             Text(
                 formatLevel(actual),
@@ -845,6 +887,18 @@ fun ExpandedFaders(onClose: () -> Unit) {
                 color = if (formatLevel(actual) != formatLevel(0.0)) Palette.Lit else Palette.TextDim,
                 modifier = Modifier.weight(1f),
             )
+            fun nudge(by: Double) {
+                editFaders(faders, faders.toMutableList().also { it[band] = GraphicEq.snap(it[band] + by) })
+                Repo.commit()
+            }
+            FilledTonalIconButton(enabled = faders[band] > -GraphicEq.MAX_DB, onClick = { nudge(-STEP_DB) }) {
+                Icon(painterResource(R.drawable.ic_minus), contentDescription = stringResource(R.string.ui_lower, GraphicEq.formatFrequency(freqs[band])))
+            }
+            Spacer(Modifier.width(8.dp))
+            FilledTonalIconButton(enabled = faders[band] < GraphicEq.MAX_DB, onClick = { nudge(STEP_DB) }) {
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.ui_raise, GraphicEq.formatFrequency(freqs[band])))
+            }
+            Spacer(Modifier.width(8.dp))
             UndoRedoButtons()
             Spacer(Modifier.width(8.dp))
             SlidingToggle(

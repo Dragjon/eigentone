@@ -43,10 +43,26 @@ import kotlin.math.round
 fun PresetDetailsDialog(preset: Preset, folders: List<String>, onDismiss: () -> Unit) {
     var name by remember { mutableStateOf(preset.name) }
     var folder by remember { mutableStateOf(preset.folder.orEmpty()) }
-    AlertDialog(
+    MotionDialog(
         onDismissRequest = onDismiss,
         containerColor = Palette.Tooltip,
-        title = { Text(stringResource(R.string.ui_edit_preset)) },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.ui_edit_preset), modifier = Modifier.weight(1f))
+                // A copy to try changes on, keeping the original as it is.
+                val copyName = PresetOrganiser.freeName(Repo.state.value, stringResource(R.string.ui_preset_copy, preset.name))
+                androidx.compose.material3.IconButton(onClick = {
+                    Repo.duplicatePreset(preset.id, copyName)
+                    onDismiss()
+                }) {
+                    androidx.compose.material3.Icon(
+                        androidx.compose.ui.res.painterResource(R.drawable.ic_copy),
+                        contentDescription = stringResource(R.string.ui_duplicate_preset_named, preset.name),
+                        tint = Palette.Text,
+                    )
+                }
+            }
+        },
         text = {
             Column(
                 Modifier.verticalScroll(rememberScrollState()),
@@ -78,6 +94,7 @@ fun PresetDetailsDialog(preset: Preset, folders: List<String>, onDismiss: () -> 
                         }
                     }
                 }
+
             }
         },
         confirmButton = {
@@ -125,7 +142,7 @@ fun CorrectionTuner(onDismiss: () -> Unit) {
     fun db(value: Double) = String.format(Locale.US, "%+.1f dB", value)
     val range = -Processing.MAX_TONE_DB.toFloat()..Processing.MAX_TONE_DB.toFloat()
 
-    AlertDialog(
+    MotionDialog(
         onDismissRequest = onDismiss,
         containerColor = Palette.Tooltip,
         title = { Text(stringResource(R.string.ui_tune_correction)) },

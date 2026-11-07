@@ -59,13 +59,13 @@ import io.github.dragjon.eigentone.R
 import io.github.dragjon.eigentone.data.Repo
 import kotlin.math.roundToInt
 
-/** The stops of the tour, in order. One has nothing to point at, because the save bar only shows after a change. */
+/** The stops of the tour, in order. The save bar is shown for its stop as an example, since it only appears after a change. */
 enum class TourStop(@StringRes val title: Int, @StringRes val body: Int, val anchored: Boolean = true) {
     POWER(R.string.tour_power_title, R.string.tour_power_body),
     PRESETS(R.string.tour_presets_title, R.string.tour_presets_body),
     STRIP(R.string.tour_strip_title, R.string.tour_strip_body),
     FADERS(R.string.tour_faders_title, R.string.tour_faders_body),
-    SAVE(R.string.tour_save_title, R.string.tour_save_body, anchored = false),
+    SAVE(R.string.tour_save_title, R.string.tour_save_body),
     TABS(R.string.tour_tabs_title, R.string.tour_tabs_body),
     SETTINGS(R.string.tour_settings_title, R.string.tour_settings_body),
 }

@@ -2,6 +2,19 @@
 
 Changes since 0.33.0. Every release is a pre-release on [GitHub](https://github.com/Dragjon/eigentone/releases) until the first official one.
 
+## 0.39.0
+
+- **Motion throughout.** Tabs slide towards where they sit, tools and Settings slide in and back out, folding sections open and close smoothly, dialogs shrink away instead of vanishing, and each step of a listening test slides to the next.
+- **A better status strip.** The device name shows once and grows when the strip opens, each effect's icon moves down into its own row, every row opens its setting, and a tap anywhere else closes it.
+- **Haptics** when a slider or fader passes zero or reaches its end, and for the power switch, Bypass and Save.
+- **A crisper light theme** with white panels, darker text and an orange status strip, and a little more depth between panels in the dark one.
+- A soft fill under the EQ curve, a gentle glow on lit controls, and a star beside favourites in the preset menu.
+- After the welcome, the app fades in behind the opening line instead of squeezing open.
+- **Duplicate a preset** from its edit dialog.
+- Saved presets are called by their own name above the faders.
+- Undo after Discard, Reset tone, deleting a filter, removing ear correction and restoring a backup now works and stays on screen.
+- Long help opens in a scrolling dialog, and the tour points at the save bar and fits the Settings gear.
+- **Fixes:** Compare targets no longer closes itself; Compare plays what you chose and puts the sound back when you go back; test tones stop when you leave the app; Find my sound matches loudness properly; an unreadable save file is kept rather than wiping your presets; renaming or reloading a preset keeps its edits; with two outputs connected, the one actually playing is used; EQ files with comma decimals import correctly; and many smaller layout, wording and accessibility fixes.
 ## 0.38.1
 
 - More space between the version and the Bypass button, and the version still shows in full.

@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +42,7 @@ import io.github.dragjon.eigentone.data.Repo
 import io.github.dragjon.eigentone.data.SidePick
 import io.github.dragjon.eigentone.data.SpotAnswer
 import io.github.dragjon.eigentone.data.Sweep
+import io.github.dragjon.eigentone.data.SoundFinder
 import io.github.dragjon.eigentone.data.SweepMark
 import io.github.dragjon.eigentone.dsp.GraphicEq
 import io.github.dragjon.eigentone.engine.SweepPlayer
@@ -66,6 +68,7 @@ fun PeakFinderScreen(onClose: () -> Unit) {
     val finder = remember { PeakFinder() }
     var stage by remember { mutableStateOf(FinderStage.INTRO) }
     var marks by remember { mutableStateOf(emptyList<SweepMark>()) }
+    val room = remember { Sweep.roomFor(before.filters) }
     var answers by remember { mutableIntStateOf(0) }
     var levelDb by remember { mutableDoubleStateOf(Sweep.DEFAULT_LEVEL_DB) }
     var ready by remember { mutableStateOf(false) }
@@ -99,8 +102,17 @@ fun PeakFinderScreen(onClose: () -> Unit) {
     }
     LaunchedEffect(levelDb) { player.levelDb = levelDb }
 
-    LaunchedEffect(stage, answers) {
+    // The notes pause while Eigentone is out of sight, so leaving the app doesn't leave a tone playing.
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    val lifecycleState by lifecycle.currentStateFlow.collectAsState()
+    val onScreen = lifecycleState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+
+    LaunchedEffect(stage, answers, onScreen) {
         if (stage != FinderStage.QUESTIONS) return@LaunchedEffect
+        if (!onScreen) {
+            player.muted = true
+            return@LaunchedEffect
+        }
         val tones = finder.question?.tones ?: return@LaunchedEffect
         ready = false
         var played = 0
@@ -120,7 +132,8 @@ fun PeakFinderScreen(onClose: () -> Unit) {
     fun afterAnswer() {
         answers++
         if (finder.isDone) {
-            marks = finder.marks().take(Sweep.roomFor(before.filters))
+            // Everything found is shown, even past the preset's free filter slots, which the result explains.
+            marks = finder.marks()
             player.muted = false
             stage = FinderStage.RESULT
         }
@@ -128,8 +141,10 @@ fun PeakFinderScreen(onClose: () -> Unit) {
 
     BackHandler { onClose() }
 
-    ToolScreen(title = stringResource(R.string.ui_find_peaks_for_me), onBack = onClose, spacing = 14.dp, progress = questionProgress) {
-        when (stage) {
+    ToolScreen(title = stringResource(R.string.ui_find_peaks_for_me), onBack = onClose, spacing = 16.dp, progress = questionProgress) {
+        // Each step slides in as the last one leaves.
+        ToolSteps(stage) { shown ->
+        when (shown) {
             FinderStage.INTRO -> Intro(failed, onStart = { stage = FinderStage.QUESTIONS })
             FinderStage.QUESTIONS -> finder.question?.let { question ->
                 Questions(
@@ -153,17 +168,26 @@ fun PeakFinderScreen(onClose: () -> Unit) {
             }
             FinderStage.RESULT -> Result(
                 marks = marks,
+                room = room,
                 onHear = { withFilters ->
-                    Repo.edit { if (withFilters) it.copy(filters = Sweep.addTo(before.filters, marks), tone = before.tone) else before }
+                    // At the same loudness as before, so the cuts aren't heard as simply quieter.
+                    Repo.edit {
+                        if (withFilters) {
+                            SoundFinder.levelMatched(before.copy(filters = Sweep.addTo(before.filters, marks.take(room))), before.tone, before, Repo.state.value.autoHeadroom)
+                        } else {
+                            before
+                        }
+                    }
                 },
                 onAdd = {
                     finished = true
-                    Repo.edit { before.copy(filters = Sweep.addTo(before.filters, marks)) }
+                    Repo.edit { before.copy(filters = Sweep.addTo(before.filters, marks.take(room))) }
                     Repo.commit()
                     onClose()
                 },
                 onClose = onClose,
             )
+        }
         }
     }
 }
@@ -266,6 +290,7 @@ private fun AnswerButton(text: String, enabled: Boolean, onClick: () -> Unit) {
 @Composable
 private fun Result(
     marks: List<SweepMark>,
+    room: Int,
     onHear: (Boolean) -> Unit,
     onAdd: () -> Unit,
     onClose: () -> Unit,
@@ -339,6 +364,11 @@ private fun Result(
         SideCard(stringResource(R.string.ui_before), !hearingNew, musicActive, Modifier.weight(1f)) { hearingNew = false }
         SideCard(stringResource(R.string.ui_with_filters), hearingNew, musicActive, Modifier.weight(1f)) { hearingNew = true }
     }
-    Button(onClick = onAdd, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.ui_add_to_my_sound)) }
-    TextButton(onClick = onClose, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_discard)) }
+    if (marks.size > room) {
+        Text(appPlural(R.plurals.ui_room_for_filters, room, room), style = MaterialTheme.typography.bodySmall, color = Palette.TextDim)
+    }
+    Button(enabled = room > 0, onClick = onAdd, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+        Text(if (marks.size > room) stringResource(R.string.ui_add_to_my_sound_2, room) else stringResource(R.string.ui_add_to_my_sound))
+    }
+    TextButton(onClick = onClose, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.ui_not_now)) }
 }

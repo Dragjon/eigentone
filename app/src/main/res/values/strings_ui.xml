@@ -118,7 +118,7 @@
     <string name="help_low_latency_body" formatted="false">Reduces processing delay for games and video, but bass control gets less precise.</string>
     <string name="help_low_latency_title" formatted="false">Low latency</string>
     <string name="help_match_bypass_body" formatted="false">Louder usually sounds better, which makes comparisons unfair. This keeps Bypass at about the same loudness, so you\'re comparing tone. The match is an estimate.</string>
-    <string name="help_match_bypass_title" formatted="false">Level-matched Bypass</string>
+    <string name="help_match_bypass_title" formatted="false">Level-matched bypass</string>
     <string name="help_night_mode_body" formatted="false">Brings quiet and loud parts closer together, so you can hear details at low volume without sudden loud moments. High values can make music sound flatter.</string>
     <string name="help_night_mode_title" formatted="false">Night mode</string>
     <string name="help_night_schedule_amount_body" formatted="false">How strong night mode is during the scheduled hours.</string>
@@ -301,7 +301,7 @@
     <string name="ui_knee" formatted="false">Knee</string>
     <string name="ui_level" formatted="false">Level</string>
     <string name="ui_level_in_left_to_right_level_out_bottom" formatted="false">Level in, left to right. Level out, bottom to top.</string>
-    <string name="ui_level_matched_bypass" formatted="false">Level-matched Bypass</string>
+    <string name="ui_level_matched_bypass" formatted="false">Level-matched bypass</string>
     <string name="ui_limiter" formatted="false">Limiter</string>
     <string name="ui_limiter_threshold" formatted="false">Limiter threshold</string>
     <string name="ui_loading_the_list" formatted="false">Loading the list…</string>
@@ -650,10 +650,10 @@
     <string name="ui_problem_see_the_system_tab" formatted="false">Problem. See Settings</string>
     <string name="ui_starting" formatted="false">Starting…</string>
     <string name="ui_another_audio_app_has_taken_control" formatted="false">Another audio app has taken control</string>
-    <string name="ui_deleted" formatted="false">Deleted %1$s</string>
+    <string name="ui_deleted" formatted="false">Deleted %1$s.</string>
     <string name="ui_could_not_read_that_file" formatted="false">Could not read that file: %1$s</string>
     <string name="ui_imported_eq" formatted="false">Imported EQ</string>
-    <string name="ui_imported_filters" formatted="false">Imported %1$s filters.</string>
+    <string name="ui_imported_filters" formatted="false">Filters imported: %1$s.</string>
     <string name="ui_imported_a_curve_with_points" formatted="false">Imported a curve with %1$s points.</string>
     <string name="ui_no_eq_found_choose_an_autoeq" formatted="false">No EQ found. Choose an AutoEq or Equalizer APO ParametricEQ or GraphicEQ file.</string>
     <string name="ui_could_not_read_that_file_2" formatted="false">Could not read that file.</string>
@@ -980,4 +980,25 @@
     <string name="ui_refine_change" formatted="false">What changed</string>
     <string name="ui_refine_steady" formatted="false">You gave the same answer to %1$d of %2$d repeated pairs.</string>
     <string name="ui_refine_unsteady" formatted="false">You answered %1$d of %2$d repeated pairs differently the second time, which is normal for small differences. The result leans on the answers that agreed.</string>
+    <string name="ui_ear_correction_updated" formatted="false">Ear correction updated from your latest check.</string>
+    <string name="ui_ear_correction_removed" formatted="false">Ear correction removed.</string>
+    <string name="help_report_problem_title" formatted="false">Report a problem</string>
+    <string name="help_report_problem_body" formatted="false">Opens Eigentone\'s issue page on GitHub, where you can describe a problem or suggest an idea. Copy status details first and paste them in, so the cause is easier to find.</string>
+    <string name="ui_preset_level" formatted="false">Preset level</string>
+    <string name="ui_tone_reset" formatted="false">Tone reset.</string>
+    <string name="ui_balance_left" formatted="false">L %1$s</string>
+    <string name="ui_balance_right" formatted="false">R %1$s</string>
+    <string name="ui_filter_deleted" formatted="false">Filter deleted.</string>
+    <string name="ui_not_saved" formatted="false">%1$s (not saved)</string>
+    <string name="ui_quiet_turn_on" formatted="false">Adds bass and treble back as you turn the volume down, tuned for %1$s.</string>
+    <string name="ui_shape_at" formatted="false">%1$s at %2$s</string>
+    <string name="ui_shape_on_preset" formatted="false">%1$s + %2$s</string>
+    <string name="ui_stop_test_title" formatted="false">Stop the test?</string>
+    <string name="ui_stop_test_body" formatted="false">Your answers so far will be lost, and the sound goes back to how it was.</string>
+    <string name="ui_keep_going" formatted="false">Keep going</string>
+    <string name="ui_strip_open_setting" formatted="false">Open this setting</string>
+    <string name="ui_preset_copy" formatted="false">%1$s copy</string>
+    <string name="ui_duplicate_preset" formatted="false">Duplicate</string>
+    <string name="ui_duplicate_preset_named" formatted="false">Duplicate %1$s</string>
+    <string name="ui_favourite" formatted="false">Favourite</string>
 </resources>

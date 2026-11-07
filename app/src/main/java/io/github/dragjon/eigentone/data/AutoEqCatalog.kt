@@ -102,7 +102,13 @@ object AutoEqCatalog {
         if (!fresh) {
             try {
                 val bytes = download(BASE + "INDEX.md", MAX_INDEX_BYTES)
-                cache.writeBytes(bytes)
+                // Written beside it and then swapped in, so an interrupted write never leaves a short list that looks fresh.
+                val partial = java.io.File(cache.parentFile, cache.name + ".part")
+                partial.writeBytes(bytes)
+                if (!partial.renameTo(cache)) {
+                    cache.delete()
+                    partial.renameTo(cache)
+                }
             } catch (e: IOException) {
                 if (!cache.exists()) throw e
             }

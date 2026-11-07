@@ -21,8 +21,22 @@ object OutputDetector {
     )
 
     fun current(context: Context): Detected {
-        val devices = context.getSystemService(AudioManager::class.java).getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-        val best = PRIORITY.firstNotNullOfOrNull { type -> devices.firstOrNull { it.type == type } }
+        val audio = context.getSystemService(AudioManager::class.java)
+        // Where Android is sending music right now, which matters when two outputs are connected at once.
+        val routed = runCatching {
+            audio.getAudioDevicesForAttributes(
+                android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_MEDIA).build(),
+            )
+        }.getOrNull().orEmpty()
+        val routedBest = PRIORITY.firstNotNullOfOrNull { type -> routed.firstOrNull { it.type == type } }
+        val routedToPhone = routedBest == null && routed.any { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+        // Otherwise, or on a phone that doesn't say, the most likely of everything connected.
+        val devices = audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+        val best = when {
+            routedBest != null -> routedBest
+            routedToPhone -> null
+            else -> PRIORITY.firstNotNullOfOrNull { type -> devices.firstOrNull { it.type == type } }
+        }
         val speaker = OutputInfo("speaker", "Phone speaker")
         if (best == null) return Detected(speaker, AudioDeviceInfo.TYPE_BUILTIN_SPEAKER)
         val family = when (best.type) {

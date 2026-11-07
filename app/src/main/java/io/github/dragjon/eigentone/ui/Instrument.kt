@@ -1,5 +1,8 @@
 package io.github.dragjon.eigentone.ui
 
+import androidx.compose.animation.togetherWith
+import androidx.compose.runtime.getValue
+
 import android.content.Context
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
@@ -129,9 +132,35 @@ fun ToolScreen(
     }
 }
 
-/** How far through a test, as an engraved scale that fills from the left. */
+/**
+ * The steps of a tool, such as its intro, its questions and its result. A new step slides in from the
+ * right as the last one slides out to the left, and the page's height follows smoothly.
+ */
 @Composable
-fun StepRail(progress: Float) {
+fun <S> ToolSteps(step: S, spacing: Dp = 16.dp, content: @Composable ColumnScope.(S) -> Unit) {
+    androidx.compose.animation.AnimatedContent(
+        targetState = step,
+        transitionSpec = {
+            (
+                androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(STEP_MS, easing = androidx.compose.animation.core.FastOutSlowInEasing)) { it / 5 } +
+                    androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(STEP_MS, delayMillis = 60))
+                ) togetherWith (
+                androidx.compose.animation.slideOutHorizontally(androidx.compose.animation.core.tween(STEP_MS, easing = androidx.compose.animation.core.FastOutSlowInEasing)) { -it / 5 } +
+                    androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(STEP_MS / 2))
+                ) using androidx.compose.animation.SizeTransform(clip = false)
+        },
+        label = "step",
+    ) { shown ->
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(spacing)) { content(shown) }
+    }
+}
+
+private const val STEP_MS = 280
+
+/** How far through a test, as an engraved scale that fills from the left. */@Composable
+fun StepRail(target: Float) {
+    // Fills to each new answer rather than jumping to it.
+    val progress by androidx.compose.animation.core.animateFloatAsState(target, androidx.compose.animation.core.tween(320), label = "rail")
     val percent = (progress.coerceIn(0f, 1f) * 100).toInt()
     Canvas(
         Modifier

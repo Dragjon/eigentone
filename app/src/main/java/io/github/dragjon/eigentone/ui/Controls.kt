@@ -5,6 +5,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import io.github.dragjon.eigentone.R
 import androidx.compose.ui.res.stringResource
 import android.media.AudioDeviceCallback
@@ -60,6 +70,12 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -80,6 +96,7 @@ private const val TRACK_TICKS = 20
  * A heading above a group of settings on one surface. With a [summary], the group folds away under its
  * heading, and the summary says what's on while it's closed, so nothing changed is ever hidden from view.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun SettingsSection(
     title: String?,
@@ -90,12 +107,27 @@ fun SettingsSection(
     val folds = summary != null && title != null
     var open by rememberSaveable(title) { mutableStateOf(false) }
     val shown = !folds || open
-    Column(Modifier.fillMaxWidth().animateContentSize()) {
+    // The chevron turns rather than swapping, so it's plain which way the section is going.
+    val turn by animateFloatAsState(if (open) 180f else 0f, tween(FOLD_MS, easing = FastOutSlowInEasing), label = "chevron")
+    // Asked for from elsewhere, such as a row in the strip's drawer: it opens and scrolls into view.
+    val requester = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
+    val requested = SectionFocus.request
+    LaunchedEffect(requested) {
+        if (title == null || requested != title) return@LaunchedEffect
+        SectionFocus.request = null
+        open = true
+        // Waits for the tab to slide in and the section to unfold, then brings all of it into view.
+        delay(FOLD_MS + 120L)
+        requester.bringIntoView()
+    }
+    Column(Modifier.fillMaxWidth().bringIntoViewRequester(requester)) {
         if (title != null) {
             Row(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = if (folds) 48.dp else 40.dp)
+                    // The press highlight has the same rounded corners as the panels.
+                    .clip(KeyShape)
                     .then(
                         if (folds) {
                             Modifier.clickable(
@@ -111,7 +143,15 @@ fun SettingsSection(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(title.uppercase(), style = PanelLegend, color = Palette.TextDim)
-                    if (folds && !open) {
+                    // Folds away under the heading as the section opens, and back out as it closes, so the
+                    // heading glides into place rather than jumping.
+                    AnimatedVisibility(
+                        visible = folds && !open,
+                        enter = expandVertically(tween(FOLD_MS, easing = FastOutSlowInEasing), expandFrom = Alignment.Top) +
+                            fadeIn(tween(FOLD_MS)),
+                        exit = shrinkVertically(tween(FOLD_MS, easing = FastOutSlowInEasing), shrinkTowards = Alignment.Top) +
+                            fadeOut(tween(FOLD_MS / 2)),
+                    ) {
                         Text(
                             summary.orEmpty(),
                             style = MaterialTheme.typography.bodySmall,
@@ -124,24 +164,42 @@ fun SettingsSection(
                 trailing?.invoke()
                 if (folds) {
                     Icon(
-                        if (open) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                        Icons.Filled.KeyboardArrowDown,
                         contentDescription = null,
                         tint = Palette.TextDim,
-                        modifier = Modifier.padding(horizontal = 8.dp),
+                        modifier = Modifier
+                            .padding(horizontal = 8.dp)
+                            .graphicsLayer { rotationZ = turn },
                     )
                 }
             }
         }
-        if (shown) {
+        // Opens downwards and closes back up the same way.
+        AnimatedVisibility(
+            visible = shown,
+            enter = expandVertically(tween(FOLD_MS, easing = FastOutSlowInEasing), expandFrom = Alignment.Top) + fadeIn(tween(FOLD_MS)),
+            exit = shrinkVertically(tween(FOLD_MS, easing = FastOutSlowInEasing), shrinkTowards = Alignment.Top) + fadeOut(tween(FOLD_MS / 2)),
+        ) {
             Column(
                 Modifier
                     .fillMaxWidth()
                     .clip(PanelShape)
-                    .background(Palette.Surface),
+                    .background(Palette.Surface)
+                    // Rows appearing or going inside a panel, such as a setting that only shows when it applies,
+                    // grow and shrink it smoothly.
+                    .animateContentSize(tween(FOLD_MS, easing = FastOutSlowInEasing)),
                 content = content,
             )
         }
     }
+}
+
+/** How long a section takes to fold open or closed. */
+internal const val FOLD_MS = 260
+
+/** A section another part of the app wants shown, by its title. The section clears it once it has opened. */
+object SectionFocus {
+    var request by mutableStateOf<String?>(null)
 }
 
 /** Joins what's on into one short line for a folded section, or says that nothing is. */
@@ -153,10 +211,35 @@ fun RowDivider() {
     HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = Palette.Line)
 }
 
-/** Opens an explanation next to the setting. Tapping anywhere else closes it. */
+/** Past this many characters a tip opens as a dialog that scrolls, since a tooltip would run off the screen. */
+private const val LONG_TIP_CHARS = 300
+
+/**
+ * Shows [tip] beside what [anchor] draws: a tooltip for a short explanation, a dialog for a long one.
+ * [anchor] gets the function that opens it.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InfoButton(tip: Tip) {
+private fun TipHost(tip: Tip, anchor: @Composable (open: () -> Unit) -> Unit) {
+    val body = stringResource(tip.body)
+    if (body.length > LONG_TIP_CHARS) {
+        var open by remember { mutableStateOf(false) }
+        anchor { open = true }
+        if (open) {
+            MotionDialog(
+                onDismissRequest = { open = false },
+                containerColor = Palette.Tooltip,
+                titleContentColor = Palette.Text,
+                textContentColor = Palette.Text,
+                title = { Text(stringResource(tip.title), style = MaterialTheme.typography.titleMedium) },
+                text = {
+                    Text(body, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.verticalScroll(rememberScrollState()))
+                },
+                confirmButton = { TextButton(onClick = { open = false }) { Text(stringResource(R.string.ui_done)) } },
+            )
+        }
+        return
+    }
     val state = rememberTooltipState(isPersistent = true)
     val scope = rememberCoroutineScope()
     TooltipBox(
@@ -169,12 +252,18 @@ fun InfoButton(tip: Tip) {
                     contentColor = Palette.Text,
                     titleContentColor = Palette.Text,
                 ),
-            ) { Text(stringResource(tip.body), style = MaterialTheme.typography.bodyMedium) }
+            ) { Text(body, style = MaterialTheme.typography.bodyMedium) }
         },
         state = state,
         enableUserInput = false,
-    ) {
-        IconButton(onClick = { scope.launch { state.show() } }) {
+    ) { anchor { scope.launch { state.show() } } }
+}
+
+/** Opens an explanation next to the setting. Tapping anywhere else closes it. */
+@Composable
+fun InfoButton(tip: Tip) {
+    TipHost(tip) { open ->
+        IconButton(onClick = open) {
             Icon(
                 Icons.Outlined.Info,
                 contentDescription = stringResource(R.string.ui_about_setting, stringResource(tip.title)),
@@ -189,29 +278,12 @@ fun InfoButton(tip: Tip) {
  * Something too small or too plain for an info button beside it, such as a meter, which explains itself
  * when tapped instead. The touch area is [modifier]'s, so it can be wider than what it draws.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TipOnTap(tip: Tip, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    val state = rememberTooltipState(isPersistent = true)
-    val scope = rememberCoroutineScope()
     val about = stringResource(R.string.ui_about_setting, stringResource(tip.title))
-    TooltipBox(
-        positionProvider = TooltipDefaults.rememberRichTooltipPositionProvider(),
-        tooltip = {
-            RichTooltip(
-                title = { Text(stringResource(tip.title), style = MaterialTheme.typography.titleSmall) },
-                colors = TooltipDefaults.richTooltipColors(
-                    containerColor = Palette.Tooltip,
-                    contentColor = Palette.Text,
-                    titleContentColor = Palette.Text,
-                ),
-            ) { Text(stringResource(tip.body), style = MaterialTheme.typography.bodyMedium) }
-        },
-        state = state,
-        enableUserInput = false,
-    ) {
+    TipHost(tip) { open ->
         androidx.compose.foundation.layout.Box(
-            modifier.clickable(onClickLabel = about, role = Role.Button) { scope.launch { state.show() } },
+            modifier.clickable(onClickLabel = about, role = Role.Button, onClick = open),
             contentAlignment = Alignment.Center,
         ) { content() }
     }
@@ -219,12 +291,12 @@ fun TipOnTap(tip: Tip, modifier: Modifier = Modifier, content: @Composable () ->
 
 /** Label, info button and an optional current value. Shared by every setting. */
 @Composable
-private fun SettingLabel(title: String, tip: Tip?, modifier: Modifier = Modifier) {
+private fun SettingLabel(title: String, tip: Tip?, modifier: Modifier = Modifier, color: Color = Palette.Text) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Text(
             title,
             style = MaterialTheme.typography.bodyLarge,
-            color = Palette.Text,
+            color = color,
             modifier = Modifier.weight(1f, fill = false),
         )
         if (tip != null) InfoButton(tip)
@@ -257,9 +329,20 @@ fun SwitchSetting(title: String, tip: Tip, checked: Boolean, detail: String? = n
     }
 }
 
-/** A row that opens something or runs an action. */
+/**
+ * A row that opens something or runs an action. [opens] draws the chevron, so a row that acts at once,
+ * such as copying or deleting, doesn't look like it leads somewhere. [danger] is for removing things.
+ */
 @Composable
-fun ActionRow(title: String, tip: Tip, detail: String? = null, enabled: Boolean = true, onClick: () -> Unit) {
+fun ActionRow(
+    title: String,
+    tip: Tip,
+    detail: String? = null,
+    enabled: Boolean = true,
+    opens: Boolean = true,
+    danger: Boolean = false,
+    onClick: () -> Unit,
+) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -269,7 +352,13 @@ fun ActionRow(title: String, tip: Tip, detail: String? = null, enabled: Boolean 
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            SettingLabel(title, tip)
+            // A row that can't be used now looks it, rather than only ignoring taps.
+            val color = when {
+                !enabled -> Palette.TextDim.copy(alpha = 0.6f)
+                danger -> Palette.Danger
+                else -> Palette.Text
+            }
+            SettingLabel(title, tip, color = color)
             if (detail != null) {
                 Text(
                     detail,
@@ -279,21 +368,25 @@ fun ActionRow(title: String, tip: Tip, detail: String? = null, enabled: Boolean 
                 )
             }
         }
-        Icon(
-            Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = Palette.TextDim,
-        )
+        if (opens) {
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = if (enabled) Palette.TextDim else Palette.TextDim.copy(alpha = 0.4f),
+            )
+        }
     }
 }
 
 /** Opens more settings inside a section. Looks and works like a folding section's header, at row size. */
 @Composable
 fun DisclosureRow(label: String, open: Boolean, onToggle: () -> Unit) {
+    val turn by animateFloatAsState(if (open) 180f else 0f, tween(FOLD_MS, easing = FastOutSlowInEasing), label = "disclosure")
     Row(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = 52.dp)
+            .heightIn(min = 56.dp)
+            .clip(KeyShape)
             .clickable(
                 role = Role.Button,
                 onClickLabel = stringResource(if (open) R.string.ui_fold_close else R.string.ui_fold_open),
@@ -301,12 +394,15 @@ fun DisclosureRow(label: String, open: Boolean, onToggle: () -> Unit) {
             .padding(start = 16.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, color = Palette.Lit, modifier = Modifier.weight(1f))
+        // Plain text with a chevron, like every other row; amber stays for what's lit or active.
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = Palette.Text, modifier = Modifier.weight(1f))
         Icon(
-            if (open) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+            Icons.Filled.KeyboardArrowDown,
             contentDescription = null,
-            tint = Palette.Lit,
-            modifier = Modifier.padding(horizontal = 8.dp),
+            tint = Palette.TextDim,
+            modifier = Modifier
+                .padding(horizontal = 8.dp)
+                .graphicsLayer { rotationZ = turn },
         )
     }
 }
@@ -388,6 +484,8 @@ fun ValueTrack(
     val resetValue by rememberUpdatedState(resetTo)
     val span = range.endInclusive - range.start
     val clamped = value.coerceIn(range)
+    val view = LocalView.current
+    val defaultNow by rememberUpdatedState(default)
 
     Canvas(
         Modifier
@@ -415,6 +513,7 @@ fun ValueTrack(
                         if (isTap) {
                             val now = up!!.uptimeMillis
                             if (now - lastTapAt < DOUBLE_TAP_MS) {
+                                Haptics.tick(view)
                                 change(resetValue)
                                 finished()
                                 lastTapAt = 0L
@@ -424,11 +523,15 @@ fun ValueTrack(
                         }
                         return@awaitEachGesture
                     }
-                    val width = size.width.toFloat().coerceAtLeast(1f)
+                    // The cap travels the width less its own, so the value keeps pace with the finger.
+                    val width = (size.width - 12.dp.toPx()).coerceAtLeast(1f)
                     var running = current
                     horizontalDrag(drag.id) { event ->
                         val moved = event.positionChange().x
+                        val before = running
                         running = (running + moved / width * span).coerceIn(range)
+                        // A tick passing the default, and a firmer one reaching either end, felt without looking.
+                        Haptics.crossing(view, before, running, defaultNow, range)
                         change(running)
                         event.consume()
                     }
@@ -496,15 +599,33 @@ fun ValueTrack(
     }
 }
 
-/** Names of the connected audio outputs, kept current as devices come and go, even while Eigentone is off. */
-/** Whether Android's own spatial audio is on. It can only be read, because only system apps can change it. */
+/**
+ * Whether Android's own spatial audio is on. It can only be read, because only system apps can change it,
+ * and it follows changes made in Quick Settings while the screen is open.
+ */
 @Composable
 fun rememberSystemSpatialAudio(): Boolean {
     val context = LocalContext.current
     val spatializer = remember { context.getSystemService(AudioManager::class.java).spatializer }
-    return remember { spatializer.isAvailable && spatializer.isEnabled }
+    fun read() = spatializer.isAvailable && spatializer.isEnabled
+    var on by remember { mutableStateOf(read()) }
+    DisposableEffect(spatializer) {
+        val listener = object : android.media.Spatializer.OnSpatializerStateChangedListener {
+            override fun onSpatializerEnabledChanged(s: android.media.Spatializer, enabled: Boolean) {
+                on = read()
+            }
+
+            override fun onSpatializerAvailableChanged(s: android.media.Spatializer, available: Boolean) {
+                on = read()
+            }
+        }
+        spatializer.addOnSpatializerStateChangedListener(context.mainExecutor, listener)
+        onDispose { spatializer.removeOnSpatializerStateChangedListener(listener) }
+    }
+    return on
 }
 
+/** Names of the connected audio outputs, kept current as devices come and go, even while Eigentone is off. */
 @Composable
 fun rememberConnectedOutputNames(): List<String> {
     val context = LocalContext.current
@@ -527,16 +648,19 @@ fun rememberConnectedOutputNames(): List<String> {
     return names
 }
 
-/** Whether any app is playing music right now, checked once a second. */
+/** Whether any app is playing music right now, checked once a second while Eigentone is on screen. */
 @Composable
 fun rememberMusicActive(): Boolean {
     val context = LocalContext.current
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     var active by remember { mutableStateOf(true) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(lifecycle) {
         val audio = context.getSystemService(AudioManager::class.java)
-        while (true) {
-            active = audio.isMusicActive
-            delay(MUSIC_CHECK_MS)
+        lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            while (true) {
+                active = audio.isMusicActive
+                delay(MUSIC_CHECK_MS)
+            }
         }
     }
     return active
@@ -556,3 +680,42 @@ fun NothingPlayingHint(modifier: Modifier = Modifier) {
 
 /** The gaps between sections, kept in one place. */
 val SectionSpacing = Arrangement.spacedBy(12.dp)
+
+/**
+ * Touch feedback for the moments that matter: passing a default, reaching an end, switching something
+ * on or off, and confirming. Everyday taps stay silent, so these mean something.
+ */
+object Haptics {
+    fun tick(view: android.view.View) {
+        view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+    }
+
+    fun limit(view: android.view.View) {
+        view.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK)
+    }
+
+    fun toggle(view: android.view.View, on: Boolean) {
+        view.performHapticFeedback(
+            if (android.os.Build.VERSION.SDK_INT >= 34) {
+                if (on) android.view.HapticFeedbackConstants.TOGGLE_ON else android.view.HapticFeedbackConstants.TOGGLE_OFF
+            } else {
+                android.view.HapticFeedbackConstants.CONTEXT_CLICK
+            },
+        )
+    }
+
+    fun confirm(view: android.view.View) {
+        view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
+    }
+
+    /** Feedback for a value moving from [before] to [after]: past [default], or arriving at an end of [range]. */
+    fun crossing(view: android.view.View, before: Float, after: Float, default: Float, range: ClosedFloatingPointRange<Float>) {
+        if (before == after) return
+        val reachedEnd = (after == range.start || after == range.endInclusive) && before != after
+        val passedDefault = (before < default && after >= default) || (before > default && after <= default)
+        when {
+            reachedEnd -> limit(view)
+            passedDefault -> tick(view)
+        }
+    }
+}

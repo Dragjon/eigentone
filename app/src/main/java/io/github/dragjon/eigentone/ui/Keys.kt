@@ -1,5 +1,8 @@
 package io.github.dragjon.eigentone.ui
 
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawBehind
+
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.offset
@@ -94,7 +97,7 @@ fun WordSegments(labels: List<String>, selected: Int, onSelect: (Int) -> Unit, m
 }
 
 /**
- * One switch between two or three choices: a rounded track with a lit thumb that slides to the chosen one, so
+ * One switch between two or three choices: a track with a lit key that slides to the chosen one, so
  * it reads as a single control rather than separate buttons.
  */
 @Composable
@@ -106,10 +109,11 @@ fun SlidingToggle(
 ) {
     androidx.compose.foundation.layout.BoxWithConstraints(
         modifier
-            .height(40.dp)
-            .clip(RoundedCornerShape(20.dp))
+            // A full touch height, with the same square-shouldered corners as every other key.
+            .height(48.dp)
+            .clip(KeyShape)
             .background(Palette.SurfaceHigh)
-            .border(1.dp, Palette.Line, RoundedCornerShape(20.dp))
+            .border(1.dp, Palette.Line, KeyShape)
             .padding(3.dp)
             .selectableGroup(),
     ) {
@@ -120,7 +124,7 @@ fun SlidingToggle(
                 .offset(x = thumbX)
                 .width(share)
                 .fillMaxHeight()
-                .clip(RoundedCornerShape(17.dp))
+                .clip(KeyShape)
                 .background(Palette.Lit),
         )
         Row(Modifier.fillMaxSize()) {
@@ -130,7 +134,7 @@ fun SlidingToggle(
                     Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .clip(RoundedCornerShape(17.dp))
+                        .clip(KeyShape)
                         .selectable(selected = on, role = Role.RadioButton, onClick = { onSelect(i) })
                         .padding(horizontal = 10.dp),
                     horizontalArrangement = Arrangement.Center,
@@ -172,7 +176,14 @@ fun Button(
     val pressed by source.collectIsPressedAsState()
     androidx.compose.material3.Button(
         onClick = onClick,
-        modifier = modifier,
+        // A lit key gives off a soft amber light, as a backlit key on a panel does.
+        modifier = modifier.then(
+            if (enabled) {
+                Modifier.shadow(KEY_GLOW_DP.dp, KeyShape, clip = false, ambientColor = Palette.Glow, spotColor = Palette.Glow)
+            } else {
+                Modifier
+            },
+        ),
         enabled = enabled,
         shape = KeyShape,
         interactionSource = source,
@@ -222,6 +233,8 @@ fun TextButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    /** For actions that remove something, which DESIGN.md draws in Danger Orange. */
+    danger: Boolean = false,
     content: @Composable RowScope.() -> Unit,
 ) {
     androidx.compose.material3.TextButton(
@@ -229,7 +242,7 @@ fun TextButton(
         modifier = modifier,
         enabled = enabled,
         shape = KeyShape,
-        colors = ButtonDefaults.textButtonColors(contentColor = Palette.Text),
+        colors = ButtonDefaults.textButtonColors(contentColor = if (danger) Palette.Danger else Palette.Text),
         content = content,
     )
 }
@@ -269,6 +282,7 @@ fun PresetSwitcher(
     problem: Boolean,
     presets: List<Preset>,
     currentId: String,
+    favorites: Set<String> = emptySet(),
     onPick: (Preset) -> Unit,
     onAll: () -> Unit,
     modifier: Modifier = Modifier,
@@ -306,12 +320,26 @@ fun PresetSwitcher(
                 val current = preset.id == currentId
                 DropdownMenuItem(
                     text = {
-                        Text(
-                            preset.name,
-                            color = if (current) Palette.Lit else Palette.Text,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                preset.name,
+                                color = if (current) Palette.Lit else Palette.Text,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                            // Favourites carry the same star as in the preset list.
+                            if (preset.id in favorites) {
+                                Icon(
+                                    androidx.compose.ui.res.painterResource(R.drawable.ic_star),
+                                    contentDescription = stringResource(R.string.ui_favourite),
+                                    tint = Palette.Lit,
+                                    modifier = Modifier
+                                        .padding(start = 6.dp)
+                                        .size(16.dp),
+                                )
+                            }
+                        }
                     },
                     leadingIcon = {
                         if (current) Icon(Icons.Filled.Check, contentDescription = stringResource(R.string.ui_selected), tint = Palette.Lit)
@@ -360,4 +388,67 @@ fun UndoRedoButtons() {
             )
         }
     }
+}
+
+/**
+ * Material's alert dialog, opening and closing with the same motion as every other dialog in the app,
+ * so it shrinks and fades away rather than vanishing.
+ */
+@Composable
+fun MotionDialog(
+    onDismissRequest: () -> Unit,
+    confirmButton: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    dismissButton: (@Composable () -> Unit)? = null,
+    title: (@Composable () -> Unit)? = null,
+    text: (@Composable () -> Unit)? = null,
+    containerColor: androidx.compose.ui.graphics.Color = Palette.Tooltip,
+    titleContentColor: androidx.compose.ui.graphics.Color = Palette.Text,
+    textContentColor: androidx.compose.ui.graphics.Color = Palette.Text,
+    properties: androidx.compose.ui.window.DialogProperties = androidx.compose.ui.window.DialogProperties(),
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismissRequest,
+        confirmButton = {
+            DialogMotionEffect()
+            confirmButton()
+        },
+        modifier = modifier,
+        dismissButton = dismissButton,
+        title = title,
+        text = text,
+        containerColor = containerColor,
+        titleContentColor = titleContentColor,
+        textContentColor = textContentColor,
+        properties = properties,
+    )
+}
+
+/** Gives the dialog window this is drawn in the app's opening and closing animation. */
+@Composable
+fun DialogMotionEffect() {
+    val view = androidx.compose.ui.platform.LocalView.current
+    androidx.compose.runtime.SideEffect {
+        val provider = view as? androidx.compose.ui.window.DialogWindowProvider
+            ?: view.parent as? androidx.compose.ui.window.DialogWindowProvider
+        provider?.window?.setWindowAnimations(io.github.dragjon.eigentone.R.style.DialogMotion)
+    }
+}
+
+private const val KEY_GLOW_DP = 4
+
+/**
+ * A soft round glow behind something lit, such as the power switch while it's on. Draws nothing in
+ * daylight, or when [on] is false.
+ */
+fun Modifier.litGlow(on: Boolean, strength: Float = 0.16f): Modifier = this.drawBehind {
+    val glow = Palette.Glow
+    if (!on || glow.alpha == 0f) return@drawBehind
+    // Kept close, so it lights the switch without reaching the keys beside it.
+    val radius = size.maxDimension * 0.5f
+    drawCircle(
+        androidx.compose.ui.graphics.Brush.radialGradient(listOf(glow.copy(alpha = strength), androidx.compose.ui.graphics.Color.Transparent), center = center, radius = radius),
+        radius = radius,
+        center = center,
+    )
 }

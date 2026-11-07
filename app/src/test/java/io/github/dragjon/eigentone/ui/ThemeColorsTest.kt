@@ -68,9 +68,12 @@ class ThemeColorsTest {
     }
 
     @Test
-    fun theStripKeepsItsGreenInBothThemes() {
+    fun theStripIsGreenInTheDarkAndWarmInDaylight() {
         assertEquals(Color(0xFF174035), DarkColors.strip)
-        assertEquals(DarkColors.strip, LightColors.strip)
+        // In daylight it's a warm band a shade deeper than the page, with no green or blue cast.
+        val light = LightColors.strip
+        assertTrue(light.red >= light.green && light.green >= light.blue)
+        assertTrue(luminance(light) < luminance(LightColors.background))
     }
 
     @Test

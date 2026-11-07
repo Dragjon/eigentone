@@ -1,0 +1,6 @@
+- Motion throughout: sliding tabs, tools and steps, smooth sections, dialogs that close gently
+- Status strip: icons move into their rows, each row opens its setting
+- Haptics on sliders, faders, power, Bypass and Save
+- Crisper light theme with an orange strip
+- Fill under the EQ curve, stars in the preset menu, duplicate presets
+- Undo for more actions, and many fixes

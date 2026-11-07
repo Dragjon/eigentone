@@ -6,6 +6,12 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 
+    <!-- Every dialog opens and closes with the same motion, so none simply vanishes. -->
+    <style name="DialogMotion">
+        <item name="android:windowEnterAnimation">@anim/dialog_in</item>
+        <item name="android:windowExitAnimation">@anim/dialog_out</item>
+    </style>
+
     <style name="WidgetButton">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">wrap_content</item>

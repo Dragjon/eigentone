@@ -25,6 +25,9 @@ class MediaWatcher(private val context: Context, private val onPlaying: (String)
     private val watched = mutableMapOf<MediaController, MediaController.Callback>()
     private var attached = false
 
+    /** Set once the service is done with it, so a poll already queued can't attach it again. */
+    @Volatile private var released = false
+
     private val sessionsChanged = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
         track(controllers.orEmpty())
     }
@@ -35,6 +38,7 @@ class MediaWatcher(private val context: Context, private val onPlaying: (String)
      */
     fun attachIfAllowed() {
         handler.post {
+            if (released) return@post
             val allowed = isAllowed(context)
             if (attached && !allowed) detach()
             if (attached || !allowed) return@post
@@ -49,6 +53,7 @@ class MediaWatcher(private val context: Context, private val onPlaying: (String)
     }
 
     fun release() {
+        released = true
         handler.post { detach() }
     }
 

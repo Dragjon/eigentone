@@ -77,10 +77,20 @@ fun HearingScreen(onClose: () -> Unit) {
         }
     }
 
-    BackHandler { onClose() }
+    // A back swipe partway through the tones would lose every answer, so it asks first.
+    var confirmingStop by remember { mutableStateOf(false) }
+    fun back() {
+        if (step == HearingStep.TONES && answers > 0) confirmingStop = true else onClose()
+    }
+    BackHandler { back() }
+    if (confirmingStop) {
+        StopTestDialog(onStop = { confirmingStop = false; onClose() }, onKeepGoing = { confirmingStop = false })
+    }
 
-    ToolScreen(title = stringResource(R.string.ui_hearing_check), onBack = onClose, spacing = 16.dp, progress = testProgress) {
-        when (step) {
+    ToolScreen(title = stringResource(R.string.ui_hearing_check), onBack = ::back, spacing = 16.dp, progress = testProgress) {
+        // Each step slides in as the last one leaves.
+        ToolSteps(step) { shown ->
+        when (shown) {
             HearingStep.INTRO -> Intro(onStart = { step = HearingStep.TONES })
             HearingStep.TONES -> {
                 LaunchedEffect(answers, replays) {
@@ -122,6 +132,7 @@ fun HearingScreen(onClose: () -> Unit) {
                 )
             }
             HearingStep.RESULT -> result?.let { Result(it, onClose) }
+        }
         }
     }
 }
@@ -319,7 +330,7 @@ private fun Result(result: HearingResult, onClose: () -> Unit) {
             }
         }
     }
-    TextButton(onClick = onClose, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (hasCurve) stringResource(R.string.ui_discard) else stringResource(R.string.ui_done)) }
+    TextButton(onClick = onClose, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (hasCurve) stringResource(R.string.ui_not_now) else stringResource(R.string.ui_done)) }
 }
 
 /** What each ear measured, side by side, so they can be compared whether or not they need correcting. */

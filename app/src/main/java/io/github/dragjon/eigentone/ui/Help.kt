@@ -127,6 +127,7 @@ object Help {
     val battery = Tip(R.string.help_battery_title, R.string.help_battery_body)
     val console = Tip(R.string.help_console_title, R.string.help_console_body)
     val openSource = Tip(R.string.help_open_source_title, R.string.help_open_source_body)
+    val reportProblem = Tip(R.string.help_report_problem_title, R.string.help_report_problem_body)
 
     val statusRunning = Tip(R.string.help_status_running_title, R.string.help_status_running_body)
     val statusMode = Tip(R.string.help_status_mode_title, R.string.help_status_mode_body)

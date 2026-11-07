@@ -66,7 +66,13 @@ fun DeviceTabIcon(kind: OutputKind, tint: Color, ring: Color) {
     val pulse = remember { Animatable(0f) }
 
     LaunchedEffect(kind) {
-        if (kind == shown) return@LaunchedEffect
+        if (kind == shown) {
+            // A quick change back cancels the animation partway, so the icon is put back to full size.
+            scale.snapTo(1f)
+            orbit.snapTo(0f)
+            pulse.snapTo(0f)
+            return@LaunchedEffect
+        }
         if (SystemClock.uptimeMillis() - opened < SETTLE_MS) {
             shown = kind
             return@LaunchedEffect

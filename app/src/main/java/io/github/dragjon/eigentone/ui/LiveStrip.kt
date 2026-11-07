@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
+
 package io.github.dragjon.eigentone.ui
 
 import androidx.compose.ui.semantics.Role
@@ -8,7 +10,23 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.clickable
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -85,22 +103,34 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
         state.enabled && Processing.peakEstimate(state, attenuationNow, output.key, scheduledNight).risk == ClipRisk.CLIPPING
     }
 
-    var expanded by rememberSaveable { mutableStateOf(false) }
+    val expanded = StripDrawer.open
+    val openEffect = LocalOpenEffect.current
+    // 0 closed, 1 open. The name grows into the room the drawer makes, while the small icons slide down
+    // and out, since the drawer lists each of them in full.
+    val grow by animateFloatAsState(if (expanded) 1f else 0f, tween(STRIP_MS, easing = FastOutSlowInEasing), label = "strip")
+    val turn by animateFloatAsState(if (expanded) 180f else 0f, tween(STRIP_MS, easing = FastOutSlowInEasing), label = "stripChevron")
+    // Each small effect icon in the bar travels down to its own row in the drawer as it opens, and back up
+    // into the bar as it closes, so it's plain which row is which.
+    SharedTransitionLayout(Modifier.fillMaxWidth()) {
+    val shared = this
     Column(
         Modifier
             .fillMaxWidth()
             .background(Palette.Strip)
-            .clickable(
-                role = Role.Button,
-                onClickLabel = stringResource(if (expanded) R.string.ui_strip_hide else R.string.ui_strip_show),
-            ) { expanded = !expanded }
-            .animateContentSize(),
+            // Where the strip and its drawer are, so a tap anywhere else can close the drawer.
+            .onGloballyPositioned { StripDrawer.bounds = it.boundsInRoot() },
     ) {
+    // Ripples and icons stay light on the green whichever theme the page uses.
+    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides Palette.StripText) {
     Row(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = STRIP_HEIGHT_DP.dp)
-            .padding(horizontal = 16.dp, vertical = 4.dp),
+            .heightIn(min = (STRIP_HEIGHT_DP + (STRIP_OPEN_HEIGHT_DP - STRIP_HEIGHT_DP) * grow).dp)
+            .clickable(
+                role = Role.Button,
+                onClickLabel = stringResource(if (expanded) R.string.ui_strip_hide else R.string.ui_strip_show),
+            ) { StripDrawer.open = !expanded }
+            .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -108,44 +138,136 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
             painterResource(outputIcon(output)),
             contentDescription = null,
             tint = if (working) Palette.StripOn else Palette.StripDim,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size((16 + 6 * grow).dp),
         )
         Text(
             output.label,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontSize = (12 + 4 * grow).sp,
+                lineHeight = (16 + 6 * grow).sp,
+            ),
             color = Palette.StripText,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        if (clipping) EffectPill(stringResource(R.string.ui_clip_risk), Palette.StripDanger)
-        effects.forEach { EffectTag(it) }
+        AnimatedVisibility(
+            visible = !expanded,
+            enter = fadeIn(tween(STRIP_MS)),
+            exit = fadeOut(tween(STRIP_MS / 2)),
+        ) {
+            val bar = this
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (clipping) EffectPill(stringResource(R.string.ui_clip_risk), Palette.StripDanger)
+                effects.forEach { effect ->
+                    EffectTag(
+                        effect,
+                        iconModifier = with(shared) {
+                            Modifier.sharedElement(rememberSharedContentState(effectKey(effect.name)), animatedVisibilityScope = bar, boundsTransform = stripBounds)
+                        },
+                    )
+                }
+            }
+        }
         PlayingDot()
         if (showCurve) MiniCurve(state, output.key, working)
+        // Says the strip opens, and turns to say it closes again.
+        Icon(
+            Icons.Filled.KeyboardArrowDown,
+            contentDescription = null,
+            tint = Palette.StripDim,
+            modifier = Modifier
+                .size(18.dp)
+                .graphicsLayer { rotationZ = turn },
+        )
     }
-    if (expanded) StripDetails(effects, output, clipping, state, scheduledNight)
+    AnimatedVisibility(
+        visible = expanded,
+        enter = expandVertically(tween(STRIP_MS, easing = FastOutSlowInEasing), expandFrom = Alignment.Top) + fadeIn(tween(STRIP_MS)),
+        exit = shrinkVertically(tween(STRIP_MS, easing = FastOutSlowInEasing), shrinkTowards = Alignment.Top) + fadeOut(tween(STRIP_MS)),
+    ) {
+        StripDetails(effects, output, clipping, state, scheduledNight, shared) { name ->
+            StripDrawer.open = false
+            openEffect(name)
+        }
+    }
+    }
+    }
     }
 }
 
-/** Every effect by its full name, opened by tapping the strip. */
+private fun effectKey(name: String) = "strip-effect-$name"
+
+/** The icons travel on the same curve and timing as the drawer that carries them. */
+@OptIn(ExperimentalSharedTransitionApi::class)
+private val stripBounds = androidx.compose.animation.BoundsTransform { _, _ -> tween(STRIP_MS, easing = FastOutSlowInEasing) }
+
+/** Whether the strip's drawer is open, and where the strip sits, shared so the rest of the app can close it. */
+object StripDrawer {
+    var open by mutableStateOf(false)
+    var bounds by mutableStateOf(androidx.compose.ui.geometry.Rect.Zero)
+}
+
+/** Opens the setting behind an effect, by its name, from the strip's drawer. */
+val LocalOpenEffect = androidx.compose.runtime.compositionLocalOf<(String) -> Unit> { {} }
+
+private const val STRIP_MS = 280
+private const val STRIP_OPEN_HEIGHT_DP = 52
+
+/** Every effect by its full name, opened by tapping the strip. Each row leads to its setting. */
 @Composable
-private fun StripDetails(effects: List<EffectState>, output: OutputInfo, clipping: Boolean, state: AppState, scheduledNight: Boolean) {
-    val outputLabel = output.label
+private fun androidx.compose.animation.AnimatedVisibilityScope.StripDetails(
+    effects: List<EffectState>,
+    output: OutputInfo,
+    clipping: Boolean,
+    state: AppState,
+    scheduledNight: Boolean,
+    shared: SharedTransitionScope,
+    onOpen: (String) -> Unit,
+) {
+    val drawer = this
     val status by Repo.status.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     Column(
         Modifier
             .fillMaxWidth()
             .background(Palette.StripPanel)
-            .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 8.dp),
     ) {
-        Text(outputLabel, style = MaterialTheme.typography.bodyMedium, color = Palette.StripText)
-        if (clipping) Text(stringResource(R.string.ui_clip_risk), style = MaterialTheme.typography.bodySmall, color = Palette.StripDanger)
-        effects.forEach { effect ->
+        if (clipping) {
+            Text(
+                stringResource(R.string.ui_clip_risk),
+                style = MaterialTheme.typography.bodySmall,
+                color = Palette.StripDanger,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            )
+        }
+        effects.forEachIndexed { index, effect ->
             val colour = if (effect.on) Palette.StripOn else Palette.StripDim
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(painterResource(effectIcon(effect.name)), contentDescription = null, tint = colour, modifier = Modifier.size(18.dp))
+            // Each row drops in just after the one above, and lifts out the same way when the drawer closes.
+            val stagger = index * ROW_STAGGER_MS
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp)
+                    .animateEnterExit(
+                        enter = slideInVertically(tween(STRIP_MS, delayMillis = stagger, easing = FastOutSlowInEasing)) { -it / 2 } +
+                            fadeIn(tween(STRIP_MS, delayMillis = stagger)),
+                        exit = slideOutVertically(tween(STRIP_MS, easing = FastOutSlowInEasing)) { -it / 2 } + fadeOut(tween(STRIP_MS / 2)),
+                    )
+                    .clip(KeyShape)
+                    .clickable(role = Role.Button, onClickLabel = stringResource(R.string.ui_strip_open_setting)) { onOpen(effect.name) }
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    painterResource(effectIcon(effect.name)),
+                    contentDescription = null,
+                    tint = colour,
+                    modifier = with(shared) {
+                        Modifier.sharedElement(rememberSharedContentState(effectKey(effect.name)), animatedVisibilityScope = drawer, boundsTransform = stripBounds)
+                    }.size(18.dp),
+                )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(effectLabel(effect.name)), style = MaterialTheme.typography.bodyMedium, color = Palette.StripText)
@@ -155,11 +277,18 @@ private fun StripDetails(effects: List<EffectState>, output: OutputInfo, clippin
                 Icon(if (effect.on) Icons.Filled.Check else Icons.Filled.Close, contentDescription = null, tint = colour, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(stringResource(if (effect.on) R.string.ui_state_on else R.string.ui_mode_off), style = Readout, color = colour)
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = Palette.StripDim,
+                    modifier = Modifier.padding(start = 4.dp).size(18.dp),
+                )
             }
         }
     }
 }
 
+private const val ROW_STAGGER_MS = 25
 /** What an effect is doing right now, in a few words. */
 @Composable
 private fun effectDetail(effect: EffectState, state: AppState, output: OutputInfo, scheduledNight: Boolean, reverbApps: List<String>): String? {
@@ -221,14 +350,15 @@ private fun effectLabel(name: String): Int = when (name) {
 
 /** An icon for the effect, then a tick or a cross, so the state doesn't rely on colour alone. */
 @Composable
-private fun EffectTag(effect: EffectState) {
+private fun EffectTag(effect: EffectState, iconModifier: Modifier = Modifier) {
     val colour = if (effect.on) Palette.StripOn else Palette.StripDim
-    val description = stringResource(if (effect.on) R.string.ui_effect_on else R.string.ui_effect_off, effect.name)
+    // Announced by the name shown in the drawer, not the short code used inside the app.
+    val description = stringResource(if (effect.on) R.string.ui_effect_on else R.string.ui_effect_off, stringResource(effectLabel(effect.name)))
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = description },
     ) {
-        Icon(painterResource(effectIcon(effect.name)), contentDescription = null, tint = colour, modifier = Modifier.size(16.dp))
+        Icon(painterResource(effectIcon(effect.name)), contentDescription = null, tint = colour, modifier = iconModifier.size(16.dp))
         Icon(
             if (effect.on) Icons.Filled.Check else Icons.Filled.Close,
             contentDescription = null,
@@ -291,23 +421,25 @@ private fun MiniCurve(state: AppState, outputKey: String, working: Boolean) {
         DoubleArray(MINI_POINTS + 1) { i -> Eq.curveDb(list, Eq.logFreq(i.toDouble() / MINI_POINTS)) }
     val left = remember(filters, channels) { sample(channels?.first ?: filters) }
     val right = remember(channels) { channels?.second?.let(::sample) }
+    // Drawn in the theme's own colours, which the strip follows.
+    val strip = if (Palette.colors == DarkColors) DarkColors else LightColors
     val leftColour = when {
-        !working -> Palette.TextDim
-        right != null -> Palette.LeftEar
-        else -> Palette.Lit
+        !working -> strip.textDim
+        right != null -> strip.leftEar
+        else -> strip.lit
     }
-    val rightColour = if (working) Palette.RightEar else Palette.TextDim
+    val rightColour = if (working) strip.rightEar else strip.textDim
 
     Canvas(
         Modifier
             .size(width = 52.dp, height = 26.dp)
             .clip(RoundedCornerShape(4.dp))
-            .background(Palette.Bar)
+            .background(strip.bar)
             .semantics { contentDescription = appText(R.string.ui_current_sound_curve) },
     ) {
         spectrum.value?.let { bands -> drawBars(bands) }
         val zero = size.height / 2
-        drawLine(Palette.Line, Offset(0f, zero), Offset(size.width, zero), strokeWidth = 1f)
+        drawLine(strip.line, Offset(0f, zero), Offset(size.width, zero), strokeWidth = 1f)
         drawMiniLine(left, leftColour, dashed = false)
         right?.let { drawMiniLine(it, rightColour, dashed = true) }
     }
@@ -323,7 +455,7 @@ private fun DrawScope.drawBars(bands: FloatArray) {
         if (level > 0f) {
             val height = level * size.height
             drawRect(
-                Palette.TextDim.copy(alpha = 0.35f),
+                (if (Palette.colors == DarkColors) DarkColors else LightColors).textDim.copy(alpha = 0.35f),
                 topLeft = Offset(bar * barWidth, size.height - height),
                 size = Size(barWidth * 0.8f, height),
             )

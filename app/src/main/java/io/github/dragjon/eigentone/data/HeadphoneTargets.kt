@@ -123,7 +123,8 @@ object HeadphoneTargets {
             val cells = line.split(',')
             val hz = cells.getOrNull(hzColumn)?.toDoubleOrNull() ?: return@mapNotNull null
             val db = cells.getOrNull(targetColumn)?.toDoubleOrNull() ?: return@mapNotNull null
-            if (db.isFinite() && hz.isFinite()) hz to db else null
+            // A frequency of zero or below can't sit on a log scale and would turn the curve into NaN.
+            if (db.isFinite() && hz.isFinite() && hz > 0) hz to db else null
         }
         if (curve.size < 2 || curve != curve.sortedBy { it.first }) return null
         val reference = GraphicEq.interpolate(curve, REFERENCE_HZ)
