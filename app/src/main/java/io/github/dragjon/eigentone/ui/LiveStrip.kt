@@ -21,6 +21,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.ui.layout.layout
+import kotlin.math.roundToInt
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -107,11 +110,30 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
     val openEffect = LocalOpenEffect.current
     // 0 closed, 1 open. The name grows into the room the drawer makes, while the small icons slide down
     // and out, since the drawer lists each of them in full.
-    val grow by animateFloatAsState(if (expanded) 1f else 0f, tween(STRIP_MS, easing = FastOutSlowInEasing), label = "strip")
-    val turn by animateFloatAsState(if (expanded) 180f else 0f, tween(STRIP_MS, easing = FastOutSlowInEasing), label = "stripChevron")
+    // Read only while laying out and drawing, never while composing, so the strip isn't rebuilt every frame
+    // of the animation: the name and icon are scaled rather than given a new size each frame.
+    val grow = animateFloatAsState(if (expanded) 1f else 0f, tween(STRIP_MS, easing = LinearOutSlowInEasing), label = "strip")
+    val turn by animateFloatAsState(if (expanded) 180f else 0f, tween(STRIP_MS, easing = LinearOutSlowInEasing), label = "stripChevron")
+    val nameScale = { STRIP_NAME_CLOSED + (1f - STRIP_NAME_CLOSED) * grow.value }
     // Each small effect icon in the bar travels down to its own row in the drawer as it opens, and back up
     // into the bar as it closes, so it's plain which row is which.
-    SharedTransitionLayout(Modifier.fillMaxWidth()) {
+    // The open drawer lies over the page rather than pushing it down, so the page holds still and isn't
+    // laid out and redrawn on every frame while the drawer moves. The strip only ever takes its closed height.
+    val closedHeight = remember { intArrayOf(0) }
+    SharedTransitionLayout(
+        Modifier
+            .fillMaxWidth()
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                val taken = if (closedHeight[0] > 0) closedHeight[0].coerceAtMost(placeable.height) else placeable.height
+                layout(placeable.width, taken) { placeable.place(0, 0) }
+            }
+            // Lifts off the page as it opens, so it reads as lying over it.
+            .graphicsLayer {
+                shadowElevation = STRIP_DRAWER_SHADOW_DP.dp.toPx() * grow.value
+                clip = false
+            },
+    ) {
     val shared = this
     Column(
         Modifier
@@ -125,7 +147,13 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
     Row(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = (STRIP_HEIGHT_DP + (STRIP_OPEN_HEIGHT_DP - STRIP_HEIGHT_DP) * grow).dp)
+            .layout { measurable, constraints ->
+                val least = (STRIP_HEIGHT_DP + (STRIP_OPEN_HEIGHT_DP - STRIP_HEIGHT_DP) * grow.value).dp.roundToPx()
+                val placeable = measurable.measure(constraints.copy(minHeight = least.coerceIn(constraints.minHeight, constraints.maxHeight)))
+                // The height the strip keeps on the page, taken while shut, so a larger font still fits.
+                if (grow.value == 0f) closedHeight[0] = placeable.height
+                layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+            }
             .clickable(
                 role = Role.Button,
                 onClickLabel = stringResource(if (expanded) R.string.ui_strip_hide else R.string.ui_strip_show),
@@ -138,18 +166,19 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
             painterResource(outputIcon(output)),
             contentDescription = null,
             tint = if (working) Palette.StripOn else Palette.StripDim,
-            modifier = Modifier.size((16 + 6 * grow).dp),
+            modifier = Modifier
+                .grownBy(nameScale)
+                .size(22.dp),
         )
         Text(
             output.label,
-            style = MaterialTheme.typography.bodySmall.copy(
-                fontSize = (12 + 4 * grow).sp,
-                lineHeight = (16 + 6 * grow).sp,
-            ),
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 16.sp, lineHeight = 22.sp),
             color = Palette.StripText,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .grownBy(nameScale),
         )
         AnimatedVisibility(
             visible = !expanded,
@@ -183,8 +212,8 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
     }
     AnimatedVisibility(
         visible = expanded,
-        enter = expandVertically(tween(STRIP_MS, easing = FastOutSlowInEasing), expandFrom = Alignment.Top) + fadeIn(tween(STRIP_MS)),
-        exit = shrinkVertically(tween(STRIP_MS, easing = FastOutSlowInEasing), shrinkTowards = Alignment.Top) + fadeOut(tween(STRIP_MS)),
+        enter = expandVertically(tween(STRIP_MS, easing = LinearOutSlowInEasing), expandFrom = Alignment.Top) + fadeIn(tween(STRIP_MS)),
+        exit = shrinkVertically(tween(STRIP_MS, easing = LinearOutSlowInEasing), shrinkTowards = Alignment.Top) + fadeOut(tween(STRIP_MS)),
     ) {
         StripDetails(effects, output, clipping, state, scheduledNight, shared) { name ->
             StripDrawer.open = false
@@ -200,7 +229,7 @@ private fun effectKey(name: String) = "strip-effect-$name"
 
 /** The icons travel on the same curve and timing as the drawer that carries them. */
 @OptIn(ExperimentalSharedTransitionApi::class)
-private val stripBounds = androidx.compose.animation.BoundsTransform { _, _ -> tween(STRIP_MS, easing = FastOutSlowInEasing) }
+private val stripBounds = androidx.compose.animation.BoundsTransform { _, _ -> tween(STRIP_MS, easing = LinearOutSlowInEasing) }
 
 /** Whether the strip's drawer is open, and where the strip sits, shared so the rest of the app can close it. */
 object StripDrawer {
@@ -213,6 +242,35 @@ val LocalOpenEffect = androidx.compose.runtime.compositionLocalOf<(String) -> Un
 
 private const val STRIP_MS = 280
 private const val STRIP_OPEN_HEIGHT_DP = 52
+private const val STRIP_DRAWER_SHADOW_DP = 8
+
+/** The name and its icon are drawn at their open size and shrunk by this while the drawer is shut (12 sp of 16). */
+private const val STRIP_NAME_CLOSED = 0.75f
+
+/**
+ * Lays its content out at full size, then shrinks it by [scale] and takes only the room it then needs, so a
+ * growing label costs a cheap re-layout each frame rather than a rebuild at a new font size. Text still
+ * ellipsises at the width it ends up with.
+ */
+private fun Modifier.grownBy(scale: () -> Float): Modifier = layout { measurable, constraints ->
+    val s = scale().coerceAtLeast(0.01f)
+    val inner = constraints.copy(
+        minWidth = 0,
+        maxWidth = if (constraints.hasBoundedWidth) (constraints.maxWidth / s).toInt() else constraints.maxWidth,
+        minHeight = 0,
+        maxHeight = if (constraints.hasBoundedHeight) (constraints.maxHeight / s).toInt() else constraints.maxHeight,
+    )
+    val placeable = measurable.measure(inner)
+    val width = (placeable.width * s).roundToInt().coerceIn(constraints.minWidth, constraints.maxWidth)
+    val height = (placeable.height * s).roundToInt().coerceIn(constraints.minHeight, constraints.maxHeight)
+    layout(width, height) {
+        placeable.placeWithLayer(0, 0) {
+            scaleX = s
+            scaleY = s
+            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+        }
+    }
+}
 
 /** Every effect by its full name, opened by tapping the strip. Each row leads to its setting. */
 @Composable
@@ -251,9 +309,9 @@ private fun androidx.compose.animation.AnimatedVisibilityScope.StripDetails(
                     .fillMaxWidth()
                     .heightIn(min = 52.dp)
                     .animateEnterExit(
-                        enter = slideInVertically(tween(STRIP_MS, delayMillis = stagger, easing = FastOutSlowInEasing)) { -it / 2 } +
+                        enter = slideInVertically(tween(STRIP_MS, delayMillis = stagger, easing = LinearOutSlowInEasing)) { -it / 2 } +
                             fadeIn(tween(STRIP_MS, delayMillis = stagger)),
-                        exit = slideOutVertically(tween(STRIP_MS, easing = FastOutSlowInEasing)) { -it / 2 } + fadeOut(tween(STRIP_MS / 2)),
+                        exit = slideOutVertically(tween(STRIP_MS, easing = LinearOutSlowInEasing)) { -it / 2 } + fadeOut(tween(STRIP_MS / 2)),
                     )
                     .clip(KeyShape)
                     .clickable(role = Role.Button, onClickLabel = stringResource(R.string.ui_strip_open_setting)) { onOpen(effect.name) }

@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.dragjon.eigentone.R
+import io.github.dragjon.eigentone.data.BuiltIns
 import io.github.dragjon.eigentone.data.CurveDifference
 import io.github.dragjon.eigentone.data.Preset
 import io.github.dragjon.eigentone.data.Processing
@@ -53,7 +54,14 @@ import io.github.dragjon.eigentone.dsp.GraphicEq
 @Composable
 fun CurveCompareScreen(onClose: () -> Unit) {
     val state by Repo.state.collectAsStateWithLifecycle()
-    val presets = remember(state.presets) { Repo.allPresets(state) }
+    // The same choice as everywhere else: corrections for particular headphones only while those are
+    // connected, though the one in use is always there to compare.
+    val connected = rememberConnectedOutputNames()
+    val presets = remember(connected, state.presets, state.current.id) {
+        val offered = BuiltIns.availableFor(connected) + state.presets
+        val inUse = Repo.allPresets(state).firstOrNull { it.id == state.current.id }
+        if (inUse != null && offered.none { it.id == inUse.id }) listOf(inUse) + offered else offered
+    }
     // The one in use first, against the one most likely to be compared with it: the next of your own.
     var firstId by rememberSaveable { mutableStateOf(state.current.id) }
     var secondId by rememberSaveable {
@@ -225,7 +233,7 @@ private fun PresetPicker(label: String, chosen: Preset, presets: List<Preset>, s
             }
         }
         // Capped, so a long list scrolls rather than running under the navigation bar out of reach.
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = Palette.Tooltip, modifier = Modifier.heightIn(max = MENU_MAX_DP.dp)) {
+        MotionMenu(expanded = open, onDismissRequest = { open = false }) {
             presets.forEach { preset ->
                 DropdownMenuItem(
                     text = { Text(preset.name, color = if (preset.id == chosen.id) Palette.Lit else Palette.Text, maxLines = 1, overflow = TextOverflow.Ellipsis) },

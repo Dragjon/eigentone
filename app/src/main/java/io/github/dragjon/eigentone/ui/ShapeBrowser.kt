@@ -560,7 +560,7 @@ private fun SoundFilter(selected: ShapeTrait?, onSelect: (ShapeTrait?) -> Unit) 
                 Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
             }
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        MotionMenu(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.ui_any_sound)) },
                 onClick = {

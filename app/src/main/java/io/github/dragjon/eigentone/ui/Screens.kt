@@ -8,6 +8,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.layout.navigationBars
@@ -116,6 +117,9 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.layout.layout
+import kotlinx.coroutines.flow.first
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.text.drawText
@@ -225,7 +229,10 @@ private val LocalOpenHearing = compositionLocalOf<() -> Unit> { error("No hearin
 private val LocalOpenRefine = compositionLocalOf<() -> Unit> { error("No refine") }
 
 private const val SEARCH_FROM_PRESETS = 6
-private const val TAB_SLIDE_MS = 260
+private const val TAB_SLIDE_MS = 240
+
+/** How long after the app appears the tabs not yet visited are built, so the opening isn't slowed by them. */
+private const val TAB_PREBUILD_DELAY_MS = 400L
 private const val OPEN_MS = 1500
 /** When, as a share of the opening, the app starts to fade in behind the line. */
 private const val OPEN_UNFOLD_AT = 0.52f
@@ -425,8 +432,9 @@ private class OverlayOpeners(
     val curves: () -> Unit,
 )
 
-private fun <T> screenSlide() = tween<T>(SCREEN_MS, easing = FastOutSlowInEasing)
-private fun <T> screenFade() = tween<T>(SCREEN_MS)
+// Decelerating from full speed, so a page moves on the very first frame after the tap rather than easing in.
+private fun <T> screenSlide() = tween<T>(SCREEN_MS, easing = androidx.compose.animation.core.LinearOutSlowInEasing)
+private fun <T> screenFade() = tween<T>(SCREEN_MS / 2)
 private const val SCREEN_MS = 300
 
 /** The app itself: the bars, the strip, and the tab that's open. */
@@ -580,38 +588,70 @@ private fun AppScreen(
                     .padding(padding),
                 contentAlignment = Alignment.TopCenter,
             ) {
+                // Every tab stays built once made, so a switch only slides pages rather than first building one.
+                // The rest are built shortly after the app appears, one at a time, so opening stays quick.
+                var built by remember { mutableStateOf(setOf(tab)) }
+                LaunchedEffect(Unit) {
+                    androidx.compose.runtime.snapshotFlow { opening.value >= 1f }.first { it }
+                    kotlinx.coroutines.delay(TAB_PREBUILD_DELAY_MS)
+                    Tab.entries.forEach { t ->
+                        if (t in built) return@forEach
+                        built = built + t
+                        repeat(2) { androidx.compose.runtime.withFrameNanos { } }
+                    }
+                }
+                // What each page last showed while in view. A page out of view keeps it, so changes elsewhere,
+                // such as a fader being dragged, don't make the hidden pages redo their work.
+                val lastSeen = remember { HashMap<Tab, Pair<AppState, EngineStatus>>() }
                 // Tabs slide towards where they sit in the bar, so moving right slides the page left, and back.
-                AnimatedContent(
-                    targetState = tab,
-                    transitionSpec = {
-                        val forward = targetState.ordinal > initialState.ordinal
-                        val sign = if (forward) 1 else -1
-                        (slideInHorizontally(tween(TAB_SLIDE_MS, easing = FastOutSlowInEasing)) { sign * it / 3 } + fadeIn(tween(TAB_SLIDE_MS))) togetherWith
-                            (slideOutHorizontally(tween(TAB_SLIDE_MS, easing = FastOutSlowInEasing)) { -sign * it / 3 } + fadeOut(tween(TAB_SLIDE_MS / 2)))
-                    },
-                    label = "tab",
-                ) { shownTab ->
-                    // The whole width scrolls, so the space beside the page works too, as on a tablet or in landscape.
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .verticalScroll(scrolls.getValue(shownTab)),
-                        contentAlignment = Alignment.TopCenter,
-                    ) {
-                        Column(
-                            Modifier
-                                .widthIn(max = 640.dp)
-                                .fillMaxWidth()
-                                // Room at the end, so the last setting can scroll clear of the floating save bar.
-                                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = UNSAVED_BAR_ROOM_DP.dp),
-                            verticalArrangement = SectionSpacing,
-                        ) {
-                            when (shownTab) {
-                                Tab.EQ -> EqTab(state)
-                                Tab.SOUND -> SoundTab(state)
-                                Tab.PRESETS -> PresetsTab(state)
-                                Tab.HEADPHONES -> HeadphonesTab(state)
-                                Tab.SYSTEM -> SystemTab(state, status)
+                val pages = androidx.compose.animation.core.updateTransition(tab, label = "tab")
+                Tab.entries.forEach { t ->
+                    if (t !in built && t != tab) return@forEach
+                    androidx.compose.runtime.key(t) {
+                        val presence = pages.animateFloat(
+                            transitionSpec = { tween(TAB_SLIDE_MS, easing = LinearOutSlowInEasing) },
+                            label = "page",
+                        ) { if (it == t) 1f else 0f }
+                        val seen = if (t == tab) (state to status).also { lastSeen[t] = it } else lastSeen.getOrPut(t) { state to status }
+                        CompositionLocalProvider(LocalPageShown provides (t == tab)) {
+                            // The whole width scrolls, so the space beside the page works too, as on a tablet or in landscape.
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    // A page out of view isn't placed, so it draws nothing and can't be touched or read out.
+                                    .layout { measurable, constraints ->
+                                        val placeable = measurable.measure(constraints)
+                                        layout(placeable.width, placeable.height) {
+                                            if (t == pages.targetState || presence.value > 0f) placeable.place(0, 0)
+                                        }
+                                    }
+                                    .graphicsLayer {
+                                        val p = presence.value
+                                        val entering = t == pages.targetState
+                                        val sign = if (pages.targetState.ordinal >= pages.currentState.ordinal) 1f else -1f
+                                        translationX = (if (entering) sign else -sign) * (1f - p) * size.width / 3f
+                                        // Fades over the first half: the new page arrives quickly, the old one leaves quickly.
+                                        alpha = if (entering) (p * 2f).coerceAtMost(1f) else ((p - 0.5f) * 2f).coerceIn(0f, 1f)
+                                    }
+                                    .verticalScroll(scrolls.getValue(t)),
+                                contentAlignment = Alignment.TopCenter,
+                            ) {
+                                Column(
+                                    Modifier
+                                        .widthIn(max = 640.dp)
+                                        .fillMaxWidth()
+                                        // Room at the end, so the last setting can scroll clear of the floating save bar.
+                                        .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = UNSAVED_BAR_ROOM_DP.dp),
+                                    verticalArrangement = SectionSpacing,
+                                ) {
+                                    when (t) {
+                                        Tab.EQ -> EqTab(seen.first)
+                                        Tab.SOUND -> SoundTab(seen.first)
+                                        Tab.PRESETS -> PresetsTab(seen.first)
+                                        Tab.HEADPHONES -> HeadphonesTab(seen.first)
+                                        Tab.SYSTEM -> SystemTab(seen.first, seen.second)
+                                    }
+                                }
                             }
                         }
                     }
@@ -850,7 +890,7 @@ private fun EqTab(state: AppState) {
     val showParametric = Disclosure.parametric(state)
     val inGraphic = graphicMode || !showParametric
     // The graph grows for parametric editing and shrinks back above the faders, rather than jumping.
-    val graphHeight = androidx.compose.animation.core.animateDpAsState(if (inGraphic) 170.dp else 260.dp, tween(TAB_SLIDE_MS, easing = FastOutSlowInEasing), label = "graphHeight")
+    val graphHeight = androidx.compose.animation.core.animateDpAsState(if (inGraphic) 170.dp else 260.dp, tween(TAB_SLIDE_MS, easing = LinearOutSlowInEasing), label = "graphHeight")
     val attenuation by Repo.attenuationDb.collectAsStateWithLifecycle()
     val curveFilters = remember(state, attenuation, Repo.output.value.key) { Processing.effectiveFilters(state, attenuation, Repo.output.value.key) }
     val graphOutput by Repo.output.collectAsStateWithLifecycle()
@@ -986,8 +1026,8 @@ private fun EqTab(state: AppState) {
         targetState = inGraphic,
         transitionSpec = {
             val sign = if (targetState) -1 else 1
-            (slideInHorizontally(tween(TAB_SLIDE_MS, easing = FastOutSlowInEasing)) { sign * it / 4 } + fadeIn(tween(TAB_SLIDE_MS))) togetherWith
-                (slideOutHorizontally(tween(TAB_SLIDE_MS, easing = FastOutSlowInEasing)) { -sign * it / 4 } + fadeOut(tween(TAB_SLIDE_MS / 2))) using
+            (slideInHorizontally(tween(TAB_SLIDE_MS, easing = LinearOutSlowInEasing)) { sign * it / 4 } + fadeIn(tween(TAB_SLIDE_MS / 2))) togetherWith
+                (slideOutHorizontally(tween(TAB_SLIDE_MS, easing = LinearOutSlowInEasing)) { -sign * it / 4 } + fadeOut(tween(TAB_SLIDE_MS / 2))) using
                 androidx.compose.animation.SizeTransform(clip = false)
         },
         label = "eqMode",
@@ -1050,8 +1090,8 @@ private fun EqTab(state: AppState) {
             transitionSpec = {
                 val forward = filters.indexOfFirst { it.id == targetState } >= filters.indexOfFirst { it.id == initialState }
                 val sign = if (forward) 1 else -1
-                (slideInHorizontally(tween(TAB_SLIDE_MS, easing = FastOutSlowInEasing)) { sign * it / 5 } + fadeIn(tween(TAB_SLIDE_MS))) togetherWith
-                    (slideOutHorizontally(tween(TAB_SLIDE_MS, easing = FastOutSlowInEasing)) { -sign * it / 5 } + fadeOut(tween(TAB_SLIDE_MS / 2))) using
+                (slideInHorizontally(tween(TAB_SLIDE_MS, easing = LinearOutSlowInEasing)) { sign * it / 5 } + fadeIn(tween(TAB_SLIDE_MS / 2))) togetherWith
+                    (slideOutHorizontally(tween(TAB_SLIDE_MS, easing = LinearOutSlowInEasing)) { -sign * it / 5 } + fadeOut(tween(TAB_SLIDE_MS / 2))) using
                     androidx.compose.animation.SizeTransform(clip = false)
             },
             label = "filter",
