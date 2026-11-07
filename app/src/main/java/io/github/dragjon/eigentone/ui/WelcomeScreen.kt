@@ -371,7 +371,14 @@ private fun TurnOn(state: AppState, onSetEnabled: (Boolean) -> Unit) {
     Heading(stringResource(R.string.welcome_on_title), stringResource(R.string.welcome_on_body))
     if (!state.enabled) {
         Button(
-            onClick = { permission.launch(Manifest.permission.POST_NOTIFICATIONS) },
+            onClick = {
+                // Android 12 and older show the notification without asking.
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    onSetEnabled(true)
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 52.dp),

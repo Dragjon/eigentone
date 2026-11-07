@@ -612,6 +612,8 @@ fun ValueTrack(
  */
 @Composable
 fun rememberSystemSpatialAudio(): Boolean {
+    // Android's spatial audio arrived in Android 12L.
+    if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S_V2) return false
     val context = LocalContext.current
     val spatializer = remember { context.getSystemService(AudioManager::class.java).spatializer }
     fun read() = spatializer.isAvailable && spatializer.isEnabled

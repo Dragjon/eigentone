@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/Dragjon/eigentone/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/Dragjon/eigentone?include_prereleases&label=release&color=FFC24A"></a>
   <a href="LICENSE"><img alt="Licence: GPL v3" src="https://img.shields.io/badge/licence-GPL--3.0-0D0C09"></a>
-  <img alt="Android 13 and newer" src="https://img.shields.io/badge/Android-13%2B-3DDC84">
+  <img alt="Android 11 and newer" src="https://img.shields.io/badge/Android-11%2B-3DDC84">
   <a href="https://github.com/Dragjon/eigentone/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/Dragjon/eigentone/total?color=FFC24A"></a>
 </p>
 
@@ -60,7 +60,7 @@ Eigentone sits behind Spotify, YouTube and most other apps, and shapes their sou
 | Finding problems by ear | Peak finder, frequency sweep and a blind A/B comparison | Not in its feature list |
 | Curves and files | 350-shape library, ParametricEQ and GraphicEQ import, GraphicEQ export, share codes | Not in its feature list |
 | Ads and tracking | None. No analytics, no account | No ads<sup>[4]</sup> |
-| Availability | GitHub releases, Android 13 and newer, tested on one phone so far | Google Play, 5.5 million+ installs<sup>[4]</sup> |
+| Availability | GitHub releases, Android 11 and newer, tested on one phone so far | Google Play, 5.5 million+ installs<sup>[4]</sup> |
 
 Where Wavelet is ahead: it's on Google Play, it has years of testing across millions of phones, and its AutoEq database works offline, where Eigentone downloads a profile when you ask for one. If you want the simplest one-tap correction on a phone Eigentone hasn't been tested on, Wavelet is a safe choice. If you want to shape the sound in detail, fit it to your own ears, or know exactly what the app does, that's what Eigentone is for.
 

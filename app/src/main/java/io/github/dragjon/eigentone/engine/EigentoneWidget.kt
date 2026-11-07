@@ -1,6 +1,5 @@
 package io.github.dragjon.eigentone.engine
 
-import android.app.ForegroundServiceStartNotAllowedException
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
@@ -73,7 +72,8 @@ class WidgetReceiver : BroadcastReceiver() {
     private fun start(context: Context) {
         try {
             AudioService.start(context)
-        } catch (e: ForegroundServiceStartNotAllowedException) {
+        } catch (e: IllegalStateException) {
+            if (!e.isBackgroundStartRefused()) throw e
             // Android refused a background start, so open the app, which can start it.
             context.startActivity(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }

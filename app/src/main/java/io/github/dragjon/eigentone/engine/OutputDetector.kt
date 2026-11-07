@@ -23,7 +23,7 @@ object OutputDetector {
     fun current(context: Context): Detected {
         val audio = context.getSystemService(AudioManager::class.java)
         // Where Android is sending music right now, which matters when two outputs are connected at once.
-        val routed = runCatching {
+        val routed = if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) emptyList() else runCatching {
             audio.getAudioDevicesForAttributes(
                 android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_MEDIA).build(),
             )

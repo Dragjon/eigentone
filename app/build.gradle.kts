@@ -19,7 +19,7 @@ android {
 
     defaultConfig {
         applicationId = "io.github.dragjon.eigentone"
-        minSdk = 33
+        minSdk = 30
         targetSdk = 36
         versionCode = 59
         versionName = "0.39.1"

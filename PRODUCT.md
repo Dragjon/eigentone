@@ -12,7 +12,7 @@ Headphone enthusiasts on Android phones who know AutoEq, Q and dB, and want prec
 
 ## Product Purpose
 
-A free, system-wide equaliser for Android 13 and newer that needs no root. It works with Spotify, YouTube and most other apps, and tunes sound to one person's ears and headphones. Success is sound the listener prefers, confirmed by their own ears rather than by the app's claims.
+A free, system-wide equaliser for Android 11 and newer that needs no root. It works with Spotify, YouTube and most other apps, and tunes sound to one person's ears and headphones. Success is sound the listener prefers, confirmed by their own ears rather than by the app's claims.
 
 ## Positioning
 

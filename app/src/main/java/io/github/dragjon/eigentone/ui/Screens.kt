@@ -166,6 +166,7 @@ import io.github.dragjon.eigentone.dsp.Eq
 import io.github.dragjon.eigentone.dsp.Filter
 import io.github.dragjon.eigentone.dsp.FilterType
 import io.github.dragjon.eigentone.engine.SpectrumAnalyser
+import io.github.dragjon.eigentone.engine.readAtMost
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -2677,7 +2678,7 @@ private fun ManageSection(state: AppState) {
                 runCatching {
                     val text = resolver.openInputStream(uri)!!.use { s ->
                         // Real EQ files are tiny. The limit protects against opening the wrong file.
-                        s.readNBytes(MAX_IMPORT_BYTES).decodeToString()
+                        s.readAtMost(MAX_IMPORT_BYTES).decodeToString()
                     }
                     val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
                         ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
@@ -2745,7 +2746,7 @@ private fun ManageSection(state: AppState) {
         scope.launch {
             val text = withContext(Dispatchers.IO) {
                 runCatching {
-                    context.contentResolver.openInputStream(uri)!!.use { it.readNBytes(MAX_BACKUP_BYTES).decodeToString() }
+                    context.contentResolver.openInputStream(uri)!!.use { it.readAtMost(MAX_BACKUP_BYTES).decodeToString() }
                 }.getOrNull()
             }
             // A restore replaces presets with the same names, so it can be taken back for a while.

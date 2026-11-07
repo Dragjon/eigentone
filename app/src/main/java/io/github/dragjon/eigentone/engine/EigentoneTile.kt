@@ -1,6 +1,5 @@
 package io.github.dragjon.eigentone.engine
 
-import android.app.ForegroundServiceStartNotAllowedException
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
@@ -23,7 +22,8 @@ class EigentoneTile : TileService() {
         if (turnOn) {
             try {
                 AudioService.start(this)
-            } catch (e: ForegroundServiceStartNotAllowedException) {
+            } catch (e: IllegalStateException) {
+                if (!e.isBackgroundStartRefused()) throw e
                 // Android refused a background start, so open the app, which can start it.
                 val intent = Intent(this, MainActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

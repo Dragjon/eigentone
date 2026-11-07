@@ -3,13 +3,13 @@ package io.github.dragjon.eigentone.ui
 import io.github.dragjon.eigentone.R
 import androidx.compose.ui.res.stringResource
 import android.Manifest
-import android.app.ForegroundServiceStartNotAllowedException
 import android.app.UiModeManager
 import android.content.Intent
 import android.graphics.Color
 import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.map
 import io.github.dragjon.eigentone.engine.AudioService
 import io.github.dragjon.eigentone.engine.OutputDetector
 import io.github.dragjon.eigentone.engine.PresetShortcuts
+import io.github.dragjon.eigentone.engine.isBackgroundStartRefused
 
 class MainActivity : ComponentActivity() {
 
@@ -50,7 +51,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         AppText.context = applicationContext
         // On a first run the welcome asks, with an explanation, when the EQ is turned on.
-        if (Repo.state.value.welcomeDone) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        // Android 12 and older show the notification without asking.
+        if (Repo.state.value.welcomeDone && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         setContent {
             val modes = remember { Repo.state.map { it.themeMode }.distinctUntilChanged() }
             val mode by modes.collectAsStateWithLifecycle(Repo.state.value.themeMode)
@@ -72,6 +74,8 @@ class MainActivity : ComponentActivity() {
 
     /** Android remembers this, so the window behind the app opens in the right colour next time, with no flash. */
     private fun matchWindowToTheme(mode: ThemeMode) {
+        // Only from Android 12. Before that the window takes the phone's own light or dark setting.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
         getSystemService(UiModeManager::class.java).setApplicationNightMode(
             when (mode) {
                 ThemeMode.DEVICE -> UiModeManager.MODE_NIGHT_AUTO
@@ -121,7 +125,8 @@ class MainActivity : ComponentActivity() {
     private fun startEngine() {
         try {
             AudioService.start(this)
-        } catch (e: ForegroundServiceStartNotAllowedException) {
+        } catch (e: IllegalStateException) {
+            if (!e.isBackgroundStartRefused()) throw e
             Log.w("Eigentone", "Could not start engine", e)
             Repo.status.value = Repo.status.value.copy(error = appText(R.string.ui_android_blocked_the_background_service, e.message))
         }
