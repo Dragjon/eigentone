@@ -1001,4 +1001,35 @@
     <string name="ui_duplicate_preset" formatted="false">Duplicate</string>
     <string name="ui_duplicate_preset_named" formatted="false">Duplicate %1$s</string>
     <string name="ui_favourite" formatted="false">Favourite</string>
+    <string name="ui_compare_curves" formatted="false">Compare curves</string>
+    <string name="ui_compare_curves_detail" formatted="false">See two presets side by side, and how they differ in words</string>
+    <string name="ui_compare_curves_intro" formatted="false">Choose two presets. Both curves are drawn on one graph, and below is what the first has more or less of than the second. Nothing about the sound changes here.</string>
+    <string name="ui_curve_first" formatted="false">First (solid)</string>
+    <string name="ui_curve_second" formatted="false">Second (dashed)</string>
+    <string name="ui_curve_differences" formatted="false">How they differ</string>
+    <string name="ui_curve_differences_note" formatted="false">Overall loudness is left out, as when two sounds are compared at the same level. Differences under 1 dB are too small for most people to hear.</string>
+    <string name="ui_curve_same" formatted="false">%1$s and %2$s are within 1 dB of each other everywhere, so they should sound almost the same.</string>
+    <string name="ui_curve_small" formatted="false">%1$s and %2$s differ only slightly, by less than 1 dB in any range.</string>
+    <string name="ui_curve_range" formatted="false">%1$s to %2$s</string>
+    <string name="ui_curve_more" formatted="false">%1$s has more %2$s, about %3$s more from %4$s.</string>
+    <string name="ui_curve_less" formatted="false">%1$s has less %2$s, about %3$s less from %4$s.</string>
+    <string name="ui_curve_warmer" formatted="false">%1$s sounds warmer and fuller than %2$s</string>
+    <string name="ui_curve_brighter" formatted="false">%1$s sounds brighter and more detailed than %2$s</string>
+    <string name="ui_region_deep_bass" formatted="false">deep bass</string>
+    <string name="ui_region_bass" formatted="false">bass</string>
+    <string name="ui_region_lower_mids" formatted="false">lower mids</string>
+    <string name="ui_region_mids" formatted="false">midrange</string>
+    <string name="ui_region_presence" formatted="false">presence</string>
+    <string name="ui_region_treble" formatted="false">treble</string>
+    <string name="ui_region_air" formatted="false">air</string>
+    <string name="help_compare_curves_title" formatted="false">Compare curves</string>
+    <string name="help_compare_curves_body" formatted="false">Draws two presets\' curves together, the first solid and the second dashed, and describes where the first differs from the second: more or less deep bass (20 to 60 Hz), bass (60 to 250 Hz), lower mids (250 to 500 Hz), midrange (500 Hz to 2 kHz), presence (2 to 5 kHz, where voices sound forward and clear), treble (5 to 10 kHz) and air (above 10 kHz). It\'s a picture of the curves, not a measurement of what you hear, so try both with Compare two sounds to decide.</string>
+    <string name="ui_curve_headline" formatted="false">Where %1$s differs from %2$s</string>
+    <string name="ui_curve_row_more" formatted="false">More %1$s</string>
+    <string name="ui_curve_row_less" formatted="false">Less %1$s</string>
+    <string name="ui_curve_same_short" formatted="false">No range differs by 1 dB or more.</string>
+    <string name="ui_curve_small_short" formatted="false">Every range is within 1 dB, too little for most people to hear.</string>
+    <string name="ui_compare_presets" formatted="false">Compare presets</string>
+    <string name="ui_refine_this" formatted="false">Refine this sound</string>
+    <string name="ui_refine_this_detail" formatted="false">Close but not quite? Fine-tune it by comparing pairs</string>
 </resources>

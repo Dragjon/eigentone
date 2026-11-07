@@ -293,6 +293,7 @@ private const val NAV_EDGE_DP = 8
 private val LocalOpenPresets = compositionLocalOf<() -> Unit> { error("No presets tab") }
 
 private val LocalOpenPeaks = compositionLocalOf<() -> Unit> { error("No peak finder") }
+private val LocalOpenCurves = compositionLocalOf<() -> Unit> { error("No curve comparison") }
 
 private val LocalOpenConsole = compositionLocalOf<() -> Unit> { error("No debug console") }
 
@@ -344,6 +345,7 @@ fun EigentoneApp(onSetEnabled: (Boolean) -> Unit) {
     var findingPeaks by rememberSaveable { mutableStateOf(false) }
     var consoleOpen by rememberSaveable { mutableStateOf(false) }
     var expandingFaders by rememberSaveable { mutableStateOf(false) }
+    var comparingCurves by rememberSaveable { mutableStateOf(false) }
 
     // Which full screen is open over the app, if any. Each slides in from the right and back out the way it came.
     val screen = when {
@@ -356,6 +358,7 @@ fun EigentoneApp(onSetEnabled: (Boolean) -> Unit) {
         finding -> Overlay.FINDER
         refining -> Overlay.REFINE
         browsingShapes -> Overlay.SHAPES
+        comparingCurves -> Overlay.CURVES
         // After the tools above, so Find your sound opens over the welcome and returns to it.
         !state.welcomeDone -> Overlay.WELCOME
         else -> null
@@ -386,6 +389,7 @@ fun EigentoneApp(onSetEnabled: (Boolean) -> Unit) {
         Overlay.FINDER -> FinderScreen(onSetEnabled = onSetEnabled, onClose = { finding = false })
         Overlay.REFINE -> RefineScreen(onSetEnabled = onSetEnabled, onClose = { refining = false })
         Overlay.SHAPES -> ShapeBrowser(onClose = { browsingShapes = false })
+        Overlay.CURVES -> CurveCompareScreen(onClose = { comparingCurves = false })
         Overlay.WELCOME -> WelcomeScreen(onSetEnabled = onSetEnabled, onFindSound = { finding = true })
         null -> AppScreen(state, status, tab, { tab = it }, beforeSettings, { beforeSettings = it }, scrolls, tabScope, toggleSettings, snackbar, onSetEnabled,
             open = OverlayOpeners(
@@ -398,13 +402,14 @@ fun EigentoneApp(onSetEnabled: (Boolean) -> Unit) {
                 peaks = { findingPeaks = true },
                 console = { consoleOpen = true },
                 faders = { expandingFaders = true },
+                curves = { comparingCurves = true },
             ),
         )
     }
     }
 }
 
-private enum class Overlay { FADERS, PEAKS, CONSOLE, SWEEP, COMPARE, HEARING, FINDER, REFINE, SHAPES, WELCOME }
+private enum class Overlay { FADERS, PEAKS, CONSOLE, SWEEP, COMPARE, HEARING, FINDER, REFINE, SHAPES, CURVES, WELCOME }
 
 /** Opens each full screen; passed down, since the screens are chosen above the app's own content. */
 private class OverlayOpeners(
@@ -417,6 +422,7 @@ private class OverlayOpeners(
     val peaks: () -> Unit,
     val console: () -> Unit,
     val faders: () -> Unit,
+    val curves: () -> Unit,
 )
 
 private fun <T> screenSlide() = tween<T>(SCREEN_MS, easing = FastOutSlowInEasing)
@@ -516,6 +522,7 @@ private fun AppScreen(
         LocalOpenPeaks provides open.peaks,
         LocalOpenConsole provides open.console,
         LocalOpenFaders provides open.faders,
+        LocalOpenCurves provides open.curves,
         LocalOpenPresets provides {
             tabScope.launch { scrolls.getValue(Tab.PRESETS).scrollTo(0) }
             setTab(Tab.PRESETS)
@@ -988,6 +995,10 @@ private fun EqTab(state: AppState) {
     Column(verticalArrangement = SectionSpacing) {
     if (graphic) {
         GraphicEqConsole(state.current.tone, state.current.id, onBrowseShapes = LocalOpenShapes.current, onExpand = LocalOpenFaders.current)
+        // A shortcut to Refine, which is also on the device tab with the other listening tools.
+        SettingsSection(null) {
+            ActionRow(stringResource(R.string.ui_refine_this), Help.refine, detail = stringResource(R.string.ui_refine_this_detail), onClick = LocalOpenRefine.current)
+        }
         return@Column
     }
 
@@ -2361,8 +2372,6 @@ private fun HeadphonesTab(state: AppState) {
         ActionRow(stringResource(R.string.ui_find_my_sound), Help.finder, detail = stringResource(R.string.ui_a_short_guided_listening_test), onClick = LocalOpenFinder.current)
         RowDivider()
         ActionRow(stringResource(R.string.ui_refine), Help.refine, detail = stringResource(R.string.ui_refine_detail), onClick = LocalOpenRefine.current)
-        RowDivider()
-        ActionRow(stringResource(R.string.ui_compare_two_sounds), Help.compare, detail = stringResource(R.string.ui_switch_instantly_with_an_optional_blind), onClick = LocalOpenCompare.current)
         // Both play tones into each ear and ask what you hear, so they're for headphones and earbuds.
         // A speaker's peaks are mostly the room's, which the microphone measurement above handles.
         if (kind.isWorn && Disclosure.measureTools(state)) {
@@ -2720,6 +2729,12 @@ private fun ManageSection(state: AppState) {
     SettingsSection(stringResource(R.string.ui_this_preset)) {
         ActionRow(stringResource(R.string.ui_save_as_new), Help.saveNew) { saving = true }
         ShareRows { message -> scope.notify(snackbar, message) }
+    }
+    // Choosing between presets, by ear and by eye, side by side.
+    SettingsSection(stringResource(R.string.ui_compare_presets)) {
+        ActionRow(stringResource(R.string.ui_compare_two_sounds), Help.compare, detail = stringResource(R.string.ui_switch_instantly_with_an_optional_blind), onClick = LocalOpenCompare.current)
+        RowDivider()
+        ActionRow(stringResource(R.string.ui_compare_curves), Help.compareCurves, detail = stringResource(R.string.ui_compare_curves_detail), onClick = LocalOpenCurves.current)
     }
     SettingsSection(stringResource(R.string.ui_files_and_backup)) {
         ActionRow(stringResource(R.string.ui_import_eq_file), Help.importFile) {

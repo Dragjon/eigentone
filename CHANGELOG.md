@@ -2,6 +2,12 @@
 
 Changes since 0.33.0. Every release is a pre-release on [GitHub](https://github.com/Dragjon/eigentone/releases) until the first official one.
 
+## 0.39.1
+
+- **Compare curves.** Under Presets, draw two presets on one graph and see in plain words where the first differs from the second, such as less presence or more deep bass, with how much and where.
+- **Refine my sound finds your sound more closely.** It can now offer broad changes as large as 7 dB apart, which are easy to hear. On simulated listeners this cut the error left after refining by about an eighth.
+- Compare two sounds now sits on the Presets tab beside Compare curves, and the Equaliser offers Refine this sound under the faders.
+- Long preset menus scroll instead of running under the navigation bar.
 ## 0.39.0
 
 - **Motion throughout.** Tabs slide towards where they sit, tools and Settings slide in and back out, folding sections open and close smoothly, dialogs shrink away instead of vanishing, and each step of a listening test slides to the next.

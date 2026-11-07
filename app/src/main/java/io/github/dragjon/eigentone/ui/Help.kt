@@ -68,6 +68,7 @@ object Help {
     val sweepLevel = Tip(R.string.help_sweep_level_title, R.string.help_sweep_level_body)
     val sweepHearEq = Tip(R.string.help_sweep_hear_eq_title, R.string.help_sweep_hear_eq_body)
     val compare = Tip(R.string.help_compare_title, R.string.help_compare_body)
+    val compareCurves = Tip(R.string.help_compare_curves_title, R.string.help_compare_curves_body)
     val compareBlind = Tip(R.string.help_compare_blind_title, R.string.help_compare_blind_body)
     val hearing = Tip(R.string.help_hearing_title, R.string.help_hearing_body)
     val perApp = Tip(R.string.help_per_app_title, R.string.help_per_app_body)

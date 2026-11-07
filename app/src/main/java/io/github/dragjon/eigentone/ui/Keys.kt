@@ -315,7 +315,8 @@ fun PresetSwitcher(
                 )
             }
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = Palette.Tooltip) {
+        // Capped, so a long list scrolls rather than running under the navigation bar out of reach.
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = Palette.Tooltip, modifier = Modifier.heightIn(max = MENU_MAX_DP.dp)) {
             presets.forEach { preset ->
                 val current = preset.id == currentId
                 DropdownMenuItem(
@@ -452,3 +453,6 @@ fun Modifier.litGlow(on: Boolean, strength: Float = 0.16f): Modifier = this.draw
         center = center,
     )
 }
+
+/** The tallest a list menu grows before it scrolls, short enough to stay clear of the navigation bar. */
+internal const val MENU_MAX_DP = 480

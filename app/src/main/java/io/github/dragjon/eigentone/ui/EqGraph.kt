@@ -82,6 +82,8 @@ fun EqGraph(
     morphKey: Any? = null,
     /** Room kept clear at the top left, such as for an info button over the graph, which the ear legend moves past. */
     legendInsetDp: Int = 0,
+    /** Another sound's curve to compare with, drawn dashed in plain text colour so it can't be taken for an ear. */
+    overlay: List<Filter>? = null,
 ) {
     val currentFilters by rememberUpdatedState(filters)
     val measurer = rememberTextMeasurer()
@@ -114,6 +116,9 @@ fun EqGraph(
                     (rightCurve != null && kotlin.math.abs(saved[i] - rightCurve[i]) > GHOST_MIN_DIFFERENCE_DB)
             }
         }
+    }
+    val overlayCurve = remember(overlay) {
+        overlay?.let { other -> DoubleArray(CURVE_POINTS + 1) { i -> Eq.curveDb(other, Eq.logFreq(i.toDouble() / CURVE_POINTS)) } }
     }
     val selectedFilter = filters.firstOrNull { it.id == selectedId && it.enabled }
     val selectedCurve = remember(selectedFilter) {
@@ -248,6 +253,16 @@ fun EqGraph(
                     endY = yOf(-FILL_FULL_DB, h, rangeDb),
                 ),
             )
+        }
+        overlayCurve?.let { points ->
+            val other = Path()
+            points.forEachIndexed { i, db ->
+                val x = w * i / CURVE_POINTS
+                val y = yOf(db, h, rangeDb)
+                if (i == 0) other.moveTo(x, y) else other.lineTo(x, y)
+            }
+            val dash = 5.dp.toPx()
+            drawPath(other, Palette.Text, style = Stroke(width = 2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash, dash * 0.7f))))
         }
         drawPath(curvePath, accent, style = Stroke(width = 2.dp.toPx()))
 

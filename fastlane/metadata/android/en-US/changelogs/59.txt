@@ -1,0 +1,4 @@
+- Compare curves: two presets on one graph, with the differences in words
+- Refine my sound finds your sound more closely
+- Compare two sounds moved to Presets, and Refine this sound under the faders
+- Long preset menus scroll

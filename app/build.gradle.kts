@@ -21,8 +21,8 @@ android {
         applicationId = "io.github.dragjon.eigentone"
         minSdk = 33
         targetSdk = 36
-        versionCode = 58
-        versionName = "0.39.0"
+        versionCode = 59
+        versionName = "0.39.1"
     }
 
     signingConfigs {
