@@ -1,0 +1,5 @@
+- Now installs on Android 11 and 12, not yet tested on a real phone
+- Tabs switch without a pause, and the status strip slides over the page
+- Menus close with a fold instead of vanishing
+- Drawer rows scroll to their setting
+- Refine and Find my sound: "I'm not sure" replaces "I can't hear a difference"
