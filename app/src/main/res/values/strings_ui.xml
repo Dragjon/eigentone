@@ -291,7 +291,7 @@
     <string name="ui_help_and_reset" formatted="false">Help and reset</string>
     <string name="ui_higher_means_that_ear_needed_a_louder_to" formatted="false">Lower means that ear needed a louder tone, as on an audiogram. This compares your ears with each other, and isn\'t a measure of how well you hear.</string>
     <string name="ui_how_each_ear_heard" formatted="false">How each ear heard</string>
-    <string name="ui_i_can_t_hear_a_difference" formatted="false">I can\'t hear a difference</string>
+    <string name="ui_i_can_t_hear_a_difference" formatted="false">I\'m not sure</string>
     <string name="ui_i_didn_t_hear_it" formatted="false">I didn\'t hear it</string>
     <string name="ui_i_heard_it" formatted="false">I heard it</string>
     <string name="ui_import_eq_file" formatted="false">Import EQ file</string>
