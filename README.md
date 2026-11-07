@@ -24,10 +24,10 @@
 </p>
 
 <p align="center">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/01-equaliser.png" width="19%" alt="Equaliser tab: a corrected curve for each ear over the live spectrum, with the graphic EQ faders">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/01-equaliser.png" width="19%" alt="Equaliser tab: the EQ curve with a soft fill over the live spectrum, and the graphic EQ faders">
   <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/02-effects.png" width="19%" alt="Effects tab: preset strength, preamp and tone controls">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/03-presets.png" width="19%" alt="Presets tab: your presets and the corrections for the connected earbuds">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/04-headphones.png" width="19%" alt="Headphones tab: headphone correction and the preset that loads automatically">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/03-presets.png" width="19%" alt="Presets tab: your presets, with a favourite starred, and the corrections for the connected earbuds">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/04-headphones.png" width="19%" alt="Earbuds tab, named after what is connected: headphone correction and the preset that loads automatically">
   <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/05-settings.png" width="19%" alt="Settings: volume, level, stereo, theme and Advanced controls">
 </p>
 
