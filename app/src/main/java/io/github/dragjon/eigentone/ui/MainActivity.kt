@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
             val dark = isDarkTheme(mode)
             LaunchedEffect(dark) { matchSystemBars(dark) }
             LaunchedEffect(mode) { matchWindowToTheme(mode) }
-            EigentoneTheme(dark) { EigentoneApp(onSetEnabled = ::setEnabled) }
+            EigentoneTheme(dark) { MenuHost { EigentoneApp(onSetEnabled = ::setEnabled) } }
         }
         // Otherwise reopening from recents after Android closed the app would load the preset again.
         if (savedInstanceState == null) handleShortcut(intent)
