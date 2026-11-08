@@ -167,6 +167,7 @@ import io.github.dragjon.eigentone.dsp.Filter
 import io.github.dragjon.eigentone.dsp.FilterType
 import io.github.dragjon.eigentone.engine.SpectrumAnalyser
 import io.github.dragjon.eigentone.engine.readAtMost
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -315,7 +316,7 @@ private val LocalOpenCompare = compositionLocalOf<() -> Unit> { error("No compar
 private val LocalOpenFaders = compositionLocalOf<() -> Unit> { error("No expanded faders") }
 
 /** Opens the shape library from the graphic EQ. */
-private val LocalOpenShapes = compositionLocalOf<() -> Unit> { error("No shape library") }
+private val LocalOpenShapes =compositionLocalOf<() -> Unit> { error("No shape library") }
 
 @Composable
 fun EigentoneApp(onSetEnabled: (Boolean) -> Unit) {
@@ -614,16 +615,21 @@ private fun AppScreen(
                             label = "page",
                         ) { if (it == t) 1f else 0f }
                         val seen = if (t == tab) (state to status).also { lastSeen[t] = it } else lastSeen.getOrPut(t) { state to status }
-                        CompositionLocalProvider(LocalPageShown provides (t == tab)) {
+                        val shownNow = remember(t) { { pages.targetState == t } }
+                        CompositionLocalProvider(LocalPageShown provides shownNow) {
                             // The whole width scrolls, so the space beside the page works too, as on a tablet or in landscape.
                             Box(
                                 Modifier
                                     .fillMaxSize()
-                                    // A page out of view isn't placed, so it draws nothing and can't be touched or read out.
+                                    // Out of view, the page isn't read out.
+                                    .then(if (t == tab) Modifier else Modifier.clearAndSetSemantics { })
+                                    // A page out of view stays laid out and drawn just past the edge of the screen, where it
+                                    // can't be touched, so bringing it into view only slides it rather than drawing it anew.
                                     .layout { measurable, constraints ->
                                         val placeable = measurable.measure(constraints)
                                         layout(placeable.width, placeable.height) {
-                                            if (t == pages.targetState || presence.value > 0f) placeable.place(0, 0)
+                                            val inView = t == pages.targetState || presence.value > 0f
+                                            placeable.place(if (inView) 0 else placeable.width * 2, 0)
                                         }
                                     }
                                     .graphicsLayer {
@@ -916,6 +922,7 @@ private fun EqTab(state: AppState) {
             ?.let { Processing.effectiveFilters(state.copy(current = it), attenuation, Repo.output.value.key) }
     }
     val spectrumState = Repo.spectrum.collectAsStateWithLifecycle()
+    val pageShown = LocalPageShown.current
 
     if (!state.tourSeen && Tour.stop == null) {
         TourOffer()
@@ -961,7 +968,8 @@ private fun EqTab(state: AppState) {
             ghostFilters = savedCurve,
             morphKey = state.current.id,
             earMarkers = earMarkers,
-            spectrum = { spectrumState.value },
+            // Not read while the page is out of view, so the graph isn't redrawn off screen with every reading.
+            spectrum = { if (pageShown()) spectrumState.value else null },
             selectedId = selectedId,
             dimmed = !state.enabled || state.bypass,
             onSelect = { selectedId = it },
@@ -2427,8 +2435,12 @@ private fun HeadphonesTab(state: AppState) {
         AutoEqDialog(onDismiss = { finding = false }) { result ->
             scope.notify(snackbar, result)
             finding = false
-            // A correction is the moment people find it too neutral, so offer this straight away.
-            tuning = true
+            // A correction is the moment people find it too neutral, so offer this straight away, once the
+            // search has finished closing rather than over it.
+            scope.launch {
+                kotlinx.coroutines.delay(DIALOG_GAP_MS)
+                tuning = true
+            }
         }
     }
     if (tuning) CorrectionTuner(onDismiss = { tuning = false })
@@ -2818,6 +2830,16 @@ fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var attempt by remember { mutableIntStateOf(0) }
     var measurements by remember { mutableStateOf<List<CatalogEntry>?>(null) }
+    // Chosen, but waiting for the search to finish closing, so the comparison opens after it rather than over it.
+    var nextMeasurements by remember { mutableStateOf<List<CatalogEntry>?>(null) }
+    nextMeasurements?.let { waiting ->
+        LaunchedEffect(waiting) {
+            kotlinx.coroutines.delay(DIALOG_GAP_MS)
+            measurements = waiting
+            nextMeasurements = null
+        }
+        return
+    }
 
     measurements?.let { options ->
         MeasurementCompare(
@@ -2877,7 +2899,7 @@ fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
                                     // Several measurements are worth hearing before choosing one.
                                     val same = AutoEqCatalog.measurementsOf(entries.orEmpty(), entry)
                                     if (same.size > 1) {
-                                        measurements = same
+                                        nextMeasurements = same
                                         return@clickable
                                     }
                                     busy = true

@@ -27,6 +27,9 @@ import kotlin.math.roundToInt
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -210,6 +213,33 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
                 .graphicsLayer { rotationZ = turn },
         )
     }
+    // A copy of the drawer is built and laid out once, out of sight, soon after launch, so the first real open
+    // isn't also the first time its rows are ever made.
+    var rehearse by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(STRIP_REHEARSE_DELAY_MS)
+        rehearse = true
+        repeat(3) { androidx.compose.runtime.withFrameNanos { } }
+        rehearse = false
+    }
+    if (rehearse && !expanded) {
+        Box(
+            Modifier
+                .clearAndSetSemantics { }
+                // Takes no room and sits far off the screen.
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints)
+                    layout(0, 0) { placeable.place(-placeable.width * 3, 0) }
+                },
+        ) {
+            SharedTransitionLayout {
+                val copy = this
+                androidx.compose.animation.AnimatedVisibility(visible = true) {
+                    StripDetails(effects, output, clipping, state, scheduledNight, copy) { }
+                }
+            }
+        }
+    }
     AnimatedVisibility(
         visible = expanded,
         enter = expandVertically(tween(STRIP_MS, easing = LinearOutSlowInEasing), expandFrom = Alignment.Top) + fadeIn(tween(STRIP_MS)),
@@ -241,6 +271,9 @@ object StripDrawer {
 val LocalOpenEffect = androidx.compose.runtime.compositionLocalOf<(String) -> Unit> { {} }
 
 private const val STRIP_MS = 280
+
+/** After the app has opened and its tabs have been built. */
+private const val STRIP_REHEARSE_DELAY_MS = 1800L
 private const val STRIP_OPEN_HEIGHT_DP = 52
 private const val STRIP_DRAWER_SHADOW_DP = 8
 

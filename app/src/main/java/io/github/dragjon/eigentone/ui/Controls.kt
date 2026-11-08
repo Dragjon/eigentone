@@ -111,18 +111,18 @@ fun SettingsSection(
     val turn by animateFloatAsState(if (open) 180f else 0f, tween(FOLD_MS, easing = FastOutSlowInEasing), label = "chevron")
     // Asked for from elsewhere, such as a row in the strip's drawer: it opens and scrolls into view.
     val requester = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
-    val requested = SectionFocus.request
     // Every tab stays built, so only a section on the page in view answers, not one of the same name elsewhere.
     val pageShown = LocalPageShown.current
-    val wanted = pageShown && title != null && requested == title
-    LaunchedEffect(wanted) {
-        if (!wanted) return@LaunchedEffect
-        open = true
-        // Waits for the tab to slide in and the section to unfold, then brings all of it into view.
-        delay(FOLD_MS + 120L)
-        requester.bringIntoView()
-        // Cleared only once it's done: clearing it sooner changes what this waits on and cancels the scroll.
-        SectionFocus.request = null
+    LaunchedEffect(title) {
+        if (title == null) return@LaunchedEffect
+        androidx.compose.runtime.snapshotFlow { pageShown() && SectionFocus.request == title }.collect { wanted ->
+            if (!wanted) return@collect
+            open = true
+            // Waits for the tab to slide in and the section to unfold, then brings all of it into view.
+            delay(FOLD_MS + 120L)
+            requester.bringIntoView()
+            SectionFocus.request = null
+        }
     }
     Column(Modifier.fillMaxWidth().bringIntoViewRequester(requester)) {
         if (title != null) {
@@ -206,8 +206,12 @@ object SectionFocus {
     var request by mutableStateOf<String?>(null)
 }
 
-/** Whether the page this is on is the tab in view. Pages out of view stay built but shouldn't act. */
-val LocalPageShown = androidx.compose.runtime.compositionLocalOf { true }
+/**
+ * Whether the page this is on is the tab in view. Pages out of view stay built but shouldn't act. It's asked
+ * rather than handed over as a value, so a tab switch only reaches the few places that ask, at the moment they
+ * ask, instead of rebuilding the page.
+ */
+val LocalPageShown = androidx.compose.runtime.staticCompositionLocalOf<() -> Boolean> { { true } }
 
 /** Joins what's on into one short line for a folded section, or says that nothing is. */
 @Composable

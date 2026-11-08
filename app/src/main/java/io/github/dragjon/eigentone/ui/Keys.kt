@@ -412,8 +412,24 @@ fun MotionDialog(
     textContentColor: androidx.compose.ui.graphics.Color = Palette.Text,
     properties: androidx.compose.ui.window.DialogProperties = androidx.compose.ui.window.DialogProperties(),
 ) {
+    // A dialog opened as another one closes can be handed that one's last back press or outside tap, or the
+    // keyboard closing, which on Android 11 shut it the moment it appeared. Nobody means to close a dialog
+    // that fast, so a request that early is ignored, and logged so the debug console shows it happened.
+    val openedAt = remember { android.os.SystemClock.uptimeMillis() }
+    val dismiss by androidx.compose.runtime.rememberUpdatedState(onDismissRequest)
+    val guardedDismiss: () -> Unit = remember {
+        {
+            val age = android.os.SystemClock.uptimeMillis() - openedAt
+            if (age < DIALOG_SETTLE_MS) {
+                android.util.Log.w("EigentoneDialog", "Ignored a request to close a dialog $age ms after it opened")
+            } else {
+                dismiss()
+            }
+            Unit
+        }
+    }
     androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismissRequest,
+        onDismissRequest = guardedDismiss,
         confirmButton = {
             DialogMotionEffect()
             confirmButton()
@@ -429,14 +445,22 @@ fun MotionDialog(
     )
 }
 
+/** How soon after opening a dialog ignores being asked to close, and how long one takes to close. */
+const val DIALOG_SETTLE_MS = 400L
+
+/** A little longer than a dialog takes to animate away, so the next one opens after it rather than over it. */
+const val DIALOG_GAP_MS = 200L
+
 /** Gives the dialog window this is drawn in the app's opening and closing animation. */
 @Composable
 fun DialogMotionEffect() {
     val view = androidx.compose.ui.platform.LocalView.current
-    androidx.compose.runtime.SideEffect {
+    // Set once, since each change makes Android lay the window out again.
+    androidx.compose.runtime.DisposableEffect(view) {
         val provider = view as? androidx.compose.ui.window.DialogWindowProvider
             ?: view.parent as? androidx.compose.ui.window.DialogWindowProvider
         provider?.window?.setWindowAnimations(io.github.dragjon.eigentone.R.style.DialogMotion)
+        onDispose { }
     }
 }
 

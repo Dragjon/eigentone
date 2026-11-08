@@ -25,8 +25,10 @@ import java.util.Locale
  */
 @Composable
 fun OutputMeterBar(modifier: Modifier = Modifier) {
-    val level by Repo.level.collectAsStateWithLifecycle()
-    val now = level
+    val level = Repo.level.collectAsStateWithLifecycle()
+    // Out of view it isn't read, so a page kept ready off screen doesn't redraw with every reading.
+    val shown = LocalPageShown.current
+    val now = if (shown()) level.value else null
     Canvas(
         modifier
             .width(METER_WIDTH_DP.dp)

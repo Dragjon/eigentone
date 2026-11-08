@@ -44,6 +44,7 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 
 private const val MENU_IN_MS = 180
 private const val MENU_OUT_MS = 150
@@ -65,7 +66,13 @@ private class MenuEntry {
 
 private class MenuLayer {
     val entries = mutableStateListOf<MenuEntry>()
+
+    /** For a moment after launch, closed menus are drawn behind the app, so their first open is already warm. */
+    var warming by mutableStateOf(false)
 }
+
+/** Long enough for the app to have opened and its tabs to have been built. */
+private const val MENU_WARM_DELAY_MS = 1500L
 
 private val LocalMenuLayer = staticCompositionLocalOf<MenuLayer?> { null }
 
@@ -76,6 +83,13 @@ private val LocalMenuLayer = staticCompositionLocalOf<MenuLayer?> { null }
 @Composable
 fun MenuHost(content: @Composable () -> Unit) {
     val layer = remember { MenuLayer() }
+    // A menu's first open would otherwise be the first time its text and shadow are ever drawn.
+    LaunchedEffect(layer) {
+        kotlinx.coroutines.delay(MENU_WARM_DELAY_MS)
+        layer.warming = true
+        repeat(3) { androidx.compose.runtime.withFrameNanos { } }
+        layer.warming = false
+    }
     Box(
         Modifier
             .fillMaxSize()
@@ -96,23 +110,29 @@ fun MenuHost(content: @Composable () -> Unit) {
             },
     ) {
         CompositionLocalProvider(LocalMenuLayer provides layer) { content() }
-        layer.entries.forEach { menu -> key(menu) { MenuSurface(menu) } }
+        layer.entries.forEach { menu -> key(menu) { MenuSurface(menu, layer) } }
     }
 }
 
 @Composable
-private fun BoxScope.MenuSurface(menu: MenuEntry) {
+private fun BoxScope.MenuSurface(menu: MenuEntry, layer: MenuLayer) {
+    // Warming only ever draws a closed menu, behind the app's opaque page, where it can't be seen.
+    val warm = { layer.warming && !menu.expanded && menu.open.value == 0f }
     Layout(
         content = {
             Column(
                 Modifier
                     .graphicsLayer {
-                        val p = menu.open.value
+                        // Warmed part-way open, squeezed and half faded, since that's what the opening first draws.
+                        val p = if (warm()) 0.4f else menu.open.value
                         // Grows out of the control's corner, mostly towards the free space, and fades as it goes.
                         transformOrigin = TransformOrigin(0f, if (menu.below) 0f else 1f)
                         scaleX = 0.92f + 0.08f * p
                         scaleY = 0.8f + 0.2f * p
                         alpha = (p * 1.6f).coerceIn(0f, 1f)
+                        // Fades each thing it draws, rather than drawing the menu aside first and fading that,
+                        // which cost a slow frame the first time it was ever done.
+                        compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
                     }
                     .onGloballyPositioned { menu.bounds = it.boundsInRoot() }
                     // Touches on the menu stay on the menu, even between its items.
@@ -129,12 +149,14 @@ private fun BoxScope.MenuSurface(menu: MenuEntry) {
                 content = menu.content,
             )
         },
-        modifier = Modifier.matchParentSize(),
+        modifier = Modifier
+            .matchParentSize()
+            .zIndex(if (layer.warming && !menu.expanded) -1f else 0f),
     ) { measurables, constraints ->
         val menuSize = measurables.first().measure(constraints.copy(minWidth = 0, minHeight = 0))
         layout(constraints.maxWidth, constraints.maxHeight) {
             // Closed menus stay built but aren't placed, so they draw nothing, can't be touched and aren't read out.
-            if (!menu.expanded && menu.open.value == 0f) return@layout
+            if (!menu.expanded && menu.open.value == 0f && !warm()) return@layout
             val margin = MENU_EDGE_DP.dp.roundToPx()
             val room = MENU_SHADOW_ROOM_DP.dp.roundToPx()
             val a = menu.anchor

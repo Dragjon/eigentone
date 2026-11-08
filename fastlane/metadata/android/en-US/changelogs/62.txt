@@ -1,0 +1,4 @@
+- Possible fix: on Android 11, the tuner or Compare measurements could close as soon as it opened after picking headphones
+- Tabs switch without a hitch, even the first time
+- The preset menu and the status strip's drawer open smoothly the first time
+- Compiled ahead of time once your phone has had a quiet moment, so nothing stutters the first time it's used

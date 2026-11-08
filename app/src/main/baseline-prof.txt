@@ -1,0 +1,18 @@
+# Compiled ahead of time once installed, so nothing hitches the first time it's used while Android is
+# still compiling it. Measured on a Galaxy A54: compiling ahead of time halved the first tab switch and
+# the first open of the status strip's drawer.
+#
+# The app's own code.
+HSPLio/github/dragjon/eigentone/**->**(**)**
+Lio/github/dragjon/eigentone/**;
+# The Compose code every screen runs on, including its animations and shared elements.
+HSPLandroidx/compose/runtime/**->**(**)**
+Landroidx/compose/runtime/**;
+HSPLandroidx/compose/ui/**->**(**)**
+Landroidx/compose/ui/**;
+HSPLandroidx/compose/foundation/**->**(**)**
+Landroidx/compose/foundation/**;
+HSPLandroidx/compose/animation/**->**(**)**
+Landroidx/compose/animation/**;
+HSPLandroidx/compose/material3/**->**(**)**
+Landroidx/compose/material3/**;
