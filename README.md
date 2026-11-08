@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.svg" width="112" alt="Eigentone logo: a strand of DNA in blue on white">
+  <img src="docs/logo-blue.svg" width="112" alt="Eigentone logo: a strand of DNA in blue on white">
 </p>
 
 <h1 align="center">Eigentone</h1>
@@ -24,11 +24,11 @@
 </p>
 
 <p align="center">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/01-equaliser.png" width="19%" alt="Equaliser tab: the EQ curve with a soft fill over the live spectrum, and the graphic EQ faders">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/02-effects.png" width="19%" alt="Effects tab: preset strength, preamp and tone controls">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/03-presets.png" width="19%" alt="Presets tab: your presets, with a favourite starred, and the corrections for the connected earbuds">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/04-headphones.png" width="19%" alt="Earbuds tab, named after what is connected: headphone correction and the preset that loads automatically">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/05-settings.png" width="19%" alt="Settings: volume, level, stereo, theme and Advanced controls">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/01-equaliser-0.41.png" width="19%" alt="Equaliser tab: the EQ curve with a soft fill over the live spectrum, and the graphic EQ faders">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/02-effects-0.41.png" width="19%" alt="Effects tab: preset strength, preamp and tone controls">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/03-presets-0.41.png" width="19%" alt="Presets tab: your presets, with a favourite starred, and the corrections for the connected earbuds">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/04-headphones-0.41.png" width="19%" alt="Earbuds tab, named after what is connected: headphone correction and the preset that loads automatically">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/05-settings-0.41.png" width="19%" alt="Settings: volume, level, stereo, theme and Advanced controls">
 </p>
 
 *Eigentones are the natural resonant tones of an enclosed space. "Eigen" is German for "own", so the name reads as "your own tone".*
