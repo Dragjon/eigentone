@@ -2830,6 +2830,10 @@ fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var attempt by remember { mutableIntStateOf(0) }
     var measurements by remember { mutableStateOf<List<CatalogEntry>?>(null) }
+    // The connected headphones, found by their name, so the search opens on them. Kept above the steps below,
+    // so coming back from comparing measurements still says where the search came from.
+    val connected = rememberConnectedOutputNames()
+    var detected by remember { mutableStateOf<Pair<String, CatalogEntry>?>(null) }
     // Chosen, but waiting for the search to finish closing, so the comparison opens after it rather than over it.
     var nextMeasurements by remember { mutableStateOf<List<CatalogEntry>?>(null) }
     nextMeasurements?.let { waiting ->
@@ -2861,7 +2865,23 @@ fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
         problem = loaded.exceptionOrNull()?.let { appText(R.string.ui_could_not_load_the_headphone_list, reason(it)) }
     }
 
-    val results = remember(entries, query) { AutoEqCatalog.search(entries.orEmpty(), query) }
+    LaunchedEffect(entries) {
+        val list = entries ?: return@LaunchedEffect
+        if (query.isNotBlank() || detected != null) return@LaunchedEffect
+        // The phone's own speaker reports the phone's model, which is never a pair of headphones.
+        val found = connected
+            .filter { it.isNotBlank() && it != android.os.Build.MODEL }
+            .firstNotNullOfOrNull { name -> AutoEqCatalog.bestMatch(list, name)?.let { name to it } }
+            ?: return@LaunchedEffect
+        detected = found
+        query = found.second.name
+    }
+    val results = remember(entries, query, detected) {
+        val found = AutoEqCatalog.search(entries.orEmpty(), query)
+        // The best measurement of the connected pair comes first.
+        val best = detected?.second?.takeIf { it in found }
+        if (best == null) found else listOf(best) + (found - best)
+    }
     MotionDialog(
         onDismissRequest = onDismiss,
         containerColor = Palette.Tooltip,
@@ -2887,6 +2907,11 @@ fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
                     entries == null -> Text(stringResource(R.string.ui_loading_the_list), color = Palette.TextDim)
                     busy -> Text(stringResource(R.string.ui_downloading), color = Palette.TextDim)
                     query.isNotBlank() && results.isEmpty() -> Text(stringResource(R.string.ui_no_matches), color = Palette.TextDim)
+                    detected?.takeIf { it.second.name == query } != null -> Text(
+                        stringResource(R.string.ui_autoeq_detected, detected!!.first),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Palette.Lit,
+                    )
                 }
                 LazyColumn(Modifier.heightIn(max = 320.dp)) {
                     items(results) { entry ->

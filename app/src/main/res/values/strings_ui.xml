@@ -699,9 +699,10 @@
     <string name="ui_target_diffuse" formatted="false">Reference</string>
     <string name="ui_target_published_detail" formatted="false">The correction as AutoEq published it.</string>
     <string name="ui_target_published_below_harman" formatted="false">As AutoEq published it, which aims for about %1$d dB less deep bass than Harman. If this sounds thin, try Harman.</string>
-    <string name="ui_target_harman_detail" formatted="false">The curve most listeners preferred in Harman\'s tests, at about 64%% of those tested.</string>
-    <string name="ui_target_less_bass_detail" formatted="false">About 2 dB less bass than Harman, which about 21%% of those tested preferred.</string>
-    <string name="ui_target_more_bass_detail" formatted="false">5 dB more bass than Harman. About 15%% of those tested preferred 4 to 6 dB more.</string>
+    <string name="ui_autoeq_detected" formatted="false">Found from the connected %1$s, best measurement first. Search for another model if these aren\'t yours.</string>
+    <string name="ui_target_harman_detail" formatted="false">The curve most listeners preferred in Harman\'s tests, at about 64% of those tested.</string>
+    <string name="ui_target_less_bass_detail" formatted="false">About 2 dB less bass than Harman, which about 21% of those tested preferred.</string>
+    <string name="ui_target_more_bass_detail" formatted="false">5 dB more bass than Harman. About 15% of those tested preferred 4 to 6 dB more.</string>
     <string name="ui_target_no_bass_lift_detail" formatted="false">Harman\'s target with its bass lift taken out, for a leaner sound.</string>
     <string name="ui_target_diffuse_detail" formatted="false">The older diffuse-field reference. Listeners in Harman\'s tests found it lean in bass and forward at 2 to 4 kHz.</string>
     <string name="help_target_title" formatted="false">Target</string>

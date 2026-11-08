@@ -301,6 +301,24 @@ class NewFeaturesTest {
     }
 
     @Test
+    fun measurementsByOneReviewerAreToldApartByVersion() {
+        val source = "crinacle on GRAS 43AG-7"
+        val labels = AutoEqCatalog.measurementLabels(
+            listOf(
+                entry("Sennheiser HD 600", "oratory1990"),
+                entry("Sennheiser HD 600 (2020)", source),
+                entry("Sennheiser HD 600 (2020, worn earpads)", source),
+                entry("Sennheiser HD 600", "Rtings"),
+                entry("Sennheiser HD 600", "Rtings"),
+            ),
+        )
+        assertEquals(
+            listOf("oratory1990", "$source (2020)", "$source (2020, worn earpads)", "Rtings 1", "Rtings 2"),
+            labels,
+        )
+    }
+
+    @Test
     fun aSampleLabelCountsAsTheSameHeadphones() {
         val a = entry("Sony WH-1000XM5", "Rtings")
         val b = entry("Sony WH-1000XM5 (sample 2)", "oratory1990")

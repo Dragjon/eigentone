@@ -1,0 +1,3 @@
+- Find headphones opens on the headphones you have connected, best measurement first
+- Measurements by the same reviewer say which version of the headphones they're of
+- Tune correction no longer shows "%%"

@@ -78,6 +78,21 @@ object AutoEqCatalog {
         return (listOf(entry) + ranked.filterNot { it == entry }).take(limit)
     }
 
+    /**
+     * What tells each measurement apart: who measured it, and which version of the headphones, such as
+     * "crinacle on GRAS 43AG-7 (2020, worn earpads)". Any still alike are numbered.
+     */
+    fun measurementLabels(measured: List<CatalogEntry>): List<String> {
+        val base = measured.map { entry ->
+            val version = Regex("""\((.*?)\)""").findAll(entry.name).joinToString(", ") { it.groupValues[1].trim() }
+            if (version.isEmpty()) entry.source else "${entry.source} ($version)"
+        }
+        val seen = HashMap<String, Int>()
+        return base.map { label ->
+            if (base.count { it == label } < 2) label else "$label ${seen.merge(label, 1, Int::plus)}"
+        }
+    }
+
     private fun words(text: String): List<String> =
         text.lowercase().split(Regex("[^a-z0-9]+")).filter { it.isNotEmpty() }
 

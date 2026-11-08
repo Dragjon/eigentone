@@ -104,8 +104,9 @@ fun MeasurementCompare(options: List<CatalogEntry>, onDismiss: () -> Unit, onCho
                             color = Palette.TextDim,
                         )
                         NothingPlayingHint()
-                        profiles.forEachIndexed { index, (entry, _) ->
-                            Option(entry.source, selected == index) { selected = index }
+                        val labels = AutoEqCatalog.measurementLabels(profiles.map { it.first })
+                        profiles.forEachIndexed { index, _ ->
+                            Option(labels[index], selected == index) { selected = index }
                         }
                         Option(stringResource(R.string.ui_what_i_had), selected == WHAT_I_HAD) { selected = WHAT_I_HAD }
                     }
