@@ -1,0 +1,2 @@
+- Dropdown menus open and close smoothly, without a stutter
+- A tap outside an open menu closes it and still does what you tapped
