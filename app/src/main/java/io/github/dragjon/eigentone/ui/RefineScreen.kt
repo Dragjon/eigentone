@@ -178,6 +178,8 @@ fun RefineScreen(onSetEnabled: (Boolean) -> Unit, onClose: () -> Unit) {
                 )
                 Text(stringResource(R.string.ui_refine_question), style = MaterialTheme.typography.titleLarge, color = Palette.Text)
                 Text(stringResource(R.string.ui_refine_hint), style = MaterialTheme.typography.bodyMedium, color = Palette.TextDim)
+                // Ears need a moment on each version; quick flips blur the difference (user decision).
+                Text(stringResource(R.string.ui_refine_listen_tip), style = MaterialTheme.typography.bodyMedium, color = Palette.TextDim)
                 NothingPlayingHint()
                 val musicActive = rememberMusicActive()
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -228,6 +230,7 @@ fun RefineScreen(onSetEnabled: (Boolean) -> Unit, onClose: () -> Unit) {
 
                 Text(stringResource(R.string.ui_refine_final), style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
                 Text(stringResource(R.string.ui_refine_final_body), style = MaterialTheme.typography.bodyLarge, color = Palette.TextDim)
+                Text(stringResource(R.string.ui_refine_listen_tip), style = MaterialTheme.typography.bodyMedium, color = Palette.TextDim)
                 NothingPlayingHint()
                 val musicActive = rememberMusicActive()
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

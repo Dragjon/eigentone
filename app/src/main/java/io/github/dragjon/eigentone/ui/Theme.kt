@@ -48,8 +48,13 @@ data class ThemeColors(
     val track: Color,
     val text: Color,
     val textDim: Color,
+    /** Lit text, readouts and lines, which have to be read on the page. */
     val lit: Color,
+    /** What lit controls are filled with: keys, segments, caps, rails and switches. */
+    val litFill: Color,
+    /** A lit control while held. */
     val litPressed: Color,
+    /** Legends on [litFill]. */
     val onLit: Color,
     /** Orange rather than red, so a problem can't be mistaken for the right ear. */
     val danger: Color,
@@ -58,25 +63,29 @@ data class ThemeColors(
     val rightEar: Color,
 )
 
-/** Warm graphite, where amber means one thing: lit or active, like a glowing meter. */
+/**
+ * Modern near-black (user decision): neutral greys, with no brown or blue cast, so the amber, the ear colours and the green
+ * strip are the only colour on screen. Amber means one thing: lit or active, like a glowing meter.
+ */
 val DarkColors = ThemeColors(
-    background = Color(0xFF13110D),
-    bar = Color(0xFF0B0A07),
+    background = Color(0xFF0F0F0F),
+    bar = Color(0xFF090909),
     strip = Color(0xFF174035),
     stripDim = Color(0xFFBFD3C9),
     stripText = Color(0xFFEEEEEA),
     stripOn = Color(0xFFFFC24A),
     stripDanger = Color(0xFFFF9A5C),
     stripPanel = Color(0xFF1F4B3F),
-    surface = Color(0xFF24201A),
-    surfaceHigh = Color(0xFF332E25),
-    tooltip = Color(0xFF38332A),
-    line = Color(0xFF36322A),
-    outline = Color(0xFF958D7E),
-    track = Color(0xFF7A7363),
-    text = Color(0xFFF3EFE6),
-    textDim = Color(0xFFBBB3A5),
+    surface = Color(0xFF191919),
+    surfaceHigh = Color(0xFF252525),
+    tooltip = Color(0xFF292929),
+    line = Color(0xFF2D2D2D),
+    outline = Color(0xFF909090),
+    track = Color(0xFF767676),
+    text = Color(0xFFF2F2F2),
+    textDim = Color(0xFFADADAD),
     lit = Color(0xFFFFC24A),
+    litFill = Color(0xFFFFC24A),
     litPressed = Color(0xFFE0A53A),
     onLit = Color(0xFF2A1C00),
     danger = Color(0xFFFF9A5C),
@@ -85,32 +94,35 @@ val DarkColors = ThemeColors(
 )
 
 /**
- * The same instrument in daylight: white panels on a warm paper page, with ink-dark text, so nothing looks
- * faded in sunlight. Amber can't glow on a light page, so lit controls are a deep amber carrying cream legends.
- * The strip becomes a soft orange band with dark legends, in the same family as the amber keys, so it
- * stands out as the status window without a dark slab across a light screen, and the ear colours deepen so they read as ink on a chart, as an audiogram does on paper.
+ * The same instrument in daylight, made modern (user decision): a white page with soft neutral-grey panels, bars only
+ * a breath off white, and charcoal rather than black text, with no warm paper tones. Lit controls are filled with the
+ * same bright amber as at night, under dark legends. Amber that has to be read as text on white would need to be so
+ * dark it turns brown, so lit text and lines are a vivid orange instead, and warnings move to a deeper red-orange to
+ * stay apart from it. The strip is a light amber tint with dark legends, and the ear colours deepen so they read as
+ * ink on a chart, as an audiogram does on paper.
  */
 val LightColors = ThemeColors(
-    background = Color(0xFFF3F0E8),
-    bar = Color(0xFFE6E1D5),
-    strip = Color(0xFFFBC48A),
-    stripDim = Color(0xFF5C4530),
-    stripText = Color(0xFF1E1208),
-    stripOn = Color(0xFF7A3A00),
-    stripDanger = Color(0xFF7A1400),
-    stripPanel = Color(0xFFF6B577),
-    surface = Color(0xFFFFFFFF),
-    surfaceHigh = Color(0xFFECE7DC),
-    tooltip = Color(0xFFFFFDF8),
-    line = Color(0xFFE2DCCF),
-    outline = Color(0xFF766D5C),
-    track = Color(0xFF837965),
-    text = Color(0xFF17140E),
-    textDim = Color(0xFF514A3E),
-    lit = Color(0xFF925000),
-    litPressed = Color(0xFF7A4300),
-    onLit = Color(0xFFFFF6E5),
-    danger = Color(0xFF8F3F00),
+    background = Color(0xFFFFFFFF),
+    bar = Color(0xFFF7F7F7),
+    strip = Color(0xFFFFE7C7),
+    stripDim = Color(0xFF6B5640),
+    stripText = Color(0xFF1A1206),
+    stripOn = Color(0xFF8A4200),
+    stripDanger = Color(0xFF8A1A00),
+    stripPanel = Color(0xFFFFF2E1),
+    surface = Color(0xFFF4F4F4),
+    surfaceHigh = Color(0xFFEAEAEA),
+    tooltip = Color(0xFFFFFFFF),
+    line = Color(0xFFE5E5E5),
+    outline = Color(0xFF868686),
+    track = Color(0xFF8A8A8A),
+    text = Color(0xFF1F1F1F),
+    textDim = Color(0xFF5F5F5F),
+    lit = Color(0xFFB35300),
+    litFill = Color(0xFFFFB21A),
+    litPressed = Color(0xFFF2A100),
+    onLit = Color(0xFF241800),
+    danger = Color(0xFFA82A00),
     leftEar = Color(0xFF0A5FAD),
     rightEar = Color(0xFFC4231A),
 )
@@ -121,6 +133,9 @@ val LightColors = ThemeColors(
  */
 object Palette {
     internal var colors by mutableStateOf(DarkColors)
+
+    /** Whether the theme in use is dark, whichever palette it came from. */
+    internal var dark by mutableStateOf(true)
 
     val Background get() = colors.background
     val Bar get() = colors.bar
@@ -139,6 +154,31 @@ object Palette {
     val Text get() = colors.text
     val TextDim get() = colors.textDim
     val Lit get() = colors.lit
+    val LitFill get() = colors.litFill
+
+    /** The selected fader's cap: bright at night, and the lit orange by day rather than a black block. */
+    val SelectedCap get() = if (dark) colors.text else colors.lit
+
+    /** Lit text that has to stand out on a dark page, such as the levels above the faders: lighter at night. */
+    val LitBright get() = if (dark) androidx.compose.ui.graphics.lerp(colors.lit, Color.White, 0.45f) else colors.lit
+
+    /**
+     * The unfilled part of every selector, slider and fader track. At night a touch of the theme colour; by day a
+     * plain grey, since the tinted container looked off on white (user decision).
+     */
+    val Track2 get() = if (dark) {
+        androidx.compose.ui.graphics.lerp(colors.surfaceHigh, colors.litFill, 0.16f)
+    } else {
+        // Light enough to sit gently on the white page as well as on a panel.
+        androidx.compose.ui.graphics.lerp(colors.surfaceHigh, colors.background, 0.35f)
+    }
+
+    /** Floating notes, such as unsaved changes and messages: a tint of the theme colour rather than grey (user decision). */
+    val Note get() = androidx.compose.ui.graphics.lerp(colors.surfaceHigh, colors.litFill, if (dark) 0.22f else 0.14f)
+    val NoteText get() = colors.text
+
+    /** The edge of an unlit key or toggle: clear enough to see on any panel, quieter than a control's outline. */
+    val KeyBorder get() = androidx.compose.ui.graphics.lerp(colors.line, colors.outline, 0.55f)
     val LitPressed get() = colors.litPressed
     val OnLit get() = colors.onLit
     val Danger get() = colors.danger
@@ -149,7 +189,8 @@ object Palette {
      * The light a lit control gives off: amber on the dark faceplate. Nothing in daylight, where a lit
      * control is dark ink and couldn't glow.
      */
-    val Glow get() = if (colors == DarkColors) colors.lit else Color.Transparent
+    // None in Material You, where lit things are flat (user decision).
+    val Glow get() = Color.Transparent
 }
 
 private val DarkScheme = darkColorScheme(
@@ -176,7 +217,8 @@ private val DarkScheme = darkColorScheme(
 )
 
 private val LightScheme = lightColorScheme(
-    primary = LightColors.lit,
+    // Material fills buttons and switches with this, so it's the fill. Text fields are given the text orange.
+    primary = LightColors.litFill,
     onPrimary = LightColors.onLit,
     secondaryContainer = LightColors.surfaceHigh,
     onSecondaryContainer = LightColors.text,
@@ -201,7 +243,14 @@ private val LightScheme = lightColorScheme(
 /** Whether this choice means dark right now. Follows the device live, including a dark mode schedule. */
 @Composable
 fun isDarkTheme(mode: ThemeMode): Boolean = when (mode) {
-    ThemeMode.DEVICE -> isSystemInDarkTheme()
+    // The phone's own setting, read from the system rather than the app: the app's light or dark choice for its
+    // launch window is only updated on leaving the app, and until then it would answer for the phone.
+    ThemeMode.DEVICE -> {
+        // Read again whenever the configuration changes, as it does when the phone switches.
+        androidx.compose.ui.platform.LocalConfiguration.current
+        (android.content.res.Resources.getSystem().configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+    }
     ThemeMode.LIGHT -> false
     ThemeMode.DARK -> true
 }
@@ -229,7 +278,18 @@ private val Type = Typography(
     bodyLarge = TextStyle(fontFamily = Body, fontSize = 16.sp, lineHeight = 22.sp),
     bodyMedium = TextStyle(fontFamily = Body, fontSize = 14.sp, lineHeight = 20.sp),
     bodySmall = TextStyle(fontFamily = Body, fontSize = 12.sp, lineHeight = 16.sp),
-    labelLarge = TextStyle(fontFamily = Body, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold),
+    // Centred in its line and trimmed, so a word sits in the middle of a pill button rather than low in it.
+    labelLarge = TextStyle(
+        fontFamily = Body,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+        fontWeight = FontWeight.SemiBold,
+        lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(
+            alignment = androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
+            trim = androidx.compose.ui.text.style.LineHeightStyle.Trim.Both,
+        ),
+        platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false),
+    ),
     labelMedium = TextStyle(fontFamily = Engraved, fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
     labelSmall = TextStyle(fontFamily = Engraved, fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium),
 )
@@ -249,18 +309,69 @@ val BigReadout = TextStyle(fontFamily = ReadoutFamily, fontSize = 38.sp, lineHei
 /** Monospaced digits, so measurements stay still while their values change. */
 val Readout = TextStyle(fontFamily = ReadoutFamily, fontSize = 13.sp, lineHeight = 18.sp)
 
+// Material You's own corner scale, so menus, chips, fields and dialogs are as soft as the rest.
 private val Corners = Shapes(
-    extraSmall = RoundedCornerShape(4.dp),
-    small = RoundedCornerShape(6.dp),
-    medium = RoundedCornerShape(8.dp),
-    large = RoundedCornerShape(10.dp),
-    extraLarge = RoundedCornerShape(12.dp),
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(20.dp),
+    extraLarge = RoundedCornerShape(28.dp),
 )
+
+/**
+ * Material You's colours, taken from the wallpaper (user decision), in the app's own roles. The ears and warnings
+ * keep their fixed colours, since what they mean can't change with the wallpaper.
+ */
+private fun fromScheme(s: androidx.compose.material3.ColorScheme, fixed: ThemeColors, dark: Boolean): ThemeColors {
+    fun over(top: Color, alpha: Float, under: Color) = androidx.compose.ui.graphics.lerp(under, top, alpha)
+    return fixed.copy(
+        // The same arrangement in both themes (user decision): the page in Material's surface tone, and the bars in
+        // its lowest, a shade apart from the page, near-black at night and white by day.
+        background = s.surface,
+        // Material's lowest tone: near-black framing the page at night, and white by day (user decisions).
+        bar = s.surfaceContainerLowest,
+        // The wallpaper's own colour, rather than a grey, so the status window stands out (user decision).
+        strip = s.primary,
+        stripDim = over(s.onPrimary, 0.72f, s.primary),
+        stripText = s.onPrimary,
+        stripOn = s.onPrimary,
+        // A lighter shade of the strip's own colour for its drawer.
+        // At night the strip's colour is a pale tint, so its drawer goes a shade deeper; by day a shade lighter.
+        // A small step from the strip's colour in either theme, so the drawer belongs to it yet reads apart.
+        stripPanel = if (dark) over(Color.Black, 0.08f, s.primary) else over(Color.White, 0.08f, s.primary),
+        // A tinted step off the page in both themes, so panels read as panels on white too.
+        surface = s.surfaceContainerLow,
+        surfaceHigh = s.surfaceContainerHighest,
+        // Menus and dialogs: a raised grey at night, and white with their shadow by day, rather than a dark grey on white.
+        tooltip = if (dark) s.surfaceContainerHigh else s.surfaceContainerLowest,
+        line = s.outlineVariant,
+        outline = s.outline,
+        track = s.outline,
+        text = s.onSurface,
+        textDim = s.onSurfaceVariant,
+        lit = s.primary,
+        litFill = s.primary,
+        litPressed = over(s.onPrimary, 0.12f, s.primary),
+        onLit = s.onPrimary,
+    )
+}
 
 @Composable
 fun EigentoneTheme(dark: Boolean, content: @Composable () -> Unit) {
-    val colors = if (dark) DarkColors else LightColors
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // Colours from the wallpaper from Android 12. Before that there are none to take, so the fixed palettes stand in.
+    val dynamic = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+    val scheme = when {
+        dynamic && dark -> androidx.compose.material3.dynamicDarkColorScheme(context)
+        dynamic -> androidx.compose.material3.dynamicLightColorScheme(context)
+        dark -> DarkScheme
+        else -> LightScheme
+    }
+    val colors = androidx.compose.runtime.remember(scheme, dark) {
+        if (dynamic) fromScheme(scheme, if (dark) DarkColors else LightColors, dark) else if (dark) DarkColors else LightColors
+    }
     // Set before anything below reads it, so a change can't show one frame of the old theme.
     if (Palette.colors != colors) Palette.colors = colors
-    MaterialTheme(colorScheme = if (dark) DarkScheme else LightScheme, typography = Type, shapes = Corners, content = content)
+    Palette.dark = dark
+    MaterialTheme(colorScheme = scheme, typography = Type, shapes = Corners, content = content)
 }

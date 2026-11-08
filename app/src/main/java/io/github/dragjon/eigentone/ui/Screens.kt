@@ -231,6 +231,9 @@ private val LocalOpenHearing = compositionLocalOf<() -> Unit> { error("No hearin
 private val LocalOpenRefine = compositionLocalOf<() -> Unit> { error("No refine") }
 
 private const val SEARCH_FROM_PRESETS = 6
+
+/** Just after the theme toggle's thumb has finished sliding, so recolouring the app never stalls it midway. */
+private const val THEME_SWITCH_AFTER_MS = 260L
 private const val TAB_SLIDE_MS = 240
 
 /** How long after the app appears the tabs not yet visited are built, so the opening isn't slowed by them. */
@@ -374,9 +377,15 @@ fun EigentoneApp(onSetEnabled: (Boolean) -> Unit) {
     }
     AnimatedContent(
         targetState = screen,
+        // The app's own page behind every change of screen, so a cross-fade never shows the window beneath, which
+        // follows the phone's light or dark setting rather than Eigentone's and flashed through (user decision).
+        modifier = Modifier.background(Palette.Background),
         transitionSpec = {
-            // The landscape faders turn the phone, which a slide would only make look broken.
-            if (initialState == Overlay.FADERS || targetState == Overlay.FADERS) {
+            // The landscape faders turn the phone, which a slide would only make look broken. The welcome closes
+            // into the line the app then opens out of, so that change needs no transition of its own either.
+            if (initialState == Overlay.FADERS || targetState == Overlay.FADERS ||
+                (initialState == Overlay.WELCOME && targetState == null)
+            ) {
                 EnterTransition.None togetherWith ExitTransition.None
             } else if (targetState != null && initialState == null || targetState == Overlay.WELCOME) {
                 (slideInHorizontally(screenSlide()) { it } + fadeIn(screenFade())) togetherWith
@@ -555,7 +564,19 @@ private fun AppScreen(
         Scaffold(
             containerColor = Palette.Background,
             topBar = { TopBar(state, status, showCurve = tab != Tab.EQ, settingsOpen = tab == Tab.SYSTEM, onSettings = toggleSettings, onSetEnabled) },
-            snackbarHost = { SnackbarHost(snackbar) },
+            // Messages wear the same card as the unsaved bar, so the two floating notes look like one family.
+            snackbarHost = {
+                SnackbarHost(snackbar) { data ->
+                    androidx.compose.material3.Snackbar(
+                        snackbarData = data,
+                        shape = PanelShape,
+                        containerColor = Palette.Note,
+                        contentColor = Palette.NoteText,
+                        actionColor = Palette.NoteText,
+                        dismissActionContentColor = Palette.TextDim,
+                    )
+                }
+            },
             bottomBar = {
                 // Settings lives in the top bar, which leaves the bottom for the four everyday tabs. They share
                 // the width equally, with labels of similar length, so the spacing is even edge to edge.
@@ -711,7 +732,7 @@ private fun NavItem(tab: Tab, selected: Boolean, device: OutputKind? = null, mod
                 Modifier
                     .size(width = 64.dp, height = 32.dp)
                     .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-                    .background(if (selected) Palette.Lit else Color.Transparent)
+                    .background(if (selected) Palette.LitFill else Color.Transparent)
                     .indication(presses, androidx.compose.material3.ripple()),
                 contentAlignment = Alignment.Center,
             ) {
@@ -813,10 +834,11 @@ private fun TopBar(
             }
         }
         // Even gaps: version, Bypass, switch and settings sit 12 dp apart (the settings icon carries its own 12 dp).
-        Row(Modifier.padding(start = 12.dp).tourTarget(TourStop.POWER), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(start = 8.dp).tourTarget(TourStop.POWER), verticalAlignment = Alignment.CenterVertically) {
             if (state.enabled) BypassButton(state.bypass)
             val view = androidx.compose.ui.platform.LocalView.current
             Switch(
+                colors = switchColors(),
                 checked = state.enabled,
                 // Felt as well as seen, since it's the switch that matters most.
                 onCheckedChange = { on ->
@@ -825,7 +847,7 @@ private fun TopBar(
                 },
                 modifier = Modifier
                     .litGlow(state.enabled && !state.bypass)
-                    .padding(start = 12.dp)
+                    .padding(start = 8.dp)
                     .semantics { contentDescription = "Eigentone" },
             )
         }
@@ -843,7 +865,8 @@ private fun TopBar(
     }
 }
 
-private val BypassPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+// Room for "Bypassed" clear of the pill's rounded ends.
+private val BypassPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
 
 /** Distinct from the power switch: neutral until engaged, when it's clearly a held state. */
 @Composable
@@ -861,7 +884,17 @@ private fun BypassButton(bypassed: Boolean) {
         }
     }
     if (bypassed) {
-        Button(onClick = { toggle() }, contentPadding = BypassPadding) { label() }
+        // Engaged, it's a warning: the EQ is silently off. Orange, since red belongs to the right ear.
+        androidx.compose.material3.Button(
+            onClick = { toggle() },
+            shape = KeyShape,
+            contentPadding = BypassPadding,
+            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                containerColor = androidx.compose.ui.graphics.lerp(Palette.Surface, Palette.Danger, 0.3f),
+                contentColor = Palette.Danger,
+            ),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Palette.Danger.copy(alpha = 0.6f)),
+        ) { label() }
     } else {
         FilledTonalButton(onClick = { toggle() }, contentPadding = BypassPadding) { label() }
     }
@@ -955,6 +988,8 @@ private fun EqTab(state: AppState) {
             .fillMaxWidth()
             .clip(PanelShape)
             .background(Palette.Surface)
+            // The graph sits inset in its rounded panel, so its labels and the info icon keep clear of the corners.
+            .padding(start = GRAPH_INSET_DP.dp, top = GRAPH_INSET_DP.dp, bottom = GRAPH_INSET_DP.dp)
             .height(androidx.compose.foundation.layout.IntrinsicSize.Min),
     ) {
         Box(Modifier.weight(1f)) {
@@ -962,14 +997,14 @@ private fun EqTab(state: AppState) {
             legendInsetDp = if (state.analyser) SPECTRUM_INFO_INSET_DP else 0,
             // Graphic mode has its own faders, so the parametric nodes would only get in the way.
             filters = if (inGraphic) emptyList() else filters,
-            heightDp = graphHeight.value.value.toInt(),
+            height = { graphHeight.value },
             curveFilters = earCurves?.first ?: curveFilters,
             rightCurveFilters = earCurves?.second,
             ghostFilters = savedCurve,
             morphKey = state.current.id,
             earMarkers = earMarkers,
             // Not read while the page is out of view, so the graph isn't redrawn off screen with every reading.
-            spectrum = { if (pageShown()) spectrumState.value else null },
+            spectrum = { if (pageShown() && state.analyser) spectrumState.value else null },
             selectedId = selectedId,
             dimmed = !state.enabled || state.bypass,
             onSelect = { selectedId = it },
@@ -1008,22 +1043,12 @@ private fun EqTab(state: AppState) {
         // Without the mode switch beside it, the analyser is a labelled chip, so it doesn't sit alone as a bare icon.
         if (!showParametric) {
             AnalyserChip(state)
-        } else SingleChoiceSegmentedButtonRow(Modifier.weight(1f)) {
-            SegmentedButton(
-                selected = graphicMode,
-                onClick = { graphicMode = true },
-                shape = SegmentedButtonDefaults.itemShape(0, 2, KeyShape),
-                colors = segmentColors(),
-                icon = {},
-            ) { Text(stringResource(R.string.ui_graphic), maxLines = 1) }
-            SegmentedButton(
-                selected = !graphicMode,
-                onClick = { graphicMode = false },
-                shape = SegmentedButtonDefaults.itemShape(1, 2, KeyShape),
-                colors = segmentColors(),
-                icon = {},
-            ) { Text(stringResource(R.string.ui_parametric), maxLines = 1) }
-        }
+        } else SlidingToggle(
+            options = listOf(ToggleOption(stringResource(R.string.ui_graphic)), ToggleOption(stringResource(R.string.ui_parametric))),
+            selected = if (graphicMode) 0 else 1,
+            onSelect = { graphicMode = it == 0 },
+            modifier = Modifier.weight(1f),
+        )
         // Beside the mode rather than on the graph, where the ear legends sit.
         if (showParametric) AnalyserToggle(state, Modifier)
         if (showParametric) InfoButton(Help.eqMode)
@@ -1037,7 +1062,8 @@ private fun EqTab(state: AppState) {
             val sign = if (targetState) -1 else 1
             (slideInHorizontally(tween(TAB_SLIDE_MS, easing = LinearOutSlowInEasing)) { sign * it / 4 } + fadeIn(tween(TAB_SLIDE_MS / 2))) togetherWith
                 (slideOutHorizontally(tween(TAB_SLIDE_MS, easing = LinearOutSlowInEasing)) { -sign * it / 4 } + fadeOut(tween(TAB_SLIDE_MS / 2))) using
-                androidx.compose.animation.SizeTransform(clip = false)
+                // The panel's height changes on the same curve and time as the slide, so everything moves together.
+                androidx.compose.animation.SizeTransform(clip = false) { _, _ -> tween(TAB_SLIDE_MS, easing = LinearOutSlowInEasing) }
         },
         label = "eqMode",
     ) { graphic ->
@@ -1181,7 +1207,7 @@ private fun UnsavedBar(state: AppState, saved: Preset, modifier: Modifier = Modi
             .fillMaxWidth()
             .shadow(6.dp, PanelShape)
             .clip(PanelShape)
-            .background(Palette.Tooltip)
+            .background(Palette.Note)
             .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1246,13 +1272,23 @@ private fun AnalyserEffect(enabled: Boolean) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(enabled, lifecycle) {
-        val analyser = SpectrumAnalyser(onBands = { Repo.spectrum.value = it }, onLevel = { peak, rms -> Repo.updateLevel(peak, rms) })
+        // A reading already on its way when the analyser stops is dropped, so turning it off always clears the
+        // bars rather than sometimes leaving the last ones behind.
+        val live = java.util.concurrent.atomic.AtomicBoolean(true)
+        val analyser = SpectrumAnalyser(
+            onBands = { if (live.get()) Repo.spectrum.value = it },
+            onLevel = { peak, rms -> if (live.get()) Repo.updateLevel(peak, rms) },
+        )
         val observer = LifecycleEventObserver { _, event ->
             val allowed = enabled && context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
                 PackageManager.PERMISSION_GRANTED
             when (event) {
-                Lifecycle.Event.ON_START -> if (allowed) analyserUnavailable.value = !analyser.start()
+                Lifecycle.Event.ON_START -> if (allowed) {
+                    live.set(true)
+                    analyserUnavailable.value = !analyser.start()
+                }
                 Lifecycle.Event.ON_STOP -> {
+                    live.set(false)
                     analyser.stop()
                     Repo.spectrum.value = null
                     Repo.level.value = null
@@ -1262,9 +1298,11 @@ private fun AnalyserEffect(enabled: Boolean) {
         }
         lifecycle.addObserver(observer)
         onDispose {
+            live.set(false)
             lifecycle.removeObserver(observer)
             analyser.stop()
             Repo.spectrum.value = null
+            Repo.level.value = null
         }
     }
 }
@@ -1294,7 +1332,7 @@ private fun AnalyserChip(state: AppState) {
         label = { Text(stringResource(R.string.ui_live_spectrum), maxLines = 1) },
         leadingIcon = { Icon(painterResource(R.drawable.ic_spectrum), contentDescription = null, modifier = Modifier.size(18.dp)) },
         colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = Palette.Lit,
+            selectedContainerColor = Palette.LitFill,
             selectedLabelColor = Palette.OnLit,
             selectedLeadingIconColor = Palette.OnLit,
             labelColor = Palette.Text,
@@ -1321,6 +1359,9 @@ private fun AnalyserToggle(state: AppState, modifier: Modifier) {
 }
 
 private const val SPECTRUM_INFO_INSET_DP = 24
+
+/** The graph's room inside its rounded panel. */
+private const val GRAPH_INSET_DP = 8
 private const val SPECTRUM_INFO_ALPHA = 0.7f
 
 private fun updateFilter(id: Int, transform: (Filter) -> Filter) {
@@ -1384,22 +1425,18 @@ private fun FilterEditor(filter: Filter, filters: List<Filter>, dynamicPlaced: S
                 io.github.dragjon.eigentone.dsp.FilterChannel.LEFT to stringResource(R.string.ui_channel_left),
                 io.github.dragjon.eigentone.dsp.FilterChannel.RIGHT to stringResource(R.string.ui_channel_right),
             )
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                channels.forEachIndexed { i, (channel, name) ->
-                    SegmentedButton(
-                        selected = filter.channel == channel,
-                        onClick = {
-                            if (filter.channel != channel) {
-                                updateFilter(filter.id) { it.copy(channel = channel) }
-                                Repo.commit()
-                            }
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(i, channels.size, KeyShape),
-                        colors = segmentColors(),
-                        icon = {},
-                    ) { Text(name, maxLines = 1) }
-                }
-            }
+            SlidingToggle(
+                options = channels.map { (_, name) -> ToggleOption(name) },
+                selected = channels.indexOfFirst { it.first == filter.channel }.coerceAtLeast(0),
+                onSelect = { i ->
+                    val channel = channels[i].first
+                    if (filter.channel != channel) {
+                        updateFilter(filter.id) { it.copy(channel = channel) }
+                        Repo.commit()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
         if (filter.type.hasSlope) {
             RowDivider()
@@ -1411,23 +1448,18 @@ private fun FilterEditor(filter: Filter, filters: List<Filter>, dynamicPlaced: S
                     Text(stringResource(R.string.ui_db_per_octave), style = MaterialTheme.typography.bodySmall, color = Palette.TextDim)
                 }
                 val current = Eq.slopeOf(filter)
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    Eq.SLOPES.forEachIndexed { i, option ->
-                        SegmentedButton(
-                            selected = current == option,
-                            onClick = {
-                                if (current != option) {
-                                    updateFilter(filter.id) { it.copy(slope = option) }
-                                    Repo.commit()
-                                }
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(i, Eq.SLOPES.size, KeyShape),
-                            colors = segmentColors(),
-                            icon = {},
-                            modifier = Modifier.semantics { contentDescription = appText(R.string.ui_slope_option, option) },
-                        ) { Text("$option", maxLines = 1) }
-                    }
-                }
+                SlidingToggle(
+                    options = Eq.SLOPES.map { ToggleOption("$it", description = appText(R.string.ui_slope_option, it)) },
+                    selected = Eq.SLOPES.indexOf(current).coerceAtLeast(0),
+                    onSelect = { i ->
+                        val option = Eq.SLOPES[i]
+                        if (current != option) {
+                            updateFilter(filter.id) { it.copy(slope = option) }
+                            Repo.commit()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
         RowDivider()
@@ -1532,7 +1564,7 @@ private fun TypeChip(filter: Filter, type: FilterType, label: String, modifier: 
         },
         label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = Palette.Lit,
+            selectedContainerColor = Palette.LitFill,
             selectedLabelColor = Palette.OnLit,
             labelColor = Palette.Text,
         ),
@@ -1811,7 +1843,7 @@ private fun ReverbRow(state: AppState, status: EngineStatus, saved: Tone?) {
                     },
                     label = { Text(stringResource(reverbName(room)), maxLines = 1) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Palette.Lit,
+                        selectedContainerColor = Palette.LitFill,
                         selectedLabelColor = Palette.OnLit,
                         labelColor = Palette.Text,
                     ),
@@ -2158,7 +2190,7 @@ private fun LimiterDetails(state: AppState) {
                 onClick = { Repo.update { it.withLimiter(style.settings) } },
                 label = { Text(stringResource(style.label), maxLines = 1) },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Palette.Lit,
+                    selectedContainerColor = Palette.LitFill,
                     selectedLabelColor = Palette.OnLit,
                     labelColor = Palette.Text,
                 ),
@@ -2532,9 +2564,9 @@ private fun OutputSection(state: AppState, outputKey: String, outputLabel: Strin
 
 @Composable
 fun segmentColors() = SegmentedButtonDefaults.colors(
-    activeContainerColor = Palette.Lit,
+    activeContainerColor = Palette.LitFill,
     activeContentColor = Palette.OnLit,
-    activeBorderColor = Palette.Lit,
+    activeBorderColor = Palette.LitFill,
     inactiveContainerColor = Palette.SurfaceHigh,
     inactiveContentColor = Palette.Text,
     inactiveBorderColor = Palette.Line,
@@ -2560,7 +2592,7 @@ private fun PresetListSection(state: AppState) {
             singleLine = true,
             label = { Text(stringResource(R.string.ui_search_presets)) },
             leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-            colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Palette.Track),
+            colors = fieldColors(unfocusedBorder = Palette.Track),
             trailingIcon = if (query.isEmpty()) null else ({
                 IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.ui_clear_search)) }
             }),
@@ -2888,7 +2920,7 @@ fun AutoEqDialog(onDismiss: () -> Unit, onImported: (String) -> Unit) {
         title = { Text(stringResource(R.string.ui_find_headphones)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
+                OutlinedTextField(colors = fieldColors(), 
                     value = query,
                     onValueChange = {
                         query = it
@@ -2970,7 +3002,7 @@ private fun SaveDialog(
         containerColor = Palette.Tooltip,
         title = { Text(title) },
         text = {
-            OutlinedTextField(
+            OutlinedTextField(colors = fieldColors(), 
                 value = name,
                 onValueChange = { name = it },
                 singleLine = true,
@@ -3007,15 +3039,29 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
                 Text(stringResource(R.string.ui_theme), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
                 InfoButton(Help.theme)
             }
+            // The same joined selector as the audio route, so every few-way choice looks alike (user decision).
             val modes = ThemeMode.entries
-            WordSegments(
-                labels = listOf(
-                    stringResource(R.string.ui_theme_device),
-                    stringResource(R.string.ui_theme_light),
-                    stringResource(R.string.ui_theme_dark),
-                ),
-                selected = modes.indexOf(state.themeMode),
-                onSelect = { i -> Repo.update { it.copy(themeMode = modes[i]) } },
+            val names = listOf(
+                stringResource(R.string.ui_theme_device),
+                stringResource(R.string.ui_theme_light),
+                stringResource(R.string.ui_theme_dark),
+            )
+            // Recolouring the whole app is heavy, so the thumb slides first and the theme follows once it's there,
+            // rather than the toggle waiting for the recolour before it can move.
+            var picked by remember { mutableStateOf<Int?>(null) }
+            val themeScope = rememberCoroutineScope()
+            SlidingToggle(
+                options = names.map { ToggleOption(it) },
+                selected = picked ?: modes.indexOf(state.themeMode),
+                onSelect = { i ->
+                    picked = i
+                    themeScope.launch {
+                        kotlinx.coroutines.delay(THEME_SWITCH_AFTER_MS)
+                        Repo.update { it.copy(themeMode = modes[i]) }
+                        picked = null
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
             )
         }
         RowDivider()
@@ -3036,17 +3082,12 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
                 InfoButton(Help.engineMode)
             }
             val modes = EngineMode.entries
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                modes.forEachIndexed { i, mode ->
-                    SegmentedButton(
-                        selected = state.engineMode == mode,
-                        onClick = { Repo.update { it.copy(engineMode = mode) } },
-                        shape = SegmentedButtonDefaults.itemShape(i, modes.size, KeyShape),
-                        colors = segmentColors(),
-                        icon = {},
-                    ) { Text(engineModeLabel(mode), maxLines = 1) }
-                }
-            }
+            SlidingToggle(
+                options = modes.map { ToggleOption(engineModeLabel(it)) },
+                selected = modes.indexOf(state.engineMode),
+                onSelect = { i -> Repo.update { it.copy(engineMode = modes[i]) } },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
         RowDivider()
         SwitchSetting(stringResource(R.string.ui_low_latency), Help.lowLatency, state.lowLatency) { on ->

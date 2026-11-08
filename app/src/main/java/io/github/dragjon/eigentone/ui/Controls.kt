@@ -71,6 +71,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.material3.AlertDialog
@@ -124,20 +126,38 @@ fun SettingsSection(
             SectionFocus.request = null
         }
     }
+    // Pressing a folding heading lights a soft circle behind its chevron, as an icon button answers a tap.
+    val press = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by press.collectIsPressedAsState()
+    val held by animateFloatAsState(if (pressed) 1f else 0f, tween(if (pressed) 60 else 220), label = "foldPress")
+    // Every tap flashes the circle, even one too quick for the press to show.
+    val flash = remember { androidx.compose.animation.core.Animatable(0f) }
+    val flashScope = rememberCoroutineScope()
+    val glow = maxOf(held, flash.value)
     Column(Modifier.fillMaxWidth().bringIntoViewRequester(requester)) {
         if (title != null) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .heightIn(min = if (folds) 48.dp else 40.dp)
-                    // The press highlight has the same rounded corners as the panels.
-                    .clip(KeyShape)
+                    // A folding heading is a big, easy target: the legend, its summary and the space around them.
+                    .heightIn(min = if (folds) 64.dp else 40.dp)
                     .then(
                         if (folds) {
+                            // No flash across the whole heading (user decision), which drew a second rounded box
+                            // over the panel's own: a circle flashes behind the chevron instead, and no haptic, which
+                            // the app keeps for values passing their default and for switches (user decision).
                             Modifier.clickable(
+                                interactionSource = press,
+                                indication = null,
                                 role = Role.Button,
                                 onClickLabel = stringResource(if (open) R.string.ui_fold_close else R.string.ui_fold_open),
-                            ) { open = !open }
+                            ) {
+                                flashScope.launch {
+                                    flash.snapTo(1f)
+                                    flash.animateTo(0f, tween(320))
+                                }
+                                open = !open
+                            }
                         } else {
                             Modifier
                         },
@@ -173,6 +193,9 @@ fun SettingsSection(
                         tint = Palette.TextDim,
                         modifier = Modifier
                             .padding(horizontal = 8.dp)
+                            .drawBehind {
+                                if (glow > 0f) drawCircle(Palette.Text.copy(alpha = 0.12f * glow), radius = size.minDimension * 0.9f)
+                            }
                             .graphicsLayer { rotationZ = turn },
                     )
                 }
@@ -336,7 +359,7 @@ fun SwitchSetting(title: String, tip: Tip, checked: Boolean, detail: String? = n
             }
         }
         // The whole row toggles and announces itself, so the switch only draws the state.
-        Switch(checked = checked, onCheckedChange = null, modifier = Modifier.padding(start = 12.dp))
+        Switch(checked = checked, onCheckedChange = null, colors = switchColors(), modifier = Modifier.padding(start = 12.dp))
     }
 }
 
@@ -497,6 +520,8 @@ fun ValueTrack(
     val clamped = value.coerceIn(range)
     val view = LocalView.current
     val defaultNow by rememberUpdatedState(default)
+    // Material's own colour for the unfilled track, a touch deeper so it still shows on a light panel.
+    val unfilled = Palette.Track2
 
     Canvas(
         Modifier
@@ -534,8 +559,8 @@ fun ValueTrack(
                         }
                         return@awaitEachGesture
                     }
-                    // The cap travels the width less its own, so the value keeps pace with the finger.
-                    val width = (size.width - 12.dp.toPx()).coerceAtLeast(1f)
+                    // The handle travels the width less its own, so the value keeps pace with the finger.
+                    val width = (size.width - TRACK_HANDLE_DP.dp.toPx()).coerceAtLeast(1f)
                     var running = current
                     horizontalDrag(drag.id) { event ->
                         val moved = event.positionChange().x
@@ -550,65 +575,69 @@ fun ValueTrack(
                 }
             },
     ) {
-        // A thin rail with an engraved scale and a rectangular cap, like a fader on a piece of equipment.
-        val capWidth = 12.dp.toPx()
-        val capHeight = 24.dp.toPx()
-        val usable = size.width - capWidth
-        val xOf = { v: Float -> capWidth / 2 + (v - range.start) / span * usable }
+        // Material 3's slider: a thick rounded track, filled from the origin, with a tall narrow handle that
+        // stands a little clear of the track on either side.
+        val handleWidth = TRACK_HANDLE_DP.dp.toPx()
+        val handleHeight = minOf(TRACK_HANDLE_HEIGHT_DP.dp.toPx(), size.height)
+        val trackHeight = TRACK_HEIGHT_DP.dp.toPx()
+        val gap = TRACK_GAP_DP.dp.toPx()
+        val usable = size.width - handleWidth
+        val xOf = { v: Float -> handleWidth / 2 + (v - range.start) / span * usable }
         val centre = size.height / 2
-        val railHeight = 2.dp.toPx()
-        val tickHeight = 3.dp.toPx()
-        for (tick in 0..TRACK_TICKS) {
-            val x = capWidth / 2 + usable * tick / TRACK_TICKS
-            val major = tick == 0 || tick == TRACK_TICKS
-            val length = if (major) tickHeight * 2 else tickHeight
-            drawRect(
-                Palette.Track,
-                topLeft = Offset(x - 0.5.dp.toPx(), centre + railHeight + 3.dp.toPx()),
-                size = Size(1.dp.toPx(), length),
-            )
-        }
-        // The default gets its own long tick, wherever it falls on the scale.
-        drawRect(
-            Palette.TextDim,
-            topLeft = Offset(xOf(default.coerceIn(range)) - 0.5.dp.toPx(), centre + railHeight + 3.dp.toPx()),
-            size = Size(1.dp.toPx(), tickHeight * 2),
-        )
-        drawRect(
-            Palette.Track,
-            topLeft = Offset(capWidth / 2, centre - railHeight / 2),
-            size = Size(usable, railHeight),
-        )
-        val from = xOf(origin.coerceIn(range))
+        val top = centre - trackHeight / 2
+        val outer = CornerRadius(trackHeight / 2)
+        val inner = CornerRadius(2.dp.toPx())
+        // Filled from the start, as every Material slider is (user decision); the default is marked with a dot.
+        val from = 0f
         val to = xOf(clamped)
-        val left = minOf(from, to)
-        drawRect(
-            Palette.Lit,
-            topLeft = Offset(left, centre - railHeight / 2),
-            size = Size(maxOf(from, to) - left, railHeight),
-        )
-        if (origin > range.start) {
-            // A notch marks the zero point on centred controls.
-            drawRect(
-                Palette.TextDim,
-                topLeft = Offset(from - 1.dp.toPx() / 2, centre - 7.dp.toPx()),
-                size = Size(1.dp.toPx(), 7.dp.toPx()),
-            )
+
+        // A piece of track between two points, fully rounded at the track's own ends and nearly square beside
+        // the handle, as Material draws it.
+        fun piece(start: Float, end: Float, colour: androidx.compose.ui.graphics.Color, roundStart: Boolean, roundEnd: Boolean) {
+            if (end - start <= 0f) return
+            val path = androidx.compose.ui.graphics.Path().apply {
+                addRoundRect(
+                    androidx.compose.ui.geometry.RoundRect(
+                        left = start, top = top, right = end, bottom = top + trackHeight,
+                        topLeftCornerRadius = if (roundStart) outer else inner,
+                        bottomLeftCornerRadius = if (roundStart) outer else inner,
+                        topRightCornerRadius = if (roundEnd) outer else inner,
+                        bottomRightCornerRadius = if (roundEnd) outer else inner,
+                    ),
+                )
+            }
+            drawPath(path, colour)
         }
-        val corner = CornerRadius(2.dp.toPx())
+
+        val low = minOf(from, to)
+        val high = maxOf(from, to)
+        val beforeHandle = to - handleWidth / 2 - gap
+        val afterHandle = to + handleWidth / 2 + gap
+        // Unfilled track either side of the filled part, then the filled part, each kept clear of the handle.
+        piece(0f, minOf(low, beforeHandle), unfilled, roundStart = true, roundEnd = low > to)
+        piece(maxOf(high, afterHandle), size.width, unfilled, roundStart = high < to, roundEnd = true)
+        piece(from, beforeHandle, Palette.LitFill, roundStart = true, roundEnd = false)
+        // Small stops mark the default, and the zero point on centred controls, where the handle isn't.
+        val dot = 2.dp.toPx()
+        listOf(default.coerceIn(range), origin.coerceIn(range)).distinct().filter { it > range.start && it < range.endInclusive }.forEach { mark ->
+            val x = xOf(mark)
+            if (kotlin.math.abs(x - to) < handleWidth / 2 + gap + dot) return@forEach
+            val onFill = x in low..high
+            drawCircle(if (onFill) Palette.OnLit else Palette.TextDim, dot, Offset(x, centre))
+        }
         drawRoundRect(
-            Palette.Lit,
-            topLeft = Offset(to - capWidth / 2, centre - capHeight / 2),
-            size = Size(capWidth, capHeight),
-            cornerRadius = corner,
-        )
-        drawRect(
-            Palette.OnLit,
-            topLeft = Offset(to - 1.dp.toPx(), centre - capHeight / 2 + 4.dp.toPx()),
-            size = Size(2.dp.toPx(), capHeight - 8.dp.toPx()),
+            Palette.LitFill,
+            topLeft = Offset(to - handleWidth / 2, centre - handleHeight / 2),
+            size = Size(handleWidth, handleHeight),
+            cornerRadius = CornerRadius(handleWidth / 2),
         )
     }
 }
+
+private const val TRACK_HANDLE_DP = 4
+private const val TRACK_HANDLE_HEIGHT_DP = 40
+private const val TRACK_HEIGHT_DP = 16
+private const val TRACK_GAP_DP = 6
 
 /**
  * Whether Android's own spatial audio is on. It can only be read, because only system apps can change it,
@@ -690,6 +719,28 @@ fun NothingPlayingHint(modifier: Modifier = Modifier) {
         modifier = modifier,
     )
 }
+
+/** A switch that's on has a light knob in a light theme (user decision), rather than a dark one. */
+@Composable
+fun switchColors() = androidx.compose.material3.SwitchDefaults.colors(
+    checkedThumbColor = if (Palette.dark) androidx.compose.material3.MaterialTheme.colorScheme.onPrimary else androidx.compose.ui.graphics.Color.White,
+    checkedIconColor = Palette.LitFill,
+)
+
+/** Text fields take the lit text colour when focused, since their label and cursor have to be read. */
+@Composable
+fun fieldColors(
+    unfocusedBorder: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Unspecified,
+) = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+    unfocusedBorderColor = unfocusedBorder,
+    focusedBorderColor = Palette.Lit,
+    focusedLabelColor = Palette.Lit,
+    cursorColor = Palette.Lit,
+    selectionColors = androidx.compose.foundation.text.selection.TextSelectionColors(
+        handleColor = Palette.Lit,
+        backgroundColor = Palette.LitFill.copy(alpha = 0.4f),
+    ),
+)
 
 /** The gaps between sections, kept in one place. */
 val SectionSpacing = Arrangement.spacedBy(12.dp)

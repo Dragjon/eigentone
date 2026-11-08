@@ -32,8 +32,11 @@ class ThemeColorsTest {
         for (surface in surfaces) {
             check("text", t.text, surface, 4.5)
             check("dim text", t.textDim, surface, 4.5)
-            check("lit readout", t.lit, surface, 4.5)
             check("danger", t.danger, surface, 4.5)
+        }
+        // Lit text sits on the page, the bars, panels and dialogs; an unlit key never carries it.
+        for (surface in listOf(t.background, t.bar, t.surface, t.tooltip)) {
+            check("lit readout", t.lit, surface, 4.5)
         }
         for (surface in listOf(t.surface, t.background, t.bar)) {
             check("left ear", t.leftEar, surface, 3.0)
@@ -43,7 +46,7 @@ class ThemeColorsTest {
             check("rail", t.track, surface, 3.0)
             check("outline", t.outline, surface, 3.0)
         }
-        check("key legend", t.onLit, t.lit, 4.5)
+        check("key legend", t.onLit, t.litFill, 4.5)
         check("pressed key legend", t.onLit, t.litPressed, 4.5)
         for (item in listOf(t.stripText, t.stripOn, t.stripDim, t.stripDanger)) {
             check("strip", item, t.strip, 4.5)

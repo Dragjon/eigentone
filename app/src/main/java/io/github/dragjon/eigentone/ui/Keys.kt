@@ -57,6 +57,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -65,106 +69,119 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.dragjon.eigentone.data.Preset
 import io.github.dragjon.eigentone.data.Repo
 
-/** A choice between a few words. Longer words get wider keys, so none of them is cut off. */
+/** One option in a [SlidingToggle]: words, an icon, or both. An icon alone is still named for screen readers. */
+data class ToggleOption(val label: String, val icon: Int? = null, val showLabel: Boolean = true, val description: String? = null)
+
+/** A choice between a few words, as a [SlidingToggle]. Longer words get wider keys, so none of them is cut off. */
 @Composable
 fun WordSegments(labels: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
-    Row(
-        modifier
-            .fillMaxWidth()
-            .height(IntrinsicSize.Min)
-            .selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        labels.forEachIndexed { i, label ->
-            val on = i == selected
-            Box(
-                Modifier
-                    .weight(label.length + 4f)
-                    .fillMaxHeight()
-                    .heightIn(min = 48.dp)
-                    .clip(KeyShape)
-                    .background(if (on) Palette.Lit else Palette.SurfaceHigh)
-                    .selectable(selected = on, role = Role.RadioButton, onClick = { onSelect(i) })
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (on) Palette.OnLit else Palette.Text,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2,
-                )
-            }
-        }
-    }
+    SlidingToggle(labels.map { ToggleOption(it) }, selected, onSelect, modifier.fillMaxWidth(), weighted = true)
 }
 
-/**
- * One switch between two or three choices: a track with a lit key that slides to the chosen one, so
- * it reads as a single control rather than separate buttons.
- */
+/** The icon-and-word form, kept for the places that already pass pairs. */
 @Composable
 fun SlidingToggle(
     options: List<Pair<Int, String>>,
     selected: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+) = SlidingToggle(options.map { (icon, label) -> ToggleOption(label, icon) }, selected, onSelect, modifier, weighted = false)
+
+/**
+ * Every few-way choice in the app (user decision): a casing with a lit thumb that slides to the chosen option
+ * and takes its width, so it reads as one control rather than separate buttons. The press flash has the thumb's
+ * own shape, so a tap never shows a second, differently rounded box.
+ */
+@Composable
+fun SlidingToggle(
+    options: List<ToggleOption>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    /** Wider keys for longer words, rather than equal shares. */
+    weighted: Boolean = false,
+    height: androidx.compose.ui.unit.Dp = 48.dp,
 ) {
-    androidx.compose.foundation.layout.BoxWithConstraints(
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    // Where each option sits, learnt as they're laid out, so the thumb can travel to any of them.
+    val spans = remember(options.size) { androidx.compose.runtime.mutableStateListOf<Pair<Float, Float>>().apply { repeat(options.size) { add(0f to 0f) } } }
+    val target = spans.getOrElse(selected) { 0f to 0f }
+    // On the same curve and time as the pages and panels the toggle changes, so they all move as one.
+    val thumbX by androidx.compose.animation.core.animateFloatAsState(target.first, tween(TOGGLE_MS, easing = androidx.compose.animation.core.LinearOutSlowInEasing), label = "toggleX")
+    val thumbW by androidx.compose.animation.core.animateFloatAsState(target.second, tween(TOGGLE_MS, easing = androidx.compose.animation.core.LinearOutSlowInEasing), label = "toggleWidth")
+    Box(
         modifier
-            // A full touch height, with the same square-shouldered corners as every other key.
-            .height(48.dp)
+            .height(height)
             .clip(KeyShape)
-            .background(Palette.SurfaceHigh)
-            .border(1.dp, Palette.Line, KeyShape)
-            .padding(3.dp)
+            // A tonal casing that stands out from the panel by its own colour, with no outline (user decision).
+            .background(Palette.Track2)
+            .padding(TOGGLE_INSET_DP.dp)
             .selectableGroup(),
     ) {
-        val share = maxWidth / options.size
-        val thumbX by androidx.compose.animation.core.animateDpAsState(share * selected, label = "toggle")
-        Box(
-            Modifier
-                .offset(x = thumbX)
-                .width(share)
-                .fillMaxHeight()
-                .clip(KeyShape)
-                .background(Palette.Lit),
-        )
+        if (thumbW > 0f) {
+            Box(
+                Modifier
+                    .offset { androidx.compose.ui.unit.IntOffset(thumbX.toInt(), 0) }
+                    .width(with(density) { thumbW.toDp() })
+                    .fillMaxHeight()
+                    // Its corners follow the casing's, less the gap between them, so the two curves run parallel.
+                    .clip(ToggleThumbShape)
+                    .background(Palette.LitFill),
+            )
+        }
         Row(Modifier.fillMaxSize()) {
-            options.forEachIndexed { i, (icon, label) ->
+            options.forEachIndexed { i, option ->
                 val on = i == selected
                 Row(
                     Modifier
-                        .weight(1f)
+                        .weight(if (weighted) option.label.length + 4f else 1f)
                         .fillMaxHeight()
-                        .clip(KeyShape)
+                        .onGloballyPositioned { spans[i] = it.positionInParent().x to it.size.width.toFloat() }
+                        .clip(ToggleThumbShape)
                         .selectable(selected = on, role = Role.RadioButton, onClick = { onSelect(i) })
-                        .padding(horizontal = 10.dp),
+                        .then(if (option.showLabel && option.description == null) Modifier else Modifier.semantics { contentDescription = option.description ?: option.label })
+                        .padding(horizontal = if (option.showLabel) 8.dp else 0.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    androidx.compose.material3.Icon(
-                        androidx.compose.ui.res.painterResource(icon),
-                        contentDescription = null,
-                        tint = if (on) Palette.OnLit else Palette.TextDim,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = if (on) Palette.OnLit else Palette.Text,
-                        maxLines = 1,
-                        modifier = Modifier.padding(start = 6.dp),
-                    )
+                    option.icon?.let { icon ->
+                        androidx.compose.material3.Icon(
+                            androidx.compose.ui.res.painterResource(icon),
+                            contentDescription = null,
+                            tint = if (on) Palette.OnLit else Palette.TextDim,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    if (option.showLabel) {
+                        Text(
+                            option.label,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (on) Palette.OnLit else Palette.Text,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            modifier = Modifier.padding(start = if (option.icon != null) 6.dp else 0.dp),
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-val KeyShape = RoundedCornerShape(4.dp)
-val PanelShape = RoundedCornerShape(4.dp)
+/** Keys, segments and pressed rows: soft and nearly pill-shaped, as in Material You (user decision). */
+val KeyShape = RoundedCornerShape(20.dp)
+
+/** Panels and cards, rounded like Material You's large cards, and gentle enough that content near a corner sits clear of it. */
+val PanelShape = RoundedCornerShape(16.dp)
+
+/** The gap between a sliding toggle's casing and its thumb. */
+private const val TOGGLE_INSET_DP = 3
+
+/** The same as a tab's slide, so a toggle and what it changes move together. */
+private const val TOGGLE_MS = 240
+
+/** A sliding toggle's thumb, whose corners run parallel to its casing's. */
+private val ToggleThumbShape = RoundedCornerShape((20 - TOGGLE_INSET_DP).dp)
 
 
 /** A lit key: the primary action on a screen. */
@@ -192,7 +209,7 @@ fun Button(
         shape = KeyShape,
         interactionSource = source,
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (pressed) Palette.LitPressed else Palette.Lit,
+            containerColor = if (pressed) Palette.LitPressed else Palette.LitFill,
             contentColor = Palette.OnLit,
             disabledContainerColor = Palette.SurfaceHigh,
             disabledContentColor = Palette.TextDim,
@@ -225,7 +242,7 @@ fun FilledTonalButton(
             disabledContainerColor = Palette.Surface,
             disabledContentColor = Palette.TextDim,
         ),
-        border = BorderStroke(1.dp, Palette.Line),
+        border = BorderStroke(1.dp, Palette.KeyBorder),
         contentPadding = contentPadding,
         content = content,
     )
@@ -298,7 +315,8 @@ fun PresetSwitcher(
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
-                .clip(KeyShape)
+                // Smaller corners than a key, so the press highlight never clips the name at its edge.
+                .clip(RoundedCornerShape(8.dp))
                 .clickable(role = Role.DropdownList, onClickLabel = stringResource(R.string.ui_change_preset)) { open = true },
         ) {
             header()

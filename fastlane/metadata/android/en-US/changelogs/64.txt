@@ -1,0 +1,6 @@
+- A new Material You look: colours from your wallpaper, rounded shapes and Material sliders
+- Faders redrawn as rounded sliders, with a clear selected fader
+- One sliding selector for every choice
+- A white light theme and darker bars at night
+- Swipe through the welcome
+- New blue logo

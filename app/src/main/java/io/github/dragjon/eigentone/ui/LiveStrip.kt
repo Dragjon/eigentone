@@ -319,9 +319,11 @@ private fun androidx.compose.animation.AnimatedVisibilityScope.StripDetails(
     val drawer = this
     val status by Repo.status.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides Palette.StripText) {
     Column(
         Modifier
             .fillMaxWidth()
+            // The strip's own colour, a shade lighter, so the drawer belongs to the strip yet reads apart from its bar (user decision).
             .background(Palette.StripPanel)
             .padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 8.dp),
     ) {
@@ -377,6 +379,7 @@ private fun androidx.compose.animation.AnimatedVisibilityScope.StripDetails(
             }
         }
     }
+}
 }
 
 private const val ROW_STAGGER_MS = 25
@@ -513,7 +516,7 @@ private fun MiniCurve(state: AppState, outputKey: String, working: Boolean) {
     val left = remember(filters, channels) { sample(channels?.first ?: filters) }
     val right = remember(channels) { channels?.second?.let(::sample) }
     // Drawn in the theme's own colours, which the strip follows.
-    val strip = if (Palette.colors == DarkColors) DarkColors else LightColors
+    val strip = Palette.colors
     val leftColour = when {
         !working -> strip.textDim
         right != null -> strip.leftEar
@@ -546,7 +549,7 @@ private fun DrawScope.drawBars(bands: FloatArray) {
         if (level > 0f) {
             val height = level * size.height
             drawRect(
-                (if (Palette.colors == DarkColors) DarkColors else LightColors).textDim.copy(alpha = 0.35f),
+                Palette.colors.textDim.copy(alpha = 0.35f),
                 topLeft = Offset(bar * barWidth, size.height - height),
                 size = Size(barWidth * 0.8f, height),
             )

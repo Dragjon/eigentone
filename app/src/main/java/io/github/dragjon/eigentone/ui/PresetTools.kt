@@ -69,7 +69,7 @@ fun PresetDetailsDialog(preset: Preset, folders: List<String>, onDismiss: () -> 
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 val taken = io.github.dragjon.eigentone.data.PresetOrganiser.nameTaken(Repo.state.value, name, preset.id)
-                OutlinedTextField(
+                OutlinedTextField(colors = fieldColors(), 
                     value = name,
                     onValueChange = { name = it },
                     singleLine = true,
@@ -77,7 +77,7 @@ fun PresetDetailsDialog(preset: Preset, folders: List<String>, onDismiss: () -> 
                     isError = taken,
                     supportingText = if (taken) ({ Text(stringResource(R.string.ui_name_taken, name.trim())) }) else null,
                 )
-                OutlinedTextField(value = folder, onValueChange = { folder = it }, singleLine = true, label = { Text(stringResource(R.string.ui_folder_optional)) })
+                OutlinedTextField(colors = fieldColors(), value = folder, onValueChange = { folder = it }, singleLine = true, label = { Text(stringResource(R.string.ui_folder_optional)) })
                 if (folders.isNotEmpty()) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         folders.forEach { existing ->
@@ -86,7 +86,7 @@ fun PresetDetailsDialog(preset: Preset, folders: List<String>, onDismiss: () -> 
                                 onClick = { folder = if (folder.trim() == existing) "" else existing },
                                 label = { Text(existing, maxLines = 1) },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Palette.Lit,
+                                    selectedContainerColor = Palette.LitFill,
                                     selectedLabelColor = Palette.OnLit,
                                     labelColor = Palette.Text,
                                 ),
@@ -177,7 +177,7 @@ fun CorrectionTuner(onDismiss: () -> Unit) {
                                 onClick = { change { it.copy(targetId = option?.id, correctionInfo = info) } },
                                 label = { Text(stringResource(targetName(option)), maxLines = 1) },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Palette.Lit,
+                                    selectedContainerColor = Palette.LitFill,
                                     selectedLabelColor = Palette.OnLit,
                                     labelColor = Palette.Text,
                                 ),

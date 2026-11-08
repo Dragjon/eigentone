@@ -52,6 +52,8 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,6 +63,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -81,7 +91,8 @@ private const val STEPS = 5
 /** Set as the welcome hands over, so the app opens out of the line the welcome closed into. */
 internal val openingFromWelcome = mutableStateOf(false)
 
-private const val CLOSE_MS = 420
+/** Long enough to watch the two lines meet as the page flattens onto them. */
+private const val CLOSE_MS = 900
 
 /**
  * The first run, in five short steps: what Eigentone is, turning it on, the headphones, finding a sound, and
@@ -111,15 +122,16 @@ fun WelcomeScreen(onSetEnabled: (Boolean) -> Unit, onFindSound: () -> Unit) {
         }
     }
 
-    // Changing step sweeps the page away fader by fader to show the next: left to right going forward, right to
-    // left going back, so the direction always matches the way through.
+    // Swiping moves between steps (user decision), and each change keeps the sweep that clears the page away
+    // fader by fader, running the way the finger went: left to right going forward, right to left going back.
     var shown by remember { mutableIntStateOf(step) }
     var tearing by remember { mutableStateOf<Int?>(null) }
     var backward by remember { mutableStateOf(false) }
     val tear = remember { Animatable(0f) }
     LaunchedEffect(step) {
         if (step == shown) return@LaunchedEffect
-        backward = step < shown
+        // The sweep runs the way the finger went: swiping left to go on clears the page towards the left.
+        backward = step > shown
         tearing = shown
         shown = step
         try {
@@ -127,6 +139,26 @@ fun WelcomeScreen(onSetEnabled: (Boolean) -> Unit, onFindSound: () -> Unit) {
             tear.animateTo(1f, tween(SWEEP_MS, easing = LinearEasing))
         } finally {
             tearing = null
+        }
+    }
+    val swipeAt = with(androidx.compose.ui.platform.LocalDensity.current) { SWIPE_DP.dp.toPx() }
+    // How far along a sideways drag is, -1 to 1 where a swipe would count: a wavefront grows at the edge the drag
+    // started from, so the page answers before it turns (user decision).
+    // Set straight from the finger and read only while drawing, so the wave follows it frame by frame.
+    var pull by remember { mutableFloatStateOf(0f) }
+    val pullScope = rememberCoroutineScope()
+    var easing by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    // How far out the wave stood when a swipe past the last step let go: the closing carries on from that wave.
+    var finishDepth by remember { mutableFloatStateOf(0f) }
+    // Lets the wave go, over [ms]: quickly when the drag comes to nothing, and over the page's sweep when it turns
+    // the page, so the wave and the sweep from the same edge read as one motion.
+    fun release(ms: Int) {
+        easing?.cancel()
+        val from = pull
+        easing = pullScope.launch {
+            // A quick, even retreat when nothing turns, with no slow tail lingering like a pause (user decision).
+            val curve = if (ms == SWEEP_MS) LinearOutSlowInEasing else androidx.compose.animation.core.LinearEasing
+            androidx.compose.animation.core.animate(from, 0f, animationSpec = tween(ms, easing = curve)) { v, _ -> pull = v }
         }
     }
 
@@ -163,16 +195,41 @@ fun WelcomeScreen(onSetEnabled: (Boolean) -> Unit, onFindSound: () -> Unit) {
                 drawRect(Palette.Background)
                 drawContent()
                 if (c > 0f) {
-                    // The line grows out from the middle as the page flattens onto it.
-                    val half = size.width * (0.15f + 0.85f * c) / 2f
-                    val y = size.height / 2f
-                    drawLine(
-                        Palette.Lit.copy(alpha = c),
-                        Offset(size.width / 2f - half, y),
-                        Offset(size.width / 2f + half, y),
-                        strokeWidth = 3.dp.toPx(),
-                        cap = StrokeCap.Round,
-                    )
+                    // As the page flattens, the wave that was dragged falls into the line it flattens onto (user
+                    // decision): it stretches edge to edge across the middle as its ripples smooth out.
+                    val w = size.width
+                    val h = size.height
+                    val mid = h / 2f
+                    val t = FastOutSlowInEasing.transform(c)
+                    val depth = WAVE_DEPTH_DP.dp.toPx() * (if (finishDepth > 0f) finishDepth else 0.6f)
+                    val stroke = 3.dp.toPx()
+                    val steps = 48
+                    // [fromRight] is the dragged wave; the other is its mirror. Each point slides from its place on the
+                    // upright, rippled curve to its place on its half of the line.
+                    fun wave(fromRight: Boolean) {
+                        val path = androidx.compose.ui.graphics.Path()
+                        for (i in 0..steps) {
+                            val s = i / steps.toFloat()
+                            val bow = kotlin.math.sin(s * Math.PI).toFloat()
+                            val ripple = 1f + 0.08f * kotlin.math.sin(s * Math.PI * 6).toFloat()
+                            val startX = if (fromRight) w - depth * bow * ripple else depth * bow * ripple
+                            val startY = h * s
+                            // Both land on the same full-width line, so they slap together across the middle: the
+                            // dragged wave falls on the right, its mirror rises on the left, and each stretches edge to edge.
+
+                            val endX = w * (1f - s)
+                            val x = startX + (endX - startX) * t
+                            val y = startY + (mid - startY) * t
+                            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                        }
+                        drawPath(
+                            path,
+                            Palette.Lit,
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke, cap = StrokeCap.Round),
+                        )
+                    }
+                    // Only the wave that was dragged, the same one throughout (user decision).
+                    wave(fromRight = true)
                 }
             }
             .graphicsLayer {
@@ -191,15 +248,72 @@ fun WelcomeScreen(onSetEnabled: (Boolean) -> Unit, onFindSound: () -> Unit) {
                 .padding(start = 24.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            StepDots(step, Modifier.weight(1f))
+            StepDots(step, Modifier.weight(1f), onStart = ::startListening)
             if (step < STEPS - 1) TextButton(onClick = ::finish) { Text(stringResource(R.string.welcome_skip)) }
         }
         Box(
             Modifier
                 .weight(1f)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                // A sideways swipe turns the page; up and down still scroll it. Seen before the page's own scrolling
+                // and never taken from it, so a swipe that drifts a little still counts, and a quick flick does
+                // too, while taps and scrolling inside the page work as ever.
+                .pointerInput(step) {
+                    val flick = SWIPE_FLICK_DP.dp.toPx()
+                    val nudge = SWIPE_NUDGE_DP.dp.toPx()
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                        val tracker = androidx.compose.ui.input.pointer.util.VelocityTracker()
+                        tracker.addPosition(down.uptimeMillis, down.position)
+                        var last = down.position
+                        var heading = 0f
+                        while (true) {
+                            val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                            val finger = event.changes.firstOrNull { it.id == down.id } ?: break
+                            tracker.addPosition(finger.uptimeMillis, finger.position)
+                            last = finger.position
+                            val sx = last.x - down.position.x
+                            val sy = last.y - down.position.y
+                            // The way the drag first goes is the only way it can turn the page: dragging back fades the
+                            // wave rather than starting one on the other side (user decision).
+                            if (heading == 0f && kotlin.math.abs(sx) > kotlin.math.abs(sy) && kotlin.math.abs(sx) > viewConfiguration.touchSlop) {
+                                // Back from the first page leads nowhere, so that drag shows nothing and turns nothing.
+                                if (!(sx > 0 && step == 0)) heading = kotlin.math.sign(sx)
+                            }
+                            if (heading != 0f) {
+                                easing?.cancel()
+                                pull = heading * (sx * heading / swipeAt).coerceIn(0f, 1f)
+                            }
+                            if (!finger.pressed) break
+                        }
+                        val dx = last.x - down.position.x
+                        val dy = last.y - down.position.y
+                        val sideways = kotlin.math.abs(dx) > kotlin.math.abs(dy)
+                        val quick = kotlin.math.abs(tracker.calculateVelocity().x) > flick && kotlin.math.abs(dx) > nudge
+                        // Only in the way the drag started, so going back on it turns nothing.
+                        val turns = sideways && heading != 0f && kotlin.math.sign(dx) == heading && (kotlin.math.abs(dx) > swipeAt || quick)
+                        val finishing = turns && dx < 0 && step == STEPS - 1
+                        if (finishing) {
+                            // The wave isn't let go: the closing picks it up just where it stands.
+                            easing?.cancel()
+                            finishDepth = kotlin.math.abs(pull).coerceAtLeast(0.6f)
+                            pull = 0f
+                        } else {
+                            release(if (turns) SWEEP_MS else WAVE_RETREAT_MS)
+                        }
+                        if (turns) {
+                            when {
+                                dx < 0 && step < STEPS - 1 -> go(step + 1)
+                                // Swiping on past the last step reaches the arrow, and starts listening.
+                                dx < 0 -> startListening()
+                                dx > 0 && step > 0 -> go(step - 1)
+                            }
+                        }
+                    }
+                },
         ) {
             Page(shown, Modifier.matchParentSize())
+            DragWave({ pull }, Modifier.matchParentSize())
             tearing?.let { from ->
                 for (strip in 0 until STRIPS) {
                     FaderStrip(if (backward) STRIPS - 1 - strip else strip, strip, tear.value, Modifier.matchParentSize()) { Page(from, Modifier.fillMaxSize()) }
@@ -207,34 +321,43 @@ fun WelcomeScreen(onSetEnabled: (Boolean) -> Unit, onFindSound: () -> Unit) {
                 SweepLine(tear.value, backward, Modifier.matchParentSize())
             }
         }
+        // Quiet: a hint on the first page only, and on the last a key to begin. Everything between is a swipe.
         Row(
             Modifier
                 .fillMaxWidth()
-                .background(Palette.Bar)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .heightIn(min = 64.dp)
+                .padding(horizontal = 24.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.End,
         ) {
-            if (step > 0) TextButton(onClick = { go(step - 1) }) { Text(stringResource(R.string.ui_back)) }
-            Spacer(Modifier.weight(1f))
-            Button(
-                onClick = { if (step == STEPS - 1) startListening() else go(step + 1) },
-                modifier = Modifier.heightIn(min = 48.dp),
-            ) {
-                Text(
-                    stringResource(
-                        when (step) {
-                            0 -> R.string.welcome_get_started
-                            STEPS - 1 -> R.string.welcome_finish
-                            else -> R.string.welcome_continue
-                        },
-                    ),
-                )
+            when (step) {
+                0, STEPS - 1 -> Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                    // Quiet and out of the way, with an arrow saying which way to swipe.
+                    Text(
+                        stringResource(if (step == 0) R.string.welcome_swipe_hint else R.string.welcome_swipe_finish),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Palette.TextDim.copy(alpha = 0.7f),
+                    )
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = Palette.TextDim.copy(alpha = 0.7f),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+
+                else -> Unit
             }
         }
     }
 }
 
-private const val SWEEP_MS = 700
+private const val SWEEP_MS = 420
+
+/** How far a sideways swipe has to travel to turn the page, or a quick flick's speed and least distance. */
+private const val SWIPE_DP = 40
+private const val SWIPE_FLICK_DP = 300
+private const val SWIPE_NUDGE_DP = 12
 private const val STRIPS = 10
 
 /** How much later each strip starts than the one to its left, as a share of the sweep. */
@@ -289,17 +412,31 @@ private fun SweepLine(progress: Float, backward: Boolean, modifier: Modifier) {
 
 /** Where the welcome is, as dots: lit up to the current step. */
 @Composable
-private fun StepDots(step: Int, modifier: Modifier) {
+private fun StepDots(step: Int, modifier: Modifier, onStart: () -> Unit) {
     val label = stringResource(R.string.welcome_step_of, step + 1, STEPS)
-    Row(modifier.semantics { contentDescription = label }, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        repeat(STEPS) { i ->
-            Box(
-                Modifier
-                    .size(width = if (i == step) 24.dp else 8.dp, height = 8.dp)
-                    .clip(CircleShape)
-                    .background(if (i <= step) Palette.Lit else Palette.Track),
-            )
+    val last = step == STEPS - 1
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.semantics { contentDescription = label }, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat(STEPS) { i ->
+                Box(
+                    Modifier
+                        .size(width = if (i == step) 24.dp else 8.dp, height = 8.dp)
+                        .clip(CircleShape)
+                        .background(if (i <= step) Palette.LitFill else Palette.Track),
+                )
+            }
         }
+        // One more stop past the last step, shaped as an arrow (user decision): swiping on to it, or tapping it once
+        // there, starts listening. Lit once it's next.
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = if (last) stringResource(R.string.welcome_finish) else null,
+            tint = if (last) Palette.LitFill else Palette.Track,
+            modifier = Modifier
+                .size(24.dp)
+                .clip(CircleShape)
+                .then(if (last) Modifier.clickable(role = Role.Button, onClick = onStart) else Modifier),
+        )
     }
 }
 
@@ -333,11 +470,11 @@ private fun Hello() {
         modifier = Modifier
             .padding(top = 16.dp)
             .size(88.dp)
-            .clip(RoundedCornerShape(20.dp))
-            // The icon's own black, in either theme, so it looks the same as on the home screen.
-            .background(androidx.compose.ui.graphics.Color(0xFF0D0C09))
-            // A white rim, so the black tile stands out from the dark page as it does on a wallpaper.
-            .border(2.dp, androidx.compose.ui.graphics.Color.White, RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(24.dp))
+            // The icon's own white tile, in either theme, so it looks the same as on the home screen.
+            .background(androidx.compose.ui.graphics.Color.White)
+            // A faint rim, so the white tile still has an edge on a light page.
+            .border(1.dp, Palette.KeyBorder, RoundedCornerShape(24.dp))
             .padding(4.dp),
     )
     Heading(stringResource(R.string.welcome_hello_title), stringResource(R.string.welcome_hello_body))
@@ -522,3 +659,47 @@ private fun Choice(title: String, body: String, selected: Boolean, onSelect: () 
         Text(body, style = MaterialTheme.typography.bodyMedium, color = Palette.TextDim)
     }
 }
+
+/**
+ * Curved, wavy wavefronts at the edge a sideways drag started from, rippling inward from faint to strong as the
+ * drag nears the point where it turns the page. [pull] runs from -1 (dragging left) to 1 (dragging right).
+ */
+@Composable
+private fun DragWave(pullNow: () -> Float, modifier: Modifier) {
+    val colour = Palette.LitFill
+    Canvas(modifier) {
+        val pull = pullNow()
+        if (kotlin.math.abs(pull) < 0.02f) return@Canvas
+        val strength = kotlin.math.abs(pull)
+        // Dragging left starts at the right edge, and dragging right at the left.
+        val fromRight = pull < 0f
+        val edge = if (fromRight) size.width else 0f
+        val inward = if (fromRight) -1f else 1f
+        val depth = WAVE_DEPTH_DP.dp.toPx() * strength
+        for (k in 0 until WAVE_RINGS) {
+            // The outermost ring is strongest, each further in fainter, so they ripple from faint to strong.
+            val reach = depth * (1f - k * 0.28f)
+            if (reach <= 1f) continue
+            val path = androidx.compose.ui.graphics.Path()
+            val steps = 48
+            for (i in 0..steps) {
+                val t = i / steps.toFloat()
+                val y = size.height * t
+                // A bow that bulges most at the middle, with a gentle ripple along it.
+                val bow = kotlin.math.sin(t * Math.PI).toFloat()
+                val ripple = 1f + 0.08f * kotlin.math.sin(t * Math.PI * 6 + k).toFloat()
+                val x = edge + inward * reach * bow * ripple
+                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            drawPath(
+                path,
+                colour.copy(alpha = strength * (0.85f - k * 0.25f).coerceAtLeast(0.1f)),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = (3f - k).coerceAtLeast(1f) * density, cap = StrokeCap.Round),
+            )
+        }
+    }
+}
+
+private const val WAVE_DEPTH_DP = 56
+private const val WAVE_RINGS = 3
+private const val WAVE_RETREAT_MS = 160

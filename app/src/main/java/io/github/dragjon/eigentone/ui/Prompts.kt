@@ -208,7 +208,7 @@ fun ShareRows(snack: (String) -> Unit) {
             containerColor = Palette.Tooltip,
             title = { Text(stringResource(R.string.ui_add_a_shared_sound)) },
             text = {
-                OutlinedTextField(
+                OutlinedTextField(colors = fieldColors(), 
                     value = code,
                     onValueChange = {
                         code = it

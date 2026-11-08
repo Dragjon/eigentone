@@ -124,7 +124,7 @@ fun CompressorSection(state: AppState) {
                     },
                     label = { Text(style.name) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Palette.Lit,
+                        selectedContainerColor = Palette.LitFill,
                         selectedLabelColor = Palette.OnLit,
                         labelColor = Palette.Text,
                     ),
@@ -134,21 +134,14 @@ fun CompressorSection(state: AppState) {
         // The styles are enough for most. The bands appear with Advanced controls, or once set by hand.
         if (!io.github.dragjon.eigentone.data.Disclosure.compressorBands(state)) return@SettingsSection
         RowDivider()
-        SingleChoiceSegmentedButtonRow(
-            Modifier
+        SlidingToggle(
+            options = BAND_NAMES.map { ToggleOption(stringResource(it)) },
+            selected = selected,
+            onSelect = { selected = it },
+            modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
-        ) {
-            BAND_NAMES.forEachIndexed { index, name ->
-                SegmentedButton(
-                    selected = selected == index,
-                    onClick = { selected = index },
-                    shape = SegmentedButtonDefaults.itemShape(index, BAND_NAMES.size, KeyShape),
-                    colors = segmentColors(),
-                    icon = {},
-                ) { Text(stringResource(name), maxLines = 1) }
-            }
-        }
+        )
         val band = compressor.bands[selected]
         fun changeBand(transform: (CompressorBand) -> CompressorBand) = change { it.withBand(selected, transform(it.bands[selected])) }
 

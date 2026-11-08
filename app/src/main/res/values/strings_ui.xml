@@ -190,7 +190,7 @@
     <string name="help_sweep_level_title" formatted="false">Tone level</string>
     <string name="help_sweep_title" formatted="false">Frequency sweep</string>
     <string name="help_system_surround_body" formatted="false">Swaps Eigentone\'s stereo width for the effect built into your phone. It\'s stronger, but it varies by phone and can colour the sound. Android has deprecated it, so a future update could remove it. If your phone refuses it, stereo width takes over.</string>
-    <string name="help_system_surround_title" formatted="false">Use the phone\'s virtual surround</string>
+    <string name="help_system_surround_title" formatted="false">Phone\'s virtual surround</string>
     <string name="help_treble_body" formatted="false">Raises or lowers everything above about 8 kHz. This is saved with the preset when you save or update it.</string>
     <string name="help_treble_title" formatted="false">Treble</string>
     <string name="help_tuner_bass_body" formatted="false">Adds or removes low end on top of the correction.</string>
@@ -397,7 +397,7 @@
     <string name="ui_undo" formatted="false">Undo</string>
     <string name="ui_use_less_of_it_or_add_bass_or_treble_bac" formatted="false">Use less of it, or add bass or treble back</string>
     <string name="ui_use_the_new_sound" formatted="false">Use the new sound</string>
-    <string name="ui_use_the_phone_s_virtual_surround" formatted="false">Use the phone\'s virtual surround</string>
+    <string name="ui_use_the_phone_s_virtual_surround" formatted="false">Phone\'s virtual surround</string>
     <string name="ui_use_this" formatted="false">Use this</string>
     <string name="ui_volume_leveller" formatted="false">Volume leveller</string>
     <string name="ui_what_you_found" formatted="false">What you found</string>
@@ -699,6 +699,8 @@
     <string name="ui_target_diffuse" formatted="false">Reference</string>
     <string name="ui_target_published_detail" formatted="false">The correction as AutoEq published it.</string>
     <string name="ui_target_published_below_harman" formatted="false">As AutoEq published it, which aims for about %1$d dB less deep bass than Harman. If this sounds thin, try Harman.</string>
+    <string name="welcome_swipe_finish" formatted="false">Swipe to start listening</string>
+    <string name="welcome_swipe_hint" formatted="false">Swipe to start</string>
     <string name="ui_autoeq_detected" formatted="false">Found from the connected %1$s, best measurement first. Search for another model if these aren\'t yours.</string>
     <string name="ui_target_harman_detail" formatted="false">The curve most listeners preferred in Harman\'s tests, at about 64% of those tested.</string>
     <string name="ui_target_less_bass_detail" formatted="false">About 2 dB less bass than Harman, which about 21% of those tested preferred.</string>
@@ -969,6 +971,7 @@
     <string name="ui_refine_start" formatted="false">Start refining</string>
     <string name="ui_refine_round" formatted="false">Comparison %1$d, up to %2$d</string>
     <string name="ui_refine_question" formatted="false">Which sounds better?</string>
+    <string name="ui_refine_listen_tip" formatted="false">Listen to each version for a few seconds before switching. Your ears need a moment to settle, and quick flips make the difference harder to hear.</string>
     <string name="ui_refine_hint" formatted="false">The difference can be small. Go with your first impression, and say so when you can\'t tell: that\'s useful too.</string>
     <string name="ui_refine_final" formatted="false">One blind comparison</string>
     <string name="ui_refine_final_body" formatted="false">One of these is what you had and the other is the refined sound. Which do you prefer?</string>

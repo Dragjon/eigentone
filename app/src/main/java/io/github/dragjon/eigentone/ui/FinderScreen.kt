@@ -292,8 +292,8 @@ fun SideCard(label: String, selected: Boolean, musicActive: Boolean, modifier: M
         modifier
             .heightIn(min = 140.dp)
             .clip(PanelShape)
-            .background(if (selected) Palette.Lit else Palette.Surface)
-            .border(1.dp, if (selected) Palette.Lit else Palette.Outline, PanelShape)
+            .background(if (selected) Palette.LitFill else Palette.Surface)
+            .border(1.dp, if (selected) Palette.LitFill else Palette.Outline, PanelShape)
             .semantics { this.selected = selected }
             .clickable(role = Role.RadioButton, onClickLabel = stringResource(R.string.ui_play_version, label), onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -424,7 +424,7 @@ private fun Result(
         SideCard(stringResource(R.string.ui_before), comparingOriginal, musicActive, Modifier.weight(1f)) { compare(true) }
         SideCard(stringResource(R.string.ui_after), !comparingOriginal, musicActive, Modifier.weight(1f)) { compare(false) }
     }
-    OutlinedTextField(
+    OutlinedTextField(colors = fieldColors(), 
         value = name,
         onValueChange = { name = it },
         singleLine = true,

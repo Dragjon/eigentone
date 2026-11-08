@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -77,6 +78,8 @@ fun EqGraph(
     onDragEnd: () -> Unit,
     modifier: Modifier = Modifier,
     heightDp: Int = 260,
+    /** An animated height, read only while laying out, so a resize doesn't rebuild the graph every frame. */
+    height: (() -> androidx.compose.ui.unit.Dp)? = null,
     rangeDb: Double = RANGE_DB,
     /** When this changes, such as the preset, the curves glide to their new shape. */
     morphKey: Any? = null,
@@ -130,7 +133,7 @@ fun EqGraph(
     Canvas(
         modifier
             .fillMaxWidth()
-            .height(heightDp.dp)
+            .then(if (height == null) Modifier.height(heightDp.dp) else Modifier.then(AnimatedHeight(height)))
             .semantics {
                 contentDescription = if (rightCurveFilters == null) {
                     appText(R.string.ui_equaliser_curve_use_the_filter_controls)
@@ -238,22 +241,9 @@ fun EqGraph(
             drawPath(single, Palette.TextDim, style = Stroke(width = 1.5.dp.toPx()))
         }
 
-        // A faint wash between the curve and 0 dB, strongest far from the line and fading towards it, so how
-        // much the EQ changes reads at a glance. Left out when the ears differ, to keep their colours apart.
-        if (rightCurve == null) {
-            // Full strength by FILL_FULL_DB either way, which everyday curves reach, rather than at the
-            // graph's edges, which they rarely do.
-            drawPath(
-                fill,
-                Brush.verticalGradient(
-                    0f to accent.copy(alpha = FILL_ALPHA),
-                    0.5f to accent.copy(alpha = FILL_ZERO_ALPHA),
-                    1f to accent.copy(alpha = FILL_ALPHA),
-                    startY = yOf(FILL_FULL_DB, h, rangeDb),
-                    endY = yOf(-FILL_FULL_DB, h, rangeDb),
-                ),
-            )
-        }
+        // An even, see-through fill between the curve and 0 dB (user decision), so how much the EQ changes
+        // reads at a glance while the spectrum shows through. Left out when the ears differ, to keep their colours apart.
+        if (rightCurve == null) drawPath(fill, accent.copy(alpha = FILL_EVEN_ALPHA))
         overlayCurve?.let { points ->
             val other = Path()
             points.forEachIndexed { i, db ->
@@ -381,6 +371,30 @@ fun EarCurvesGraph(ears: EarCorrection, modifier: Modifier = Modifier, rangeDb: 
 private const val EAR_GRAPH_RANGE_DB = 8.0
 
 /** How strong the wash under the main curve is at the graph's top and bottom edges. */
-private const val FILL_ALPHA = 0.32f
-private const val FILL_ZERO_ALPHA = 0.04f
-private const val FILL_FULL_DB = 8.0
+private const val FILL_EVEN_ALPHA = 0.18f
+
+/**
+ * A height that changes while animating, read only while measuring, so a resize relays out and redraws the
+ * graph rather than rebuilding it every frame. It reports that height as its natural size too, so a panel
+ * that sizes itself to the graph follows it.
+ */
+private class AnimatedHeight(val height: () -> androidx.compose.ui.unit.Dp) : androidx.compose.ui.layout.LayoutModifier {
+    override fun androidx.compose.ui.layout.MeasureScope.measure(
+        measurable: androidx.compose.ui.layout.Measurable,
+        constraints: androidx.compose.ui.unit.Constraints,
+    ): androidx.compose.ui.layout.MeasureResult {
+        val px = height().roundToPx().coerceIn(constraints.minHeight, constraints.maxHeight)
+        val placeable = measurable.measure(constraints.copy(minHeight = px, maxHeight = px))
+        return layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+    }
+
+    override fun androidx.compose.ui.layout.IntrinsicMeasureScope.minIntrinsicHeight(
+        measurable: androidx.compose.ui.layout.IntrinsicMeasurable,
+        width: Int,
+    ): Int = height().roundToPx()
+
+    override fun androidx.compose.ui.layout.IntrinsicMeasureScope.maxIntrinsicHeight(
+        measurable: androidx.compose.ui.layout.IntrinsicMeasurable,
+        width: Int,
+    ): Int = height().roundToPx()
+}

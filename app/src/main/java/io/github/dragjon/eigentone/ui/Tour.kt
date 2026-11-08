@@ -126,9 +126,11 @@ fun TourOverlay() {
     ) {
         val width = constraints.maxWidth.toFloat()
         val height = constraints.maxHeight.toFloat()
-        val left by animateFloatAsState(target?.left ?: width / 2, spring, label = "left")
+        // Kept inside the screen, so the outline around something full width, such as the strip, stays in view.
+        val edge = with(density) { 4.dp.toPx() }
+        val left by animateFloatAsState(target?.left?.coerceAtLeast(edge) ?: width / 2, spring, label = "left")
         val top by animateFloatAsState(target?.top ?: height / 2, spring, label = "top")
-        val right by animateFloatAsState(target?.right ?: width / 2, spring, label = "right")
+        val right by animateFloatAsState(target?.right?.coerceAtMost(width - edge) ?: width / 2, spring, label = "right")
         val bottom by animateFloatAsState(target?.bottom ?: height / 2, spring, label = "bottom")
         val pulse by rememberInfiniteTransition(label = "pulse").animateFloat(
             initialValue = 0.45f,
@@ -172,7 +174,7 @@ fun TourOverlay() {
                 .widthIn(max = 420.dp)
                 .fillMaxWidth()
                 .onSizeChanged { cardHeight = it.height }
-                .clip(RoundedCornerShape(12.dp))
+                .clip(PanelShape)
                 .background(Palette.Tooltip)
                 .padding(16.dp)
                 .semantics { liveRegion = LiveRegionMode.Polite },
@@ -181,7 +183,8 @@ fun TourOverlay() {
             Text(
                 stringResource(R.string.tour_step_of, stop.ordinal + 1, TourStop.entries.size),
                 style = MaterialTheme.typography.labelMedium,
-                color = Palette.Lit,
+                // In the text colour, so it stands clear of the card rather than sinking into it (user decision).
+                color = Palette.Text,
             )
             Text(stringResource(stop.title), style = MaterialTheme.typography.titleMedium, color = Palette.Text)
             Text(stringResource(stop.body), style = MaterialTheme.typography.bodyMedium, color = Palette.TextDim)

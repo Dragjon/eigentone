@@ -174,7 +174,7 @@ fun StepRail(target: Float) {
             val x = (size.width - tick) * i / RAIL_TICKS
             val filled = i.toFloat() / RAIL_TICKS <= progress
             drawRect(
-                if (filled) Palette.Lit else Palette.Track,
+                if (filled) Palette.LitFill else Palette.Track,
                 topLeft = Offset(x, if (filled) 0f else size.height / 2),
                 size = Size(tick, if (filled) size.height else size.height / 2),
             )
@@ -188,7 +188,7 @@ fun Lamps(count: Int, lit: Int, modifier: Modifier = Modifier) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         for (i in 0 until count) {
             Canvas(Modifier.size(width = 28.dp, height = 6.dp)) {
-                drawRect(if (i == lit) Palette.Lit else Palette.Track)
+                drawRect(if (i == lit) Palette.LitFill else Palette.Track)
             }
         }
     }

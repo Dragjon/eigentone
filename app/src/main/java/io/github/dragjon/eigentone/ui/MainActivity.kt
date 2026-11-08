@@ -58,7 +58,9 @@ class MainActivity : ComponentActivity() {
             val mode by modes.collectAsStateWithLifecycle(Repo.state.value.themeMode)
             val dark = isDarkTheme(mode)
             LaunchedEffect(dark) { matchSystemBars(dark) }
-            LaunchedEffect(mode) { matchWindowToTheme(mode) }
+            // Only the launch window needs telling, and doing it now rebuilds the whole app like a change of
+            // configuration, so a theme switch lagged. It's told when the app goes into the background instead.
+            pendingWindowTheme = mode
             EigentoneTheme(dark) { MenuHost { EigentoneApp(onSetEnabled = ::setEnabled) } }
         }
         // Otherwise reopening from recents after Android closed the app would load the preset again.
@@ -111,7 +113,11 @@ class MainActivity : ComponentActivity() {
         getSystemService(AudioManager::class.java).registerAudioDeviceCallback(outputs, null)
     }
 
+    /** The theme the window behind the app should open in next time, set on the way out. */
+    private var pendingWindowTheme: ThemeMode? = null
+
     override fun onStop() {
+        pendingWindowTheme?.let(::matchWindowToTheme)
         getSystemService(AudioManager::class.java).unregisterAudioDeviceCallback(outputs)
         super.onStop()
     }

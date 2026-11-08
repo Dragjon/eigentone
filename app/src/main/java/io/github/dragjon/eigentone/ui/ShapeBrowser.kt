@@ -244,7 +244,7 @@ fun ShapeBrowser(onClose: () -> Unit) {
         val previewOnly = picked != null && LocalConfiguration.current.screenHeightDp < SHORT_SCREEN_DP
 
         if (!previewOnly) {
-            OutlinedTextField(
+            OutlinedTextField(colors = fieldColors(), 
                 value = query,
                 onValueChange = { query = it },
                 modifier = Modifier
@@ -423,8 +423,8 @@ private fun ShapeEditorDialog(draft: ShapeDraft, onDismiss: () -> Unit) {
                 Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true, label = { Text(stringResource(R.string.ui_name)) })
-                OutlinedTextField(
+                OutlinedTextField(colors = fieldColors(), value = name, onValueChange = { name = it }, singleLine = true, label = { Text(stringResource(R.string.ui_name)) })
+                OutlinedTextField(colors = fieldColors(), 
                     value = text,
                     onValueChange = { text = it },
                     minLines = 4,
@@ -747,22 +747,12 @@ private fun PreviewPanel(
             Modifier.padding(start = 16.dp, end = 8.dp, top = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SingleChoiceSegmentedButtonRow(Modifier.weight(1f)) {
-                SegmentedButton(
-                    selected = !layering,
-                    onClick = { onLayering(false) },
-                    shape = SegmentedButtonDefaults.itemShape(0, 2, KeyShape),
-                    colors = segmentColors(),
-                    icon = {},
-                ) { Text(stringResource(R.string.ui_replace), maxLines = 1) }
-                SegmentedButton(
-                    selected = layering,
-                    onClick = { onLayering(true) },
-                    shape = SegmentedButtonDefaults.itemShape(1, 2, KeyShape),
-                    colors = segmentColors(),
-                    icon = {},
-                ) { Text(stringResource(R.string.ui_add), maxLines = 1) }
-            }
+            SlidingToggle(
+                options = listOf(ToggleOption(stringResource(R.string.ui_replace)), ToggleOption(stringResource(R.string.ui_add))),
+                selected = if (layering) 1 else 0,
+                onSelect = { onLayering(it == 1) },
+                modifier = Modifier.weight(1f),
+            )
             InfoButton(Help.shapeMode)
         }
         SliderSetting(
