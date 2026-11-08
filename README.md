@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.svg" width="112" alt="Eigentone logo: a strand of DNA in amber on black">
+  <img src="docs/logo.svg" width="112" alt="Eigentone logo: a strand of DNA in blue on white">
 </p>
 
 <h1 align="center">Eigentone</h1>
@@ -10,16 +10,16 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Dragjon/eigentone/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/Dragjon/eigentone?include_prereleases&label=release&color=FFC24A"></a>
+  <a href="https://github.com/Dragjon/eigentone/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/Dragjon/eigentone?include_prereleases&label=release&color=1A73E8"></a>
   <a href="LICENSE"><img alt="Licence: GPL v3" src="https://img.shields.io/badge/licence-GPL--3.0-0D0C09"></a>
   <img alt="Android 11 and newer" src="https://img.shields.io/badge/Android-11%2B-3DDC84">
-  <a href="https://github.com/Dragjon/eigentone/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/Dragjon/eigentone/total?color=FFC24A"></a>
+  <a href="https://github.com/Dragjon/eigentone/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/Dragjon/eigentone/total?color=1A73E8"></a>
 </p>
 
 <p align="center">
   <img alt="No root needed" src="https://img.shields.io/badge/root-not%20needed-EEEEEA">
   <img alt="No ads or tracking" src="https://img.shields.io/badge/ads%20%26%20tracking-none-EEEEEA">
-  <img alt="AutoEq profiles" src="https://img.shields.io/badge/AutoEq-supported-FFC24A">
+  <img alt="AutoEq profiles" src="https://img.shields.io/badge/AutoEq-supported-1A73E8">
   <img alt="Kotlin and Jetpack Compose" src="https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white">
 </p>
 
