@@ -346,7 +346,7 @@ fun PresetSwitcher(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 preset.name,
-                                color = if (current) Palette.Lit else Palette.Text,
+                                color = if (current) Palette.LitBright else Palette.Text,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f, fill = false),
@@ -356,7 +356,7 @@ fun PresetSwitcher(
                                 Icon(
                                     androidx.compose.ui.res.painterResource(R.drawable.ic_star),
                                     contentDescription = stringResource(R.string.ui_favourite),
-                                    tint = Palette.Lit,
+                                    tint = Palette.LitBright,
                                     modifier = Modifier
                                         .padding(start = 6.dp)
                                         .size(16.dp),
@@ -365,7 +365,7 @@ fun PresetSwitcher(
                         }
                     },
                     leadingIcon = {
-                        if (current) Icon(Icons.Filled.Check, contentDescription = stringResource(R.string.ui_selected), tint = Palette.Lit)
+                        if (current) Icon(Icons.Filled.Check, contentDescription = stringResource(R.string.ui_selected), tint = Palette.LitBright)
                     },
                     onClick = {
                         open = false

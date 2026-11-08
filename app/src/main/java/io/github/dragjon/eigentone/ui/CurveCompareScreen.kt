@@ -236,7 +236,7 @@ private fun PresetPicker(label: String, chosen: Preset, presets: List<Preset>, s
         MotionMenu(expanded = open, onDismissRequest = { open = false }) {
             presets.forEach { preset ->
                 DropdownMenuItem(
-                    text = { Text(preset.name, color = if (preset.id == chosen.id) Palette.Lit else Palette.Text, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    text = { Text(preset.name, color = if (preset.id == chosen.id) Palette.LitBright else Palette.Text, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     onClick = {
                         open = false
                         onPick(preset.id)
