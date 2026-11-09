@@ -108,7 +108,7 @@ Crash reports stay on the phone. You choose whether to share one from the Settin
 
 ## Install
 
-Download the APK from [Releases](https://github.com/Dragjon/eigentone/releases), and open it on the phone. Eigentone is a pre-release, and has only been tested on three phones, a Samsung Galaxy A54 running Android 16, a Vivo Y33s running Android 13, and an Oppo A9 2020 running Android 11. If something goes wrong on your phone, Settings, Troubleshooting has a debug console whose log you can attach to an [issue](https://github.com/Dragjon/eigentone/issues). Or install with USB debugging:
+Download the APK from [Releases](https://github.com/Dragjon/eigentone/releases), and open it on the phone. Eigentone is a pre-release, and has only been tested on three phones: a Samsung Galaxy A54 running Android 16, a Vivo Y33s running Android 13, and an Oppo A9 2020 running Android 11. If something goes wrong on your phone, Settings, Troubleshooting has a debug console whose log you can attach to an [issue](https://github.com/Dragjon/eigentone/issues). Or install with USB debugging:
 
 ```powershell
 & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.39.1.apk
