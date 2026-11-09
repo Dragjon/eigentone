@@ -33,7 +33,7 @@
 
 *Eigentones are the natural resonant tones of an enclosed space. "Eigen" is German for "own", so the name reads as "your own tone".*
 
-Eigentone sits behind Spotify, YouTube and most other apps, and shapes their sound system-wide using Android's `DynamicsProcessing` effect. Connect your headphones and it offers a correction measured for them. Take the short hearing check and it fits the sound to each of your ears. Everything else, from a 31-band graphic EQ to a multiband compressor, is there when you want it and out of the way when you don't: **simple by default, powerful when needed**.
+Eigentone sits behind Spotify, YouTube and most other apps, and shapes their sound system-wide using Android's `DynamicsProcessing` effect. Connect your headphones and it offers a correction measured for them. Take the short hearing check and it fits the sound to each of your ears. Everything else, from a 31-band graphic EQ to a multiband compressor, is there when you want it and out of the way when you don't. We take inspiration of KDE Plasma's motto: **simple by default, powerful when needed**.
 
 ## Why Eigentone
 
@@ -60,7 +60,7 @@ Eigentone sits behind Spotify, YouTube and most other apps, and shapes their sou
 | Finding problems by ear | Peak finder, frequency sweep and a blind A/B comparison | Not in its feature list |
 | Curves and files | 350-shape library, ParametricEQ and GraphicEQ import, GraphicEQ export, share codes | Not in its feature list |
 | Ads and tracking | None. No analytics, no account | No ads<sup>[4]</sup> |
-| Availability | GitHub releases, Android 11 and newer, tested on one phone so far | Google Play, 5.5 million+ installs<sup>[4]</sup> |
+| Availability | GitHub releases, Android 11 and newer, tested on three phones so far | Google Play, 5.5 million+ installs<sup>[4]</sup> |
 
 Where Wavelet is ahead: it's on Google Play, it has years of testing across millions of phones, and its AutoEq database works offline, where Eigentone downloads a profile when you ask for one. If you want the simplest one-tap correction on a phone Eigentone hasn't been tested on, Wavelet is a safe choice. If you want to shape the sound in detail, fit it to your own ears, or know exactly what the app does, that's what Eigentone is for.
 
@@ -108,7 +108,7 @@ Crash reports stay on the phone. You choose whether to share one from the Settin
 
 ## Install
 
-Download the APK from [Releases](https://github.com/Dragjon/eigentone/releases), and open it on the phone. Eigentone is a pre-release, and has only been tested on a Galaxy A54 running Android 16. If something goes wrong on your phone, Settings, Troubleshooting has a debug console whose log you can attach to an [issue](https://github.com/Dragjon/eigentone/issues). Or install with USB debugging:
+Download the APK from [Releases](https://github.com/Dragjon/eigentone/releases), and open it on the phone. Eigentone is a pre-release, and has only been tested on three phones, a Samsung Galaxy A54 running Android 16, a Vivo Y33s running Android 13, and an Oppo A9 2020 running Android 11. If something goes wrong on your phone, Settings, Troubleshooting has a debug console whose log you can attach to an [issue](https://github.com/Dragjon/eigentone/issues). Or install with USB debugging:
 
 ```powershell
 & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r Eigentone-0.39.1.apk
