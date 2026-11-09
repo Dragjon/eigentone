@@ -250,14 +250,8 @@ private val LightScheme = lightColorScheme(
 /** Whether this choice means dark right now. Follows the device live, including a dark mode schedule. */
 @Composable
 fun isDarkTheme(mode: ThemeMode): Boolean = when (mode) {
-    // The phone's own setting, read from the system rather than the app: the app's light or dark choice for its
-    // launch window is only updated on leaving the app, and until then it would answer for the phone.
-    ThemeMode.DEVICE -> {
-        // Read again whenever the configuration changes, as it does when the phone switches.
-        androidx.compose.ui.platform.LocalConfiguration.current
-        (android.content.res.Resources.getSystem().configuration.uiMode and
-            android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
-    }
+    // Follows the phone; MainActivity keeps Android's choice for the app on "follow the phone" whenever Device is set.
+    ThemeMode.DEVICE -> isSystemInDarkTheme()
     ThemeMode.LIGHT -> false
     ThemeMode.DARK -> true
 }
@@ -344,11 +338,10 @@ private fun fromScheme(s: androidx.compose.material3.ColorScheme, fixed: ThemeCo
         stripOn = s.onPrimary,
         // A lighter shade of the strip's own colour for its drawer.
         // At night the strip's colour is a pale tint, so its drawer goes a shade deeper; by day a shade lighter.
-        // The strip's own container tone, Material's partner for its main colour: the same hue and saturation at a
-        // softer tone, rather than the main colour mixed with black or white, which went grey and dirty (user decision).
-        stripPanel = s.primaryContainer,
-        drawerText = s.onPrimaryContainer,
-        drawerDim = over(s.onPrimaryContainer, 0.72f, s.primaryContainer),
+        // The drawer is the strip itself carried on down, in the same colour with the same text, set apart only by a
+        // faint line and its shadow. A different tone flipped light and dark between the two, so they read as two
+        // pieces rather than one bar opening (user decision).
+        stripPanel = s.primary,
         // A tinted step off the page in both themes, so panels read as panels on white too.
         surface = s.surfaceContainerLow,
         surfaceHigh = s.surfaceContainerHighest,

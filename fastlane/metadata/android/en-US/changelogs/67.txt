@@ -1,0 +1,5 @@
+- The welcome's last swipe slides straight into the app's opening
+- Lighter swiping between welcome steps, with one quiet hint
+- The status drawer is the strip's own colour
+- Device theme follows the phone again
+- A bolder output level meter

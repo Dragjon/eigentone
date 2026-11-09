@@ -63,6 +63,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.layout.layout
+import kotlinx.coroutines.flow.first
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.foundation.Canvas
@@ -90,6 +95,9 @@ private const val STEPS = 5
 
 /** Set as the welcome hands over, so the app opens out of the line the welcome closed into. */
 internal val openingFromWelcome = mutableStateOf(false)
+
+/** How far the power-on had already played on the welcome's last page when the app took over, 0 to 1. */
+internal val openingFrom = androidx.compose.runtime.mutableFloatStateOf(0f)
 
 /** Long enough to watch the two lines meet as the page flattens onto them. */
 private const val CLOSE_MS = 900
@@ -124,16 +132,41 @@ fun WelcomeScreen(onSetEnabled: (Boolean) -> Unit, onFindSound: () -> Unit) {
 
     // Pages follow the finger, as any pager does (user decision). The page settled on is the step, saved so the
     // welcome resumes there, and a step chosen another way, by Back or on returning from Find your sound, slides there.
-    val pager = androidx.compose.foundation.pager.rememberPagerState(initialPage = step) { STEPS }
+    // One page past the last step holds only the lit line the app opens out of (user decision): swiping on slides
+    // the last step away like any other, and settling on the line opens the app from it.
+    val pager = androidx.compose.foundation.pager.rememberPagerState(initialPage = step) { STEPS + 1 }
     LaunchedEffect(pager) {
         androidx.compose.runtime.snapshotFlow { pager.settledPage }.collect { settled ->
-            if (settled != Repo.state.value.welcomeStep) go(settled)
+            if (settled < STEPS && settled != Repo.state.value.welcomeStep) go(settled)
         }
+    }
+    // The power-on starts on the last page as soon as the slide heads for it, so there's never a plain line to
+    // wait on (user decision), and rewinds if the swipe turns back.
+    val powerOn = remember { Animatable(0f) }
+    LaunchedEffect(pager) {
+        androidx.compose.runtime.snapshotFlow { pager.targetPage == STEPS || pager.currentPage == STEPS }.collect { heading ->
+            if (heading) {
+                powerOn.animateTo(1f, tween(((1f - powerOn.value) * OPEN_MS).toInt().coerceAtLeast(1), easing = LinearEasing))
+            } else {
+                powerOn.animateTo(0f, tween(160))
+            }
+        }
+    }
+    // When the page arrives, the app takes over just where the power-on has got to, so it's one animation.
+    LaunchedEffect(pager) {
+        androidx.compose.runtime.snapshotFlow {
+            pager.currentPage == STEPS && kotlin.math.abs(pager.currentPageOffsetFraction) < LINE_ARRIVED
+        }.first { it }
+        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        openingFrom.value = powerOn.value
+        openingFromWelcome.value = true
+        finish()
     }
     LaunchedEffect(step) {
         if (pager.settledPage != step && !pager.isScrollInProgress) pager.animateScrollToPage(step)
     }
-    val page = pager.currentPage
+    // The steps' own page, which stays on the last while sliding on to the line.
+    val page = pager.currentPage.coerceAtMost(STEPS - 1)
     val swipeAt = with(androidx.compose.ui.platform.LocalDensity.current) { SWIPE_DP.dp.toPx() }
 
     @Composable
@@ -147,6 +180,7 @@ fun WelcomeScreen(onSetEnabled: (Boolean) -> Unit, onFindSound: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 when (page) {
+                    STEPS -> Unit
                     0 -> Hello()
                     1 -> TurnOn(state, onSetEnabled)
                     2 -> YourHeadphones(state)
@@ -193,82 +227,57 @@ fun WelcomeScreen(onSetEnabled: (Boolean) -> Unit, onFindSound: () -> Unit) {
                 .padding(start = 24.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            StepDots(page, Modifier.weight(1f), onStart = ::startListening)
+            // The arrow slides on to the line, as a swipe would.
+            StepDots(page, Modifier.weight(1f), onStart = { scope.launch { pager.animateScrollToPage(STEPS) } })
             if (page < STEPS - 1) TextButton(onClick = ::finish) { Text(stringResource(R.string.welcome_skip)) }
         }
         Box(
             Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                // Only the last step has anything further: swiping on from it starts listening, as Start does. Seen
-                // before the pager and never taken from it, so swiping between steps, scrolling and taps work as ever.
-                .pointerInput(Unit) {
-                    val flick = SWIPE_FLICK_DP.dp.toPx()
-                    val nudge = SWIPE_NUDGE_DP.dp.toPx()
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
-                        if (pager.currentPage != STEPS - 1 || pager.isScrollInProgress) return@awaitEachGesture
-                        val tracker = androidx.compose.ui.input.pointer.util.VelocityTracker()
-                        tracker.addPosition(down.uptimeMillis, down.position)
-                        var last = down.position
-                        var onward = false
-                        while (true) {
-                            val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
-                            val finger = event.changes.firstOrNull { it.id == down.id } ?: break
-                            tracker.addPosition(finger.uptimeMillis, finger.position)
-                            last = finger.position
-                            val sx = last.x - down.position.x
-                            val sy = last.y - down.position.y
-                            // Only a drag that first heads on, to the left, counts.
-                            if (!onward && sx < -viewConfiguration.touchSlop && kotlin.math.abs(sx) > kotlin.math.abs(sy)) onward = true
-                            if (!finger.pressed) break
-                        }
-                        val dx = last.x - down.position.x
-                        val dy = last.y - down.position.y
-                        val quick = -tracker.calculateVelocity().x > flick && -dx > nudge
-                        val finishing = onward && dx < 0 && kotlin.math.abs(dx) > kotlin.math.abs(dy) && (-dx > swipeAt || quick)
-                        // A clear swipe on from the last step does what Start does.
-                        if (finishing) startListening()
-                    }
-                },
         ) {
-            // The last page doesn't stretch when pushed on, since that swipe starts listening instead.
+            // No stretch at the ends, which would fight the slide on to the line.
             @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
             androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.LocalOverscrollConfiguration provides null) {
                 androidx.compose.foundation.pager.HorizontalPager(
                     state = pager,
                     // The next step is ready before it's swiped to, so it slides in already drawn.
                     beyondViewportPageCount = 1,
+                    // Turns on a fifth of a swipe, as Android's own pagers do, rather than needing half (user decision).
+                    flingBehavior = androidx.compose.foundation.pager.PagerDefaults.flingBehavior(state = pager, snapPositionalThreshold = SNAP_AT),
                     modifier = Modifier.matchParentSize(),
-                ) { shown -> Page(shown, Modifier.fillMaxSize()) }
+                ) { shown -> if (shown == STEPS) LinePage({ powerOn.value }, Modifier.fillMaxSize()) else Page(shown, Modifier.fillMaxSize()) }
             }
         }
-        // Quiet: a hint on the first page only, and on the last a key to begin. Everything between is a swipe.
-        Row(
+        // A single hint, on the first page only, centred under the steps with an arrow that nudges the way to swipe
+        // (user decision). The last step needs none: its lit arrow says where to go.
+        Box(
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 64.dp)
-                .padding(horizontal = 24.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.End,
+                .heightIn(min = 56.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            when (page) {
-                0, STEPS - 1 -> Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                    // Quiet and out of the way, with an arrow saying which way to swipe.
-                    Text(
-                        stringResource(if (page == 0) R.string.welcome_swipe_hint else R.string.welcome_swipe_finish),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Palette.TextDim.copy(alpha = 0.7f),
-                    )
+            if (page == 0) {
+                val nudge by androidx.compose.animation.core.rememberInfiniteTransition(label = "swipeHint").animateFloat(
+                    initialValue = 0f,
+                    targetValue = 1f,
+                    animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                        tween(900, easing = FastOutSlowInEasing),
+                        androidx.compose.animation.core.RepeatMode.Reverse,
+                    ),
+                    label = "swipeNudge",
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.welcome_swipe_hint), style = MaterialTheme.typography.labelMedium, color = Palette.TextDim)
                     Icon(
                         Icons.AutoMirrored.Filled.KeyboardArrowRight,
                         contentDescription = null,
-                        tint = Palette.TextDim.copy(alpha = 0.7f),
-                        modifier = Modifier.size(18.dp),
+                        tint = Palette.TextDim,
+                        modifier = Modifier
+                            .size(18.dp)
+                            .graphicsLayer { translationX = nudge * 4.dp.toPx() },
                     )
                 }
-
-                else -> Unit
             }
         }
     }
@@ -287,6 +296,12 @@ private const val STRIPS = 10
 
 /** How long the arrow after the dots takes to light up as the last step arrives. */
 private const val ARROW_LIGHT_MS = 320
+
+/** How close to the line page the slide has to be for the app to start opening. */
+private const val LINE_ARRIVED = 0.04f
+
+/** How far a swipe must go before the page turns on letting go, as a share of the width. */
+private const val SNAP_AT = 0.2f
 
 /** How much later each strip starts than the one to its left, as a share of the sweep. */
 private const val STRIP_STAGGER = 0.06f
@@ -344,6 +359,8 @@ private fun StepDots(step: Int, modifier: Modifier, onStart: () -> Unit) {
     val label = stringResource(R.string.welcome_step_of, step + 1, STEPS)
     val last = step == STEPS - 1
     val startLabel = stringResource(R.string.welcome_finish)
+    // A pale tint of the same blue in both themes, so the ring lifts the circle rather than darkening it (user decision).
+    val ring = androidx.compose.ui.graphics.lerp(Palette.LitFill, androidx.compose.ui.graphics.Color.White, if (Palette.dark) 0.8f else 0.45f)
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.semantics { contentDescription = label }, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             repeat(STEPS) { i ->
@@ -367,6 +384,9 @@ private fun StepDots(step: Int, modifier: Modifier, onStart: () -> Unit) {
                 }
                 .clip(CircleShape)
                 .background(Palette.LitFill.copy(alpha = lit))
+                // A ring in another shade of the same blue, lighter at night and deeper by day, so the lit circle
+                // stands apart from the page without black or white (user decision), fading in with it.
+                .border(2.dp, ring.copy(alpha = lit), CircleShape)
                 .then(
                     if (last) {
                         Modifier
@@ -659,3 +679,23 @@ private const val FLOW_SPEED = 7f
 
 /** How far behind the leading end the tail sets off, as a share of the closing. */
 private const val SLITHER_LAG = 0.45f
+
+/**
+ * The page past the last step: the app's own power-on, played from [progress] as the page slides in, drawn over the
+ * whole screen just as the app draws it, so that when it takes over nothing moves or changes size.
+ */
+@Composable
+private fun LinePage(progress: () -> Float, modifier: Modifier) {
+    val screenHeight = androidx.compose.ui.platform.LocalView.current.height
+    var top by remember { mutableIntStateOf(0) }
+    Box(modifier.onGloballyPositioned { top = it.boundsInRoot().top.toInt() }) {
+        Canvas(
+            Modifier
+                .fillMaxWidth()
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(androidx.compose.ui.unit.Constraints.fixed(constraints.maxWidth, screenHeight))
+                    layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, -top) }
+                },
+        ) { drawPowerOn(progress()) }
+    }
+}

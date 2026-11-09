@@ -49,6 +49,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Android's light or dark choice for the app is set before anything draws, so Device always follows the phone
+        // from the first frame, even when an earlier Light or Dark was left in place.
+        matchWindowToTheme(Repo.state.value.themeMode)
         AppText.context = applicationContext
         // On a first run the welcome asks, with an explanation, when the EQ is turned on.
         // Android 12 and older show the notification without asking.
@@ -60,7 +63,16 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(dark) { matchSystemBars(dark) }
             // Only the launch window needs telling, and doing it now rebuilds the whole app like a change of
             // configuration, so a theme switch lagged. It's told when the app goes into the background instead.
-            pendingWindowTheme = mode
+            // Device needs it at once, or the app would keep answering with the last Light or Dark. Light and Dark
+            // wait until the app is left, since setting it now rebuilds the whole app.
+            LaunchedEffect(mode) {
+                if (mode == ThemeMode.DEVICE) {
+                    matchWindowToTheme(mode)
+                    pendingWindowTheme = null
+                } else {
+                    pendingWindowTheme = mode
+                }
+            }
             EigentoneTheme(dark) { MenuHost { EigentoneApp(onSetEnabled = ::setEnabled) } }
         }
         // Otherwise reopening from recents after Android closed the app would load the preset again.

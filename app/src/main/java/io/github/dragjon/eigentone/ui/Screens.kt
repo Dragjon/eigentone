@@ -239,7 +239,7 @@ private const val TAB_SLIDE_MS = 240
 /** How long after the app appears the tabs not yet visited are built, so the opening isn't slowed by them. */
 private const val TAB_PREBUILD_DELAY_MS = 400L
 /** Short enough that the app is in reach soon after the welcome closes (user decision). */
-private const val OPEN_MS = 1000
+internal const val OPEN_MS = 1000
 /** When, as a share of the opening, the app starts to fade in behind the line. */
 private const val OPEN_UNFOLD_AT = 0.52f
 private const val OPEN_BARS = 41
@@ -252,7 +252,7 @@ private fun phase(progress: Float, start: Float, end: Float) = ((progress - star
  * spectrum that bursts out of the line from the centre outward, moves like live sound, then settles back
  * into the line, edges first, as the app fades in.
  */
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPowerOn(p: Float) {
+internal fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPowerOn(p: Float) {
     val centre = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
     val reach = kotlin.math.hypot(size.width, size.height) / 2f
     // Pulses.
@@ -487,15 +487,16 @@ private fun AppScreen(
 
     // Straight after the welcome, the app powers on out of the lit line it closed into: a pulse rings out,
     // a spectrum bursts from the line, and the app fades in as the bars settle back into it.
-    val opening = remember { Animatable(if (openingFromWelcome.value) 0f else 1f) }
+    // Straight after the welcome it carries on from wherever the welcome's last page had played it to.
+    val opening = remember { Animatable(if (openingFromWelcome.value) openingFrom.value else 1f) }
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     LaunchedEffect(Unit) {
         if (openingFromWelcome.value) {
             launch {
-                kotlinx.coroutines.delay((OPEN_MS * OPEN_UNFOLD_AT).toLong())
+                kotlinx.coroutines.delay(((OPEN_UNFOLD_AT - opening.value).coerceAtLeast(0f) * OPEN_MS).toLong())
                 haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
             }
-            opening.animateTo(1f, tween(OPEN_MS, easing = LinearEasing))
+            opening.animateTo(1f, tween(((1f - opening.value) * OPEN_MS).toInt().coerceAtLeast(1), easing = LinearEasing))
             openingFromWelcome.value = false
             // A new user goes straight on to the tour of the screen they've just arrived at.
             if (!Repo.state.value.tourSeen) Tour.start()

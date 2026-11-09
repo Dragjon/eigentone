@@ -29,6 +29,7 @@ fun OutputMeterBar(modifier: Modifier = Modifier) {
     // Out of view it isn't read, so a page kept ready off screen doesn't redraw with every reading.
     val shown = LocalPageShown.current
     val now = if (shown()) level.value else null
+    val track = Palette.Track2
     Canvas(
         modifier
             .width(METER_WIDTH_DP.dp)
@@ -41,16 +42,18 @@ fun OutputMeterBar(modifier: Modifier = Modifier) {
         val radius = CornerRadius(size.width / 2)
         fun yOf(db: Float) = (1f - ((db - MIN_DB) / -MIN_DB).coerceIn(0f, 1f)) * size.height
         val hot = now.heldPeakDb > CLIP_DB
-        drawRoundRect(Palette.SurfaceHigh, size = size, cornerRadius = radius)
+        // The same track as every slider and fader, and a solid fill, so it reads as part of the set rather than
+        // a washed-out grey with a faint fill (user decision).
+        drawRoundRect(track, size = size, cornerRadius = radius)
         val top = yOf(now.rmsDb)
         drawRoundRect(
-            if (hot) Palette.Danger else Palette.Lit.copy(alpha = FILL_ALPHA),
+            if (hot) Palette.Danger else Palette.LitFill,
             topLeft = Offset(0f, top),
             size = Size(size.width, size.height - top),
             cornerRadius = radius,
         )
         val peak = yOf(now.heldPeakDb)
-        drawRect(if (hot) Palette.Danger else Palette.Lit, topLeft = Offset(0f, peak - 1.dp.toPx()), size = Size(size.width, 2.dp.toPx()))
+        drawRect(if (hot) Palette.Danger else Palette.LitBright, topLeft = Offset(0f, peak - 1.dp.toPx()), size = Size(size.width, 2.dp.toPx()))
     }
 }
 
@@ -59,5 +62,4 @@ private fun formatLevelDb(db: Float): String =
 
 private const val MIN_DB = -60f
 private const val CLIP_DB = -0.5f
-private const val FILL_ALPHA = 0.45f
 const val METER_WIDTH_DP = 6

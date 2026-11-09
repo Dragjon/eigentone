@@ -327,6 +327,8 @@ private fun androidx.compose.animation.AnimatedVisibilityScope.StripDetails(
             .background(Palette.StripPanel)
             .padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 8.dp),
     ) {
+        // A faint line where the bar ends and its drawer begins.
+        androidx.compose.material3.HorizontalDivider(color = Palette.DrawerText.copy(alpha = 0.18f), modifier = Modifier.padding(bottom = 4.dp))
         if (clipping) {
             Text(
                 stringResource(R.string.ui_clip_risk),
