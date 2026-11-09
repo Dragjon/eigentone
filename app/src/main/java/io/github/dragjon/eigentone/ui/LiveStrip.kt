@@ -319,7 +319,7 @@ private fun androidx.compose.animation.AnimatedVisibilityScope.StripDetails(
     val drawer = this
     val status by Repo.status.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
-    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides Palette.StripText) {
+    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides Palette.DrawerText) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -336,7 +336,7 @@ private fun androidx.compose.animation.AnimatedVisibilityScope.StripDetails(
             )
         }
         effects.forEachIndexed { index, effect ->
-            val colour = if (effect.on) Palette.StripOn else Palette.StripDim
+            val colour = if (effect.on) Palette.DrawerOn else Palette.DrawerDim
             // Each row drops in just after the one above, and lifts out the same way when the drawer closes.
             val stagger = index * ROW_STAGGER_MS
             Row(
@@ -363,9 +363,9 @@ private fun androidx.compose.animation.AnimatedVisibilityScope.StripDetails(
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(effectLabel(effect.name)), style = MaterialTheme.typography.bodyMedium, color = Palette.StripText)
+                    Text(stringResource(effectLabel(effect.name)), style = MaterialTheme.typography.bodyMedium, color = Palette.DrawerText)
                     val detail = effectDetail(effect, state, output, scheduledNight, status.reverbApps.map { appLabel(context, it) })
-                    if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall, color = Palette.StripDim)
+                    if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall, color = Palette.DrawerDim)
                 }
                 Icon(if (effect.on) Icons.Filled.Check else Icons.Filled.Close, contentDescription = null, tint = colour, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
@@ -373,7 +373,7 @@ private fun androidx.compose.animation.AnimatedVisibilityScope.StripDetails(
                 Icon(
                     Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
-                    tint = Palette.StripDim,
+                    tint = Palette.DrawerDim,
                     modifier = Modifier.padding(start = 4.dp).size(18.dp),
                 )
             }

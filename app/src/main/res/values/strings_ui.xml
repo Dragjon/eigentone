@@ -699,6 +699,7 @@
     <string name="ui_target_diffuse" formatted="false">Reference</string>
     <string name="ui_target_published_detail" formatted="false">The correction as AutoEq published it.</string>
     <string name="ui_target_published_below_harman" formatted="false">As AutoEq published it, which aims for about %1$d dB less deep bass than Harman. If this sounds thin, try Harman.</string>
+    <string name="welcome_start" formatted="false">Start</string>
     <string name="welcome_swipe_finish" formatted="false">Swipe to start listening</string>
     <string name="welcome_swipe_hint" formatted="false">Swipe to start</string>
     <string name="ui_autoeq_detected" formatted="false">Found from the connected %1$s, best measurement first. Search for another model if these aren\'t yours.</string>

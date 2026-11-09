@@ -238,7 +238,8 @@ private const val TAB_SLIDE_MS = 240
 
 /** How long after the app appears the tabs not yet visited are built, so the opening isn't slowed by them. */
 private const val TAB_PREBUILD_DELAY_MS = 400L
-private const val OPEN_MS = 1500
+/** Short enough that the app is in reach soon after the welcome closes (user decision). */
+private const val OPEN_MS = 1000
 /** When, as a share of the opening, the app starts to fade in behind the line. */
 private const val OPEN_UNFOLD_AT = 0.52f
 private const val OPEN_BARS = 41

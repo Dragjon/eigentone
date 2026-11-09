@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -61,6 +62,9 @@ data class ThemeColors(
     val leftEar: Color,
     /** Also dashed on graphs, so colour isn't the only difference between the ears. */
     val rightEar: Color,
+    /** Text in the strip's opened drawer, made for its tone. Unspecified means the strip's own text colours suit it. */
+    val drawerText: Color = Color.Unspecified,
+    val drawerDim: Color = Color.Unspecified,
 )
 
 /**
@@ -145,6 +149,9 @@ object Palette {
     val StripOn get() = colors.stripOn
     val StripDanger get() = colors.stripDanger
     val StripPanel get() = colors.stripPanel
+    val DrawerText get() = colors.drawerText.takeOrElse { colors.stripText }
+    val DrawerOn get() = colors.drawerText.takeOrElse { colors.stripOn }
+    val DrawerDim get() = colors.drawerDim.takeOrElse { colors.stripDim }
     val Surface get() = colors.surface
     val SurfaceHigh get() = colors.surfaceHigh
     val Tooltip get() = colors.tooltip
@@ -337,8 +344,11 @@ private fun fromScheme(s: androidx.compose.material3.ColorScheme, fixed: ThemeCo
         stripOn = s.onPrimary,
         // A lighter shade of the strip's own colour for its drawer.
         // At night the strip's colour is a pale tint, so its drawer goes a shade deeper; by day a shade lighter.
-        // A small step from the strip's colour in either theme, so the drawer belongs to it yet reads apart.
-        stripPanel = if (dark) over(Color.Black, 0.08f, s.primary) else over(Color.White, 0.08f, s.primary),
+        // The strip's own container tone, Material's partner for its main colour: the same hue and saturation at a
+        // softer tone, rather than the main colour mixed with black or white, which went grey and dirty (user decision).
+        stripPanel = s.primaryContainer,
+        drawerText = s.onPrimaryContainer,
+        drawerDim = over(s.onPrimaryContainer, 0.72f, s.primaryContainer),
         // A tinted step off the page in both themes, so panels read as panels on white too.
         surface = s.surfaceContainerLow,
         surfaceHigh = s.surfaceContainerHighest,

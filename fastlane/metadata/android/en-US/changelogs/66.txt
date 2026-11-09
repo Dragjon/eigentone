@@ -1,0 +1,4 @@
+- The welcome's pages follow your finger, with a lit arrow to start
+- A shorter, smoother opening
+- The notification uses the new blue on Android 13 and older
+- Clearer status drawer colours and visible landscape - and + keys

@@ -290,7 +290,8 @@ class AudioService : Service() {
         private const val CHANNEL_ID = "engine_status"
         private const val OLD_CHANNEL_ID = "engine"
         private const val NOTIFICATION_ID = 1
-        private const val NOTIFICATION_COLOUR = 0xFFFFB454.toInt()
+        // The logo's blue, which Android 13 and older tint the notification's icon with (it was the old amber).
+        private const val NOTIFICATION_COLOUR = 0xFF1A73E8.toInt()
         private const val APPLY_INTERVAL_MS = 30L
         private const val WATCHDOG_INTERVAL_MS = 10_000L
         private const val VOLUME_POLL_MS = 1_000L

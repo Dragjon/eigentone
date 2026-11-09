@@ -271,11 +271,11 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, o
             }
             // Each key is dimmed at the end of the fader's travel, where a press would do nothing.
             IconButton(enabled = faders[band] > -GraphicEq.MAX_DB, onClick = { nudge(-STEP_DB) }) {
-                Icon(painterResource(R.drawable.ic_minus), contentDescription = stringResource(R.string.ui_lower, GraphicEq.formatFrequency(freqs[band])))
+                Icon(painterResource(R.drawable.ic_minus), contentDescription = stringResource(R.string.ui_lower, GraphicEq.formatFrequency(freqs[band])), tint = if (faders[band] > -GraphicEq.MAX_DB) Palette.Text else Palette.TextDim.copy(alpha = 0.4f))
             }
             Spacer(Modifier.width(8.dp))
             IconButton(enabled = faders[band] < GraphicEq.MAX_DB, onClick = { nudge(STEP_DB) }) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.ui_raise, GraphicEq.formatFrequency(freqs[band])))
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.ui_raise, GraphicEq.formatFrequency(freqs[band])), tint = if (faders[band] < GraphicEq.MAX_DB) Palette.Text else Palette.TextDim.copy(alpha = 0.4f))
             }
         }
         RowDivider()
@@ -642,7 +642,8 @@ private fun Faders(
                         val handle = minOf(capWidth, (if (scrolling) FADER_HANDLE_SCROLL_DP else FADER_HANDLE_DP).dp.toPx()) / 2
                         // Packed tight when they all fit, a bigger handle would cover its neighbours, so only the
                         // scrolling bank, with room between faders, grows the selected one (user decision).
-                        val grows = isSelected && (scrolling || fill)
+                        // Landscape marks it with the halo alone (user decision).
+                        val grows = isSelected && scrolling && !fill
                         val radius = if (grows) handle + FADER_HANDLE_GROW_DP.dp.toPx() else handle
                         // A ring of the panel's own colour around the handle, as Material leaves a gap around a
                         // slider's handle, so it reads as a knob on the track rather than part of the line.
@@ -919,11 +920,11 @@ fun ExpandedFaders(onClose: () -> Unit) {
                 Repo.commit()
             }
             IconButton(enabled = faders[band] > -GraphicEq.MAX_DB, onClick = { nudge(-STEP_DB) }) {
-                Icon(painterResource(R.drawable.ic_minus), contentDescription = stringResource(R.string.ui_lower, GraphicEq.formatFrequency(freqs[band])))
+                Icon(painterResource(R.drawable.ic_minus), contentDescription = stringResource(R.string.ui_lower, GraphicEq.formatFrequency(freqs[band])), tint = if (faders[band] > -GraphicEq.MAX_DB) Palette.Text else Palette.TextDim.copy(alpha = 0.4f))
             }
             Spacer(Modifier.width(8.dp))
             IconButton(enabled = faders[band] < GraphicEq.MAX_DB, onClick = { nudge(STEP_DB) }) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.ui_raise, GraphicEq.formatFrequency(freqs[band])))
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.ui_raise, GraphicEq.formatFrequency(freqs[band])), tint = if (faders[band] < GraphicEq.MAX_DB) Palette.Text else Palette.TextDim.copy(alpha = 0.4f))
             }
             Spacer(Modifier.width(8.dp))
             UndoRedoButtons()
