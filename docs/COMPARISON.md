@@ -4,7 +4,9 @@
 
 [Wavelet](https://play.google.com/store/apps/details?id=com.pittvandewitt.wavelet) is the best-known system-wide EQ for Android, and it's good. Both work system-wide without root and both use AutoEq's measurements. Eigentone goes further on control, on fitting the sound to you, and on openness.
 
-| | Eigentone | Wavelet |
+## Side by side
+
+| Area | Eigentone | Wavelet |
 |---|---|---|
 | Price | Free, everything included | Free, with reverb, virtualizer and bass tuner as a paid upgrade<sup>[1]</sup> |
 | Source code | Open, GPL v3 | Not published |
@@ -20,6 +22,27 @@
 | Ads and tracking | None. No analytics, no account | No ads<sup>[4]</sup> |
 | Availability | GitHub releases, Android 11 and newer, tested on three phones so far | Google Play, 5.5 million+ installs<sup>[4]</sup> |
 
-Where Wavelet is ahead: it's on Google Play, it has years of testing across millions of phones, and its AutoEq database works offline, where Eigentone downloads a profile when you ask for one. If you want the simplest one-tap correction on a phone Eigentone hasn't been tested on, Wavelet is a safe choice. If you want to shape the sound in detail, fit it to your own ears, or know exactly what the app does, that's what Eigentone is for.
+## Where Wavelet is ahead
 
-<sub>Wavelet details as of November 2026, from its listings and coverage, and they may have changed since. [1] [XDA Developers](https://www.xda-developers.com/make-your-headphones-sound-better-automatic-eq-wavelet/) lists reverberation, virtualizer and bass tuner as an in-app purchase. [2] XDA Developers and [Softpedia](https://mobile.softpedia.com/apk/wavelet/) describe a 9-band graphic EQ. [3] Its [Google Play listing](https://play.google.com/store/apps/details?id=com.pittvandewitt.wavelet) and [SourceForge listing](https://sourceforge.net/app/wavelet-headphone-specific-eq/). [4] [AppGoblin](https://appgoblin.info/apps/com.pittvandewitt.wavelet). "Not in its feature list" means we couldn't find it described, not that it's certainly missing. Corrections are welcome as an issue.</sub>
+- **It's on Google Play**, with years of testing across millions of phones.
+- **Its AutoEq database works offline**, where Eigentone downloads a profile when you ask for one.
+
+## Which to choose
+
+| Choose Wavelet if you want | Choose Eigentone if you want |
+|---|---|
+| The simplest one-tap correction | To shape the sound in detail |
+| Years of testing on millions of phones | To fit the sound to your own ears |
+| To install from Google Play | To know exactly what the app does, and change it |
+
+## Sources
+
+Wavelet details are as of November 2026, from its listings and coverage, and may have changed since.
+
+1. [XDA Developers](https://www.xda-developers.com/make-your-headphones-sound-better-automatic-eq-wavelet/) lists reverberation, virtualizer and bass tuner as an in-app purchase.
+2. XDA Developers and [Softpedia](https://mobile.softpedia.com/apk/wavelet/) describe a 9-band graphic EQ.
+3. Its [Google Play listing](https://play.google.com/store/apps/details?id=com.pittvandewitt.wavelet) and [SourceForge listing](https://sourceforge.net/app/wavelet-headphone-specific-eq/).
+4. [AppGoblin](https://appgoblin.info/apps/com.pittvandewitt.wavelet).
+
+> [!NOTE]
+> "Not in its feature list" means we couldn't find it described, not that it's certainly missing. Corrections are welcome as an [issue](https://github.com/Dragjon/eigentone/issues).

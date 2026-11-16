@@ -2,16 +2,23 @@
 
 [← Back to the README](README.md)
 
-Thanks for thinking of helping. Eigentone is free and open source, and it's better for every person who tries it, reports a problem, or sends a change. You don't need to write code to help, and no contribution is too small.
+Thanks for thinking of helping. Eigentone is free and open source, and it's better for every person who tries it, reports a problem, or sends a change.
+
+> [!TIP]
+> You don't need to write code to help, and no contribution is too small.
+
+**On this page:** [Ways to help](#ways-to-help) · [Reporting a bug](#reporting-a-bug) · [Suggesting a feature](#suggesting-a-feature) · [Contributing code](#contributing-code) · [Translating](#translating) · [Licence](#licence)
 
 ## Ways to help
 
-- **Try it on your phone.** Eigentone has only been tested on three phones so far, and Android's audio behaves differently from one maker to the next. Telling us how it works on yours, good or bad, is one of the most useful things you can do.
-- **Report a bug** or something confusing, in an [issue](https://github.com/Dragjon/eigentone/issues).
-- **Suggest an idea.** Say what you were trying to do and what got in the way. That helps more than a finished design.
-- **Translate the app.** See [Translating](#translating) below.
-- **Improve the docs.** A clearer sentence, a missing step or a fixed typo are all welcome.
-- **Write code.** Fixes, features, tests and tidying.
+| Way to help | Code needed? | How |
+|---|---|---|
+| 📱 **Try it on your phone** | No | Eigentone has only been tested on three phones, and Android's audio differs from one maker to the next. Tell us how it works on yours, good or bad. |
+| 🐞 **Report a bug** | No | Open an [issue](https://github.com/Dragjon/eigentone/issues), as [below](#reporting-a-bug) |
+| 💡 **Suggest an idea** | No | Say what you were trying to do and what got in the way. That helps more than a finished design. |
+| 🌍 **Translate the app** | A little | See [Translating](#translating) |
+| 📝 **Improve the docs** | No | A clearer sentence, a missing step or a fixed typo are all welcome |
+| 🛠️ **Write code** | Yes | Fixes, features, tests and tidying, as [below](#contributing-code) |
 
 ## Reporting a bug
 
@@ -23,7 +30,8 @@ Please include:
 4. **What you did, what you expected, and what happened instead.** Screenshots or a short screen recording help a lot.
 5. **The debug log**, if the problem is with sound or the EQ turning on: Settings → Troubleshooting has a debug console whose log you can copy into the issue.
 
-Crash reports stay on the phone until you choose to share one, from the Settings tab.
+> [!NOTE]
+> Crash reports stay on the phone until you choose to share one, from the Settings tab.
 
 ## Suggesting a feature
 
@@ -33,7 +41,19 @@ Open an issue that describes the problem first: what you listen to, on what, and
 
 ### Before you start
 
-For anything bigger than a small fix, please open an issue first, or comment on an existing one, so we can agree on the approach before you spend time on it.
+> [!IMPORTANT]
+> For anything bigger than a small fix, please open an issue first, or comment on an existing one, so we can agree on the approach before you spend time on it.
+
+```mermaid
+flowchart LR
+    A["Open or pick<br/>an issue"] --> B["Fork, and branch<br/>from main"]
+    B --> C["Make the change<br/>and its tests"]
+    C --> D["Test on<br/>a real phone"]
+    D --> E["Open a pull<br/>request"]
+    E --> F["Review"]
+    F -->|changes asked| C
+    F -->|approved| G["Merged and<br/>released"]
+```
 
 ### Setting up
 
@@ -54,12 +74,29 @@ For anything bigger than a small fix, please open an issue first, or comment on 
 
 ### Guidelines
 
-- **Kotlin and Jetpack Compose**, following the style of the code around your change.
-- **Comments say why, not what**, in plain sentences.
-- **Text people read** in the app is plain and short, in British English ("colour", "equaliser"), and goes in `app/src/main/res/values/strings_ui.xml` rather than in the code.
-- **Interface rules that Eigentone keeps:** touch targets of at least 48 dp; anything that acts at once can be undone; unsaved changes are visible straight away; a control does nothing on an accidental touch; and every gesture has a button a screen reader can use. [Design philosophies](docs/DESIGN-PHILOSOPHIES.md) explains each one and why it's there.
-- **Commit messages** start with a short line saying what the change does, such as "Keep fader labels clear of the handles", with more detail below it if needed.
-- **No analytics, ads or tracking**, and no network use beyond what the user asks for. See [Privacy](docs/PRIVACY.md).
+| Area | Guideline |
+|---|---|
+| **Code** | Kotlin and Jetpack Compose, following the style of the code around your change |
+| **Comments** | Say why, not what, in plain sentences |
+| **Text people read** | Plain and short, in British English ("colour", "equaliser"), and in `app/src/main/res/values/strings_ui.xml` rather than in the code |
+| **Commit messages** | A short first line saying what the change does, such as "Keep fader labels clear of the handles", with more detail below it if needed |
+| **Privacy** | No analytics, ads or tracking, and no network use beyond what the user asks for. See [Privacy](docs/PRIVACY.md). |
+
+**Interface rules Eigentone keeps.** [Design philosophies](docs/DESIGN-PHILOSOPHIES.md) explains each one and why it's there.
+
+- [ ] Touch targets are at least 48 dp.
+- [ ] Anything that acts at once can be undone.
+- [ ] Unsaved changes are visible straight away.
+- [ ] A control does nothing on an accidental touch.
+- [ ] Every gesture has a button a screen reader can use.
+- [ ] Text fits its control on a small screen and with large text.
+
+### Before opening a pull request
+
+- [ ] The unit tests pass.
+- [ ] You've tried the change on a real phone, and say which one.
+- [ ] New logic in `data/` or `dsp/` has tests.
+- [ ] Anything you can see has before-and-after screenshots.
 
 ### Reviews
 
@@ -69,7 +106,8 @@ A maintainer will look at your pull request, may ask for changes, and will try i
 
 Most text is in `app/src/main/res/values/strings.xml` and `strings_ui.xml`. To add a language, copy those to `values-<code>/` and translate them. Text with values inserted, such as "Deleted Main preset", and text chosen by a condition is still in the Kotlin code, and needs moving before a translation can be complete.
 
-If you'd like to translate, open an issue so we can help get the remaining text out of the code first.
+> [!NOTE]
+> If you'd like to translate, open an issue so we can help get the remaining text out of the code first.
 
 ## Licence
 
