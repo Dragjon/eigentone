@@ -10,9 +10,9 @@ Everything Eigentone does, grouped by what you'd use it for.
 **On this page:** [Shape the sound](#shape-the-sound) · [Fit it to you](#fit-it-to-your-headphones-and-your-ears) · [Find problems by ear](#find-problems-by-ear) · [Dynamics and space](#dynamics-and-space) · [Presets and automation](#presets-and-automation) · [Using the app](#using-the-app)
 
 <p align="center">
-  <img src="../fastlane/metadata/android/en-US/images/phoneScreenshots/01-equaliser-0.43.png" width="30%" alt="Equaliser tab: the EQ curve over the live spectrum, and the graphic EQ faders">
-  <img src="../fastlane/metadata/android/en-US/images/phoneScreenshots/02-effects-0.43.png" width="30%" alt="Effects tab: preset strength, preamp and tone controls">
-  <img src="../fastlane/metadata/android/en-US/images/phoneScreenshots/04-headphones-0.43.png" width="30%" alt="Earbuds tab: headphone correction and the preset that loads automatically">
+  <img src="../fastlane/metadata/android/en-US/images/phoneScreenshots/01-equaliser-0.43.1.png" width="30%" alt="Equaliser tab: the EQ curve over the live spectrum, and the graphic EQ faders">
+  <img src="../fastlane/metadata/android/en-US/images/phoneScreenshots/02-effects-0.43.1.png" width="30%" alt="Effects tab: preset strength, preamp and tone controls">
+  <img src="../fastlane/metadata/android/en-US/images/phoneScreenshots/04-headphones-0.43.1.png" width="30%" alt="Earbuds tab: headphone correction and the preset that loads automatically">
 </p>
 
 ## Shape the sound
