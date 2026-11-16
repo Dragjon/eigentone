@@ -224,5 +224,6 @@ FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
 OTHER DEALINGS IN THE FONT SOFTWARE.
 
 
-Open-source libraries such as Jetpack Compose, Kotlin and kotlinx.serialization are used under
-the Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0
+Open-source libraries such as Jetpack Compose, Kotlin, kotlinx.serialization and Haze
+(Copyright 2023 Chris Banes, https://github.com/chrisbanes/haze) are used under the
+Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0

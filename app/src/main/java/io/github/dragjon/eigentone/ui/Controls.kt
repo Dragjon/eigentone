@@ -140,7 +140,7 @@ fun SettingsSection(
     // Where the section is, for working out how far the page has to move to show all of it.
     val sectionPlace = remember { arrayOfNulls<androidx.compose.ui.layout.LayoutCoordinates>(1) }
     val page = LocalPageScroll.current
-    val bottomRoom = with(androidx.compose.ui.platform.LocalDensity.current) { FOLLOW_BOTTOM_ROOM_DP.dp.toPx() }
+    val bottomRoom = with(androidx.compose.ui.platform.LocalDensity.current) { (LocalBottomCover.current + FOLLOW_BOTTOM_ROOM_DP.dp).toPx() }
     /**
      * Opening, the page scrolls once, alongside the unfolding, to where the whole section will be in view, so the
      * heading moves up to make room rather than the new rows unfolding off the bottom of the screen (user decision).
@@ -299,6 +299,9 @@ internal const val FOLD_MS = 260
 
 /** How much of the top of a page lies under something floating over it, such as the status strip. */
 val LocalTopCover = androidx.compose.runtime.compositionLocalOf { 0.dp }
+
+/** How much of the bottom of a page lies under the tabs, which the page now runs beneath. */
+val LocalBottomCover = androidx.compose.runtime.compositionLocalOf { 0.dp }
 
 /** Room kept below an opened section, clear of the floating save bar's edge. */
 private const val FOLLOW_BOTTOM_ROOM_DP = 16

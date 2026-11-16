@@ -7,7 +7,15 @@ What changed in each release since 0.33.0, newest first. Every release is publis
 > [!NOTE]
 > Every release is a pre-release until the first official one.
 
-**Releases:** [0.42.0](#0420) · [0.41.3](#0413) · [0.41.2](#0412) · [0.41.1](#0411) · [0.41.0](#0410) · [0.40.2](#0402) · [0.40.1](#0401) · [0.40.0](#0400) · [0.39.1](#0391) · [0.39.0](#0390) · [0.38.1](#0381) · [0.38.0](#0380) · [0.37.0](#0370) · [0.36.0](#0360) · [0.35.0](#0350) · [0.34.0](#0340)
+**Releases:** [0.43.0](#0430) · [0.42.0](#0420) · [0.41.3](#0413) · [0.41.2](#0412) · [0.41.1](#0411) · [0.41.0](#0410) · [0.40.2](#0402) · [0.40.1](#0401) · [0.40.0](#0400) · [0.39.1](#0391) · [0.39.0](#0390) · [0.38.1](#0381) · [0.38.0](#0380) · [0.37.0](#0370) · [0.36.0](#0360) · [0.35.0](#0350) · [0.34.0](#0340)
+
+## 0.43.0
+
+- **Floating, frosted tabs.** The tabs sit in a rounded bar that floats above the bottom of the screen, with the page scrolling on beneath it. From Android 12 the bar is frosted, blurring the page behind it; before that it's a tint.
+- **The page fades into the bars** at the top and bottom instead of stopping at a hard edge, and the tab bar is shorter.
+- **EQ precision.** Under Settings, with Advanced controls on, choose Standard (128 bands) or Fine (256 bands). Fine follows narrow parametric filters about twice as closely, but changes to the whole sound, such as Bypass and switching presets, take about twice as long to apply. A phone that refuses Fine uses Standard, and Status shows the bands in use.
+- The small curve in the status strip slides in and out as you move to and from the Equaliser, instead of popping.
+- Unsaved-changes bars and messages sit just above the tabs.
 
 ## 0.42.0
 

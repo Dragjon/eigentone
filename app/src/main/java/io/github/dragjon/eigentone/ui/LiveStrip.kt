@@ -214,7 +214,20 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
             }
         }
         PlayingDot()
-        if (showCurve) MiniCurve(state, output.key, working)
+        // The small curve shows on every tab but the Equaliser, which has the full graph. It slides in from the strip's
+        // end as the page changes, and back out the same way, making its room gradually so the name eases shorter or
+        // longer rather than jumping (user decision).
+        AnimatedVisibility(
+            visible = showCurve,
+            enter = androidx.compose.animation.expandHorizontally(tween(CURVE_SLIDE_MS, easing = LinearOutSlowInEasing), expandFrom = Alignment.Start) +
+                androidx.compose.animation.slideInHorizontally(tween(CURVE_SLIDE_MS, easing = LinearOutSlowInEasing)) { it } +
+                fadeIn(tween(CURVE_SLIDE_MS)),
+            exit = androidx.compose.animation.shrinkHorizontally(tween(CURVE_SLIDE_MS, easing = LinearOutSlowInEasing), shrinkTowards = Alignment.Start) +
+                androidx.compose.animation.slideOutHorizontally(tween(CURVE_SLIDE_MS, easing = LinearOutSlowInEasing)) { it } +
+                fadeOut(tween(CURVE_SLIDE_MS / 2)),
+        ) {
+            MiniCurve(state, output.key, working)
+        }
         // Says the strip opens, and turns to say it closes again.
         Icon(
             Icons.Filled.KeyboardArrowDown,
@@ -289,6 +302,8 @@ object StripDrawer {
 val LocalOpenEffect = androidx.compose.runtime.compositionLocalOf<(String) -> Unit> { {} }
 
 private const val STRIP_MS = 280
+/** How long the small curve takes to slide in or out of the strip, in step with the pages sliding. */
+private const val CURVE_SLIDE_MS = 300
 
 /** After the app has opened and its tabs have been built. */
 private const val STRIP_REHEARSE_DELAY_MS = 1800L

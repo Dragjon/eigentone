@@ -1,0 +1,4 @@
+- Tabs float in a frosted, rounded bar, and the page scrolls on beneath
+- A smaller tab bar, and the page fades into the bars at the top and bottom
+- EQ precision: Standard or Fine (256 bands), under Settings
+- The status strip's small curve slides in and out between tabs

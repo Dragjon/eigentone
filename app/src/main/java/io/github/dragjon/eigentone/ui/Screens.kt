@@ -1,5 +1,7 @@
 package io.github.dragjon.eigentone.ui
 
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.ui.layout.positionInRoot
 
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -574,18 +576,53 @@ private fun AppScreen(
             SectionFocus.request = appText(section)
         },
     ) {
+        // What the page draws, so the tab bar can show it frosted beneath itself.
+        val pageHaze = remember { dev.chrisbanes.haze.HazeState() }
         Scaffold(
             containerColor = Palette.Background,
             topBar = { TopBar(state, status, showCurve = tab != Tab.EQ, settingsOpen = tab == Tab.SYSTEM, onSettings = toggleSettings, onSetEnabled) },
             bottomBar = {
+                // The tabs float in a rounded, frosted pill, matching the strip at the top (user decision), over a band
+                // that tints in towards the bottom of the screen, so the page fades away rather than ending at an edge.
+                // The band is a plain tint: a blur that grew towards the bottom cost about 8 ms a frame on a Galaxy A54
+                // and was liked less (user decision). Phones before Android 12 can't blur, so there the pill is a tint too.
+                val barColour = Palette.Bar
+                Box(Modifier.fillMaxWidth()) {
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .background(
+                            androidx.compose.ui.graphics.Brush.verticalGradient(
+                                listOf(barColour.copy(alpha = 0f), barColour.copy(alpha = TAB_BAR_ALPHA)),
+                            ),
+                        ),
+                )
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                        .padding(start = TAB_PILL_INSET_DP.dp, end = TAB_PILL_INSET_DP.dp, top = TAB_BAND_FADE_DP.dp, bottom = TAB_PILL_GAP_DP.dp),
+                ) {
                 // Settings lives in the top bar, which leaves the bottom for the four everyday tabs. They share
                 // the width equally, with labels of similar length, so the spacing is even edge to edge.
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .background(Palette.Bar)
-                        .windowInsetsPadding(WindowInsets.navigationBars)
-                        .padding(start = NAV_EDGE_DP.dp, end = NAV_EDGE_DP.dp, top = 12.dp, bottom = 12.dp)
+                        .shadow(TAB_PILL_SHADOW_DP.dp, TabPillShape)
+                        .clip(TabPillShape)
+                        .hazeEffect(
+                            state = pageHaze,
+                            style = dev.chrisbanes.haze.HazeStyle(
+                                backgroundColor = Palette.Background,
+                                tints = listOf(dev.chrisbanes.haze.HazeTint(barColour.copy(alpha = TAB_BAR_BLUR_TINT))),
+                                blurRadius = TAB_BAR_BLUR_DP.dp,
+                                noiseFactor = 0f,
+                                fallbackTint = dev.chrisbanes.haze.HazeTint(barColour.copy(alpha = TAB_BAR_ALPHA)),
+                            ),
+                        )
+                        // A faint outline gives the pill a crisp edge against the dark page (user decision).
+                        .border(1.dp, Palette.Line.copy(alpha = 0.6f), TabPillShape)
+                        .padding(horizontal = 4.dp, vertical = 6.dp)
                         .tourTarget(TourStop.TABS)
                         .selectableGroup(),
                 ) {
@@ -602,15 +639,23 @@ private fun AppScreen(
                         }
                     }
                 }
+                }
+                }
             },
         ) { padding ->
             androidx.activity.compose.BackHandler(enabled = tab == Tab.SYSTEM) { setTab(beforeSettings) }
             var pageOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
             var pageSize by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
+            // The page runs on under both bars, which fade into it, so these keep its content clear of them.
+            val topInset = padding.calculateTopPadding()
+            val bottomInset = padding.calculateBottomPadding()
+            // Floating notes sit just above the tab pill, not above the fade band over it, so they keep their usual gap.
+            val barsInset = (bottomInset - TAB_BAND_FADE_DP.dp).coerceAtLeast(0.dp)
             Box(
                 Modifier
                     .fillMaxSize()
-                    .padding(padding)
+                    // What the tab bar shows, frosted, beneath it.
+                    .hazeSource(pageHaze)
                     .onGloballyPositioned {
                         pageOrigin = it.positionInRoot()
                         pageSize = androidx.compose.ui.geometry.Size(it.size.width.toFloat(), it.size.height.toFloat())
@@ -658,7 +703,8 @@ private fun AppScreen(
                         }
                         CompositionLocalProvider(
                             LocalPageShown provides shownNow,
-                            LocalTopCover provides stripBand + PAGE_TOP_DP.dp,
+                            LocalTopCover provides topInset + stripBand + PAGE_TOP_DP.dp,
+                            LocalBottomCover provides bottomInset,
                             LocalPageScroll provides pageScroll,
                         ) {
                             // The whole width scrolls, so the space beside the page works too, as on a tablet or in landscape.
@@ -692,7 +738,7 @@ private fun AppScreen(
                                         .widthIn(max = 640.dp)
                                         .fillMaxWidth()
                                         // Room at the end, so the last setting can scroll clear of the floating save bar.
-                                        .padding(start = 16.dp, end = 16.dp, top = stripBand + PAGE_TOP_DP.dp, bottom = UNSAVED_BAR_ROOM_DP.dp),
+                                        .padding(start = 16.dp, end = 16.dp, top = topInset + stripBand + PAGE_TOP_DP.dp, bottom = bottomInset + UNSAVED_BAR_ROOM_DP.dp),
                                     verticalArrangement = SectionSpacing,
                                 ) {
                                     when (t) {
@@ -709,17 +755,18 @@ private fun AppScreen(
                 }
                 // The status strip floats over the top of the page (tester feedback): the page scrolls on up under it,
                 // seen faintly through a band of the page colour that fades away below the strip.
-                val stripFade = Palette.Background
+                val stripFade = Palette.Bar
                 Box(
                     Modifier
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
+                        .padding(top = topInset)
                         .onSizeChanged { stripBandPx = it.height }
                         .drawBehind {
                             drawRect(
                                 androidx.compose.ui.graphics.Brush.verticalGradient(
-                                    0f to stripFade.copy(alpha = STRIP_BAND_ALPHA),
-                                    0.6f to stripFade.copy(alpha = STRIP_BAND_ALPHA),
+                                    0f to stripFade,
+                                    0.45f to stripFade.copy(alpha = BAR_EDGE_ALPHA),
                                     1f to stripFade.copy(alpha = 0f),
                                 ),
                             )
@@ -745,6 +792,7 @@ private fun AppScreen(
                 Column(
                     Modifier
                         .align(Alignment.BottomCenter)
+                        .padding(bottom = barsInset)
                         .widthIn(max = 640.dp)
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(BAR_GAP_DP.dp),
@@ -786,6 +834,7 @@ private fun AppScreen(
                     longer = state.longNotices,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
+                        .padding(bottom = barsInset)
                         .widthIn(max = 640.dp)
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                         .padding(bottom = noticeLift),
@@ -860,10 +909,13 @@ private fun TopBar(
     AnalyserEffect(state.analyser)
     // The strip floats on the page below the bar rather than sitting in it (tester feedback).
     Column(Modifier.fillMaxWidth()) {
+    val barColour = Palette.Bar
     Column(
         Modifier
             .fillMaxWidth()
-            .background(Palette.Bar)
+            // Solid behind the controls, so they stay readable over a busy page. The strip's band below continues it
+            // as a fade, so the page scrolling up beneath eases into the bar rather than stopping at an edge (user decision).
+            .background(barColour)
             .windowInsetsPadding(WindowInsets.statusBars),
     ) {
     Row(
@@ -1369,7 +1421,22 @@ private const val SHOW_SETTLE_MS = 500L
 private const val BAR_GAP_DP = 8
 /** Space between the strip and the page's first panel, matching the space above the strip. */
 private const val PAGE_TOP_DP = 8
-private const val STRIP_BAND_ALPHA = 0.88f
+/** How solid the fades beside the bars are partway through, where the page starts to show. */
+private const val BAR_EDGE_ALPHA = 0.85f
+/** How solid the tab bar's even tint is where the phone can't blur, before Android 12. */
+private const val TAB_BAR_ALPHA = 0.94f
+/** Over the blur, the tint can be lighter, since the blur already softens what's behind. */
+private const val TAB_BAR_BLUR_TINT = 0.75f
+private const val TAB_BAR_BLUR_DP = 24
+/** How far above the pill the band starts, so the page has room to fade into it. */
+private const val TAB_BAND_FADE_DP = 24
+/** The pill's inset from the sides, matching the strip's at the top. */
+private const val TAB_PILL_INSET_DP = 12
+/** Space between the pill and the gesture line. */
+private const val TAB_PILL_GAP_DP = 8
+private const val TAB_PILL_SHADOW_DP = 6
+// Concentric with the selected tab's highlight inside it: its 16 dp corners plus the 8 dp between them.
+private val TabPillShape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
 
 /**
  * The colour the app is made from: the phone's own wallpaper colours where Android has them, one of a few

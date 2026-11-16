@@ -21,8 +21,8 @@ android {
         applicationId = "io.github.dragjon.eigentone"
         minSdk = 30
         targetSdk = 36
-        versionCode = 68
-        versionName = "0.42.0"
+        versionCode = 69
+        versionName = "0.43.0"
     }
 
     signingConfigs {
@@ -61,6 +61,8 @@ dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
+    // Frosted blur behind the tab bar on Android 12 and later, with a plain tint before that.
+    implementation("dev.chrisbanes.haze:haze:1.2.2")
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
