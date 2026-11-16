@@ -12,19 +12,41 @@ Eigentone uses Android's `DynamicsProcessing` effect on the phone's mixed output
 
 ```mermaid
 flowchart LR
-    A["Any app"] --> B["Input gain<br/>preamp, headroom<br/>and balance"]
-    B --> C["One EQ per channel<br/>128 bands"]
-    C --> D["Multiband compressor<br/>compressor, night mode, leveller,<br/>Clarity and dynamic filters"]
+    A["Any app"] --> B["Input gain"]
+    B --> C["EQ<br/>128 bands per channel"]
+    C --> D["Multiband compressor"]
     D --> E["Limiter"]
     E --> F["Your headphones"]
 
-    P["Parametric filters"] -.-> C
-    G["Graphic EQ"] -.-> C
-    T["Tone"] -.-> C
-    H["Headphone correction"] -.-> C
-    R["Ear correction<br/>left and right"] -.-> C
-    L["Quiet listening"] -.-> C
-    W["Stereo width"] -.-> C
+    subgraph gain ["Set the input level"]
+        direction TB
+        B1["Preamp"]
+        B2["Headroom"]
+        B3["Balance"]
+    end
+    gain -.-> B
+
+    subgraph curves ["Added together into the EQ"]
+        direction TB
+        P["Parametric filters"]
+        G["Graphic EQ"]
+        T["Tone"]
+        H["Headphone correction"]
+        R["Ear correction"]
+        L["Quiet listening"]
+        W["Stereo width"]
+    end
+    curves -.-> C
+
+    subgraph dynamics ["Share the compressor"]
+        direction TB
+        N["Night mode"]
+        K["Compressor"]
+        V["Volume leveller"]
+        Y["Clarity"]
+        Z["Dynamic filters"]
+    end
+    dynamics -.-> D
 ```
 
 Virtual surround and reverb are separate Android effects alongside this chain. Why they work the way they do is in [Known limits](KNOWN-LIMITS.md).
