@@ -1,5 +1,7 @@
 package io.github.dragjon.eigentone.ui
 
+import androidx.compose.material.icons.filled.Close
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.snap
@@ -67,15 +69,36 @@ fun NoticeHost(state: SnackbarHostState, modifier: Modifier = Modifier, longer: 
         modifier = modifier.fillMaxWidth(),
         label = "notice",
     ) { shown: SnackbarData? ->
+        // Material's ready-made snackbar adds its own 12 dp margin, which left messages narrower than the save bars and
+        // higher above them. Built from its plain layout instead, a message lines up with the save bars exactly.
         if (shown != null) Box {
             Snackbar(
-                snackbarData = shown,
                 shape = PanelShape,
                 containerColor = Palette.Note,
                 contentColor = Palette.NoteText,
-                actionColor = Palette.LitBright,
+                actionContentColor = Palette.LitBright,
                 dismissActionContentColor = Palette.TextDim,
-            )
+                action = shown.visuals.actionLabel?.let { label ->
+                    {
+                        androidx.compose.material3.TextButton(
+                            onClick = { shown.performAction() },
+                            colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = Palette.LitBright),
+                        ) { androidx.compose.material3.Text(label) }
+                    }
+                },
+                dismissAction = if (shown.visuals.withDismissAction) {
+                    {
+                        androidx.compose.material3.IconButton(onClick = { shown.dismiss() }) {
+                            androidx.compose.material3.Icon(
+                                androidx.compose.material.icons.Icons.Filled.Close,
+                                contentDescription = androidx.compose.ui.res.stringResource(R.string.ui_dismiss),
+                            )
+                        }
+                    }
+                } else {
+                    null
+                },
+            ) { androidx.compose.material3.Text(shown.visuals.message) }
         }
     }
 }

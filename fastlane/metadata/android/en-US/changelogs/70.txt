@@ -1,0 +1,4 @@
+- New tab icons: outlined, and filled for the tab you're on
+- Tabs fill in with a quick grow-and-settle animation
+- More room in the tab bar, and messages line up with the save bar
+- The status strip's curve slides out in one smooth step

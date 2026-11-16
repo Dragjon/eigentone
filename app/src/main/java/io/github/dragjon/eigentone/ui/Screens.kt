@@ -1,5 +1,7 @@
 package io.github.dragjon.eigentone.ui
 
+import androidx.compose.material.icons.filled.Settings
+
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import androidx.compose.ui.layout.positionInRoot
@@ -200,12 +202,13 @@ import kotlin.math.roundToInt
 import androidx.compose.runtime.mutableIntStateOf
 import kotlin.math.pow
 
-private enum class Tab(@StringRes val label: Int, @DrawableRes val icon: Int) {
-    EQ(R.string.ui_tab_eq, R.drawable.ic_tab_eq),
-    SOUND(R.string.ui_tab_sound, R.drawable.ic_tab_sound),
-    PRESETS(R.string.ui_tab_presets, R.drawable.ic_tab_presets),
-    HEADPHONES(R.string.ui_tab_headphones, R.drawable.ic_tab_headphones),
-    SYSTEM(R.string.ui_tab_system, R.drawable.ic_tab_system),
+/** Each tab's icon comes outlined, and filled for the tab in view, as Material's own tab bars do (user decision). */
+private enum class Tab(@StringRes val label: Int, @DrawableRes val icon: Int, @DrawableRes val filledIcon: Int) {
+    EQ(R.string.ui_tab_eq, R.drawable.ic_tab_eq, R.drawable.ic_tab_eq_filled),
+    SOUND(R.string.ui_tab_sound, R.drawable.ic_tab_sound, R.drawable.ic_tab_sound_filled),
+    PRESETS(R.string.ui_tab_presets, R.drawable.ic_tab_presets, R.drawable.ic_tab_presets_filled),
+    HEADPHONES(R.string.ui_tab_headphones, R.drawable.ic_tab_headphones, R.drawable.ic_tab_headphones_filled),
+    SYSTEM(R.string.ui_tab_system, R.drawable.ic_tab_system, R.drawable.ic_tab_system),
 }
 
 @Composable
@@ -248,6 +251,14 @@ private const val SEARCH_FROM_PRESETS = 6
 /** Just after the theme toggle's thumb has finished sliding, so recolouring the app never stalls it midway. */
 private const val THEME_SWITCH_AFTER_MS = 260L
 private const val TAB_SLIDE_MS = 240
+/** How long a tab's icon takes to turn from outlined to filled. */
+private const val TAB_ICON_FADE_MS = 100
+/** The lit pill settles with barely any overshoot as it grows (calmed, user decision), and shrinks back quickly when left. */
+private const val PILL_DAMPING = 0.85f
+private const val PILL_SHRINK_MS = 120
+/** How far a tab's icon dips as it fills in, and how much it bounces back. */
+private const val ICON_DIP = 0.92f
+private const val ICON_DAMPING = 0.7f
 /** In a fade-through, how much of the time the old page takes to fade out before the new one fades in. */
 private const val FADE_THROUGH_SPLIT = 0.35f
 /** The size the new page grows from as it fades in. */
@@ -626,7 +637,8 @@ private fun AppScreen(
                         )
                         // A faint outline gives the pill a crisp edge against the dark page (user decision).
                         .border(1.dp, Palette.Line.copy(alpha = 0.6f), TabPillShape)
-                        .padding(horizontal = 4.dp, vertical = 6.dp)
+                        // Room above and below the tabs to roughly match the room at their sides, so the bar doesn't feel squeezed.
+                        .padding(horizontal = 4.dp, vertical = 12.dp)
                         .tourTarget(TourStop.TABS)
                         .selectableGroup(),
                 ) {
@@ -878,20 +890,61 @@ private fun NavItem(tab: Tab, selected: Boolean, device: OutputKind? = null, mod
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         val tint = if (selected) Palette.OnLit else Palette.TextDim
+        // Chosen, the lit pill grows out from the middle with a little give, and shrinks back when left, as the tab
+        // bars in WhatsApp and Telegram do (user decision).
+        val grow by androidx.compose.animation.core.animateFloatAsState(
+            if (selected) 1f else 0f,
+            if (selected) {
+                androidx.compose.animation.core.spring(dampingRatio = PILL_DAMPING, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium)
+            } else {
+                tween(PILL_SHRINK_MS)
+            },
+            label = "tabPill",
+        )
+        // The icon dips a little as it fills in and springs back, so the change reads as a press.
+        val bump = remember { androidx.compose.animation.core.Animatable(1f) }
+        LaunchedEffect(selected) {
+            if (selected) {
+                bump.snapTo(ICON_DIP)
+                bump.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = ICON_DAMPING, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium))
+            }
+        }
+        val pillColour = Palette.LitFill
         // The device tab's icon sits over the pill rather than in it, so its change animation isn't clipped.
-        Box(contentAlignment = Alignment.Center) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.graphicsLayer {
+                scaleX = bump.value
+                scaleY = bump.value
+            },
+        ) {
             Box(
                 Modifier
                     .size(width = 64.dp, height = 32.dp)
+                    .drawBehind {
+                        val w = size.width * grow.coerceAtLeast(0f)
+                        if (w > 0.5f) {
+                            drawRoundRect(
+                                pillColour,
+                                topLeft = androidx.compose.ui.geometry.Offset((size.width - w) / 2f, 0f),
+                                size = androidx.compose.ui.geometry.Size(w, size.height),
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f),
+                                alpha = grow.coerceIn(0f, 1f),
+                            )
+                        }
+                    }
                     .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-                    .background(if (selected) Palette.LitFill else Color.Transparent)
                     .indication(presses, androidx.compose.material3.ripple()),
                 contentAlignment = Alignment.Center,
             ) {
-                // The label below already names the tab for screen readers.
-                if (device == null) Icon(painterResource(tab.icon), contentDescription = null, tint = tint)
+                // The label below already names the tab for screen readers. Filled while the tab is in view.
+                if (device == null) {
+                    androidx.compose.animation.Crossfade(selected, animationSpec = tween(TAB_ICON_FADE_MS), label = "tabIcon") { on ->
+                        Icon(painterResource(if (on) tab.filledIcon else tab.icon), contentDescription = null, tint = tint)
+                    }
+                }
             }
-            if (device != null) DeviceTabIcon(device, tint = tint, ring = Palette.Lit)
+            if (device != null) DeviceTabIcon(device, tint = tint, ring = Palette.Lit, filled = selected)
         }
         val label = stringResource(device?.tabLabel() ?: tab.label)
         androidx.compose.animation.AnimatedContent(
@@ -1011,7 +1064,8 @@ private fun TopBar(
         }
         IconButton(onClick = onSettings) {
             Icon(
-                Icons.Outlined.Settings,
+                // Filled while Settings is open, as the tabs' icons are while they're in view.
+                if (settingsOpen) Icons.Filled.Settings else Icons.Outlined.Settings,
                 contentDescription = stringResource(R.string.ui_tab_system),
                 tint = if (settingsOpen) Palette.Lit else Palette.TextDim,
                 // The tour outlines the gear itself rather than its whole touch area, which would reach the switch.

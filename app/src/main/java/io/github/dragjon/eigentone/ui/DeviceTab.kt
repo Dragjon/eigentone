@@ -33,13 +33,14 @@ import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.sin
 
+/** The device's icon, outlined, or [filled] for the device tab while it's in view. */
 @DrawableRes
-fun OutputKind.icon(): Int = when (this) {
-    OutputKind.PHONE -> R.drawable.ic_tab_phone
-    OutputKind.HEADPHONES -> R.drawable.ic_tab_headphones
-    OutputKind.EARBUDS -> R.drawable.ic_tab_earbuds
-    OutputKind.SPEAKER -> R.drawable.ic_tab_speaker
-    OutputKind.CAR -> R.drawable.ic_tab_car
+fun OutputKind.icon(filled: Boolean = false): Int = when (this) {
+    OutputKind.PHONE -> if (filled) R.drawable.ic_tab_phone_filled else R.drawable.ic_tab_phone
+    OutputKind.HEADPHONES -> if (filled) R.drawable.ic_tab_headphones_filled else R.drawable.ic_tab_headphones
+    OutputKind.EARBUDS -> if (filled) R.drawable.ic_tab_earbuds_filled else R.drawable.ic_tab_earbuds
+    OutputKind.SPEAKER -> if (filled) R.drawable.ic_tab_speaker_filled else R.drawable.ic_tab_speaker
+    OutputKind.CAR -> if (filled) R.drawable.ic_tab_car_filled else R.drawable.ic_tab_car
 }
 
 @StringRes
@@ -58,7 +59,7 @@ fun OutputKind.tabLabel(): Int = when (this) {
  * finding out what's connected.
  */
 @Composable
-fun DeviceTabIcon(kind: OutputKind, tint: Color, ring: Color) {
+fun DeviceTabIcon(kind: OutputKind, tint: Color, ring: Color, filled: Boolean = false) {
     var shown by remember { mutableStateOf(kind) }
     val opened = remember { SystemClock.uptimeMillis() }
     val scale = remember { Animatable(1f) }
@@ -106,7 +107,7 @@ fun DeviceTabIcon(kind: OutputKind, tint: Color, ring: Color) {
             }
         }
         Icon(
-            painterResource(shown.icon()),
+            painterResource(shown.icon(filled)),
             contentDescription = null,
             tint = tint,
             modifier = Modifier.graphicsLayer {

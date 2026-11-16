@@ -237,6 +237,9 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
                 }
             }
         }
+        // The dot and the curve share one place in the row, with the gap between them inside the curve's own room, so
+        // the gap shrinks away with the curve rather than vanishing in a second step once it has gone (user decision).
+        Row(verticalAlignment = Alignment.CenterVertically) {
         PlayingDot()
         // The small curve shows on every tab but the Equaliser, which has the full graph. It slides in from the strip's
         // end as the page changes, and back out the same way, making its room gradually so the name eases shorter or
@@ -250,7 +253,11 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
                 androidx.compose.animation.slideOutHorizontally(tween(CURVE_SLIDE_MS, easing = LinearOutSlowInEasing)) { it } +
                 fadeOut(tween(CURVE_SLIDE_MS / 2)),
         ) {
-            MiniCurve(state, output.key, working)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Spacer(Modifier.width(CURVE_GAP_DP.dp))
+                MiniCurve(state, output.key, working)
+            }
+        }
         }
         // Says the strip opens, and turns to say it closes again.
         Icon(
@@ -328,6 +335,8 @@ val LocalOpenEffect = androidx.compose.runtime.compositionLocalOf<(String) -> Un
 private const val STRIP_MS = 280
 /** How long the small curve takes to slide in or out of the strip, in step with the pages sliding. */
 private const val CURVE_SLIDE_MS = 300
+/** The gap between the playing dot and the curve, the same as the strip's other gaps. */
+private const val CURVE_GAP_DP = 6
 /** The fade at the end of a device name that's cut off. */
 private const val NAME_FADE_DP = 20
 

@@ -7,7 +7,15 @@ What changed in each release since 0.33.0, newest first. Every release is publis
 > [!NOTE]
 > Every release is a pre-release until the first official one.
 
-**Releases:** [0.43.0](#0430) · [0.42.0](#0420) · [0.41.3](#0413) · [0.41.2](#0412) · [0.41.1](#0411) · [0.41.0](#0410) · [0.40.2](#0402) · [0.40.1](#0401) · [0.40.0](#0400) · [0.39.1](#0391) · [0.39.0](#0390) · [0.38.1](#0381) · [0.38.0](#0380) · [0.37.0](#0370) · [0.36.0](#0360) · [0.35.0](#0350) · [0.34.0](#0340)
+**Releases:** [0.43.1](#0431) · [0.43.0](#0430) · [0.42.0](#0420) · [0.41.3](#0413) · [0.41.2](#0412) · [0.41.1](#0411) · [0.41.0](#0410) · [0.40.2](#0402) · [0.40.1](#0401) · [0.40.0](#0400) · [0.39.1](#0391) · [0.39.0](#0390) · [0.38.1](#0381) · [0.38.0](#0380) · [0.37.0](#0370) · [0.36.0](#0360) · [0.35.0](#0350) · [0.34.0](#0340)
+
+## 0.43.1
+
+- **New tab icons.** Every tab has an outlined icon, and a filled one while it's the tab you're on, drawn as one set at the same size and weight. The Settings gear fills while Settings is open.
+- **Tabs fill in as you switch.** The lit pill grows out from the middle of the new tab while the old one shrinks away, and the icon fills in with a small settle.
+- **A roomier tab bar**, with more space above and below the icons.
+- **Messages line up with the save bar**, at the same width and the same distance above it.
+- **Fix:** the small curve in the status strip slides out in one smooth step when you return to the Equaliser, instead of a slide and then a jump.
 
 ## 0.43.0
 
