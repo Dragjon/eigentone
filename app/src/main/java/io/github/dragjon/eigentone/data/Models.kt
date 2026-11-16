@@ -276,6 +276,19 @@ data class AppState(
     /** Whether the tour of the main screen has been taken or turned down. Offered once until then. */
     val tourSeen: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.DEVICE,
+    /**
+     * The colour the theme is made from, as ARGB. Null takes the wallpaper's colours on Android 12 and later,
+     * and Eigentone's blue before that, where Android has none to give.
+     */
+    val themeColor: Long? = null,
+    /** How much larger than the phone's own text size the app's text is: 1, 1.15 or 1.3. */
+    val textScale: Double = 1.0,
+    /** Dim text and hairlines drawn darker (or lighter at night), so everything reads more clearly. */
+    val highContrast: Boolean = false,
+    /** Touch feedback when sliders pass their default or reach an end, and for switches and Save. */
+    val haptics: Boolean = true,
+    /** Messages, and their Undo, stay on screen twice as long. */
+    val longNotices: Boolean = false,
     val faderMode: FaderMode = FaderMode.PRECISION,
     val faderView: FaderView = FaderView.SCROLL,
     /** The output last acted on, so restarting the EQ on the same output leaves the chosen preset alone. */

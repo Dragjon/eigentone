@@ -62,6 +62,15 @@ object GraphicEq {
     /** Half-dB steps within the fader range, which also makes it easy to land on exactly zero. */
     fun snap(db: Double): Double = (round(db * 2) / 2).coerceIn(-MAX_DB, MAX_DB)
 
+    /**
+     * How far a stored fader change can reach. Twice a fader's travel, so a fader resting on a preset
+     * that already cuts or boosts can still be moved to either end.
+     */
+    const val MAX_CHANGE_DB = MAX_DB * 2
+
+    /** Rounds a stored fader change to the half dB, within [MAX_CHANGE_DB]. */
+    fun snapChange(db: Double): Double = (round(db * 2) / 2).coerceIn(-MAX_CHANGE_DB, MAX_CHANGE_DB)
+
     /** Straight-line interpolation on a log frequency axis, held flat beyond either end. */
     internal fun interpolate(points: List<Pair<Double, Double>>, freq: Double): Double {
         if (points.isEmpty()) return 0.0
@@ -77,7 +86,7 @@ object GraphicEq {
     /** Moves a curve to a different band count while keeping its shape. */
     fun resample(gains: List<Double>, fromBands: Int, toBands: Int): List<Double> {
         val points = frequencies(fromBands).zip(List(fromBands) { gains.getOrElse(it) { 0.0 } })
-        return frequencies(toBands).map { snap(interpolate(points, it)) }
+        return frequencies(toBands).map { snapChange(interpolate(points, it)) }
     }
 
     /** Like [resample], for any values rather than fader gains, so nothing is rounded or limited. */
@@ -115,7 +124,7 @@ object GraphicEq {
     fun smooth(gains: List<Double>): List<Double> = gains.indices.map { i ->
         val before = gains.getOrElse(i - 1) { gains[i] }
         val after = gains.getOrElse(i + 1) { gains[i] }
-        snap(before * 0.25 + gains[i] * 0.5 + after * 0.25)
+        snapChange(before * 0.25 + gains[i] * 0.5 + after * 0.25)
     }
 
     fun isFlat(gains: List<Double>): Boolean = gains.all { it == 0.0 }

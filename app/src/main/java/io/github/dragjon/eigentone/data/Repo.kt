@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.util.UUID
@@ -137,8 +138,51 @@ object Repo {
         null
     }
 
+    /**
+     * The device settings as last saved, while the device tab has changes waiting. Null when there are none.
+     * Until they're saved, the file keeps these, so closing the app drops the changes as it would a preset's.
+     */
+    private val _deviceSaved = MutableStateFlow<DeviceSettings?>(null)
+    val deviceSaved: StateFlow<DeviceSettings?> = _deviceSaved.asStateFlow()
+
+    /** Changes a device setting, live, keeping what was saved so the change can be discarded. */
+    @Synchronized
+    fun editDevice(transform: (AppState) -> AppState) {
+        if (_deviceSaved.value == null) _deviceSaved.value = DeviceSettings.of(_state.value)
+        _state.update(transform)
+        // Changed back by hand to what was saved, there's nothing left to save.
+        if (_deviceSaved.value == DeviceSettings.of(_state.value)) _deviceSaved.value = null
+    }
+
+    /** Keeps the device tab's changes. */
+    @Synchronized
+    fun saveDevice() {
+        if (_deviceSaved.value == null) return
+        _deviceSaved.value = null
+        val now = _state.value
+        scope.launch { save(now) }
+    }
+
+    /** Puts the device settings back as they were saved, returning the changes dropped so they can be restored. */
+    @Synchronized
+    fun discardDevice(): DeviceSettings? {
+        val saved = _deviceSaved.value ?: return null
+        val dropped = DeviceSettings.of(_state.value)
+        _deviceSaved.value = null
+        _state.update { saved.applyTo(it) }
+        // The noise mode decides which preset plays, so going back to the old one loads that again.
+        if (dropped.listeningMode != saved.listeningMode) setListeningMode(saved.listeningMode)
+        return dropped
+    }
+
+    /** Brings back device changes that were just discarded, as changes waiting to be saved again. */
+    fun restoreDevice(dropped: DeviceSettings) = editDevice { dropped.applyTo(it) }
+
     private fun save(value: AppState) {
         val atomic = file ?: return
+        // Device changes waiting to be saved aren't written yet.
+        @Suppress("NAME_SHADOWING")
+        val value = _deviceSaved.value?.applyTo(value) ?: value
         val stream = try {
             atomic.startWrite()
         } catch (e: Exception) {
@@ -326,8 +370,9 @@ object Repo {
     }
 
     /** Assigns a preset to an output, or clears the assignment when [presetId] is null. */
-    fun assignToOutput(outputKey: String, presetId: String?) {
-        _state.update { s ->
+    /** With [draft], from the device tab, the change waits to be saved there; see [editDevice]. */
+    fun assignToOutput(outputKey: String, presetId: String?, draft: Boolean = false) {
+        val change = { s: AppState ->
             s.copy(
                 outputProfiles = if (presetId == null) {
                     s.outputProfiles - outputKey
@@ -336,6 +381,7 @@ object Repo {
                 },
             )
         }
+        if (draft) editDevice(change) else _state.update(change)
     }
 
     fun toggleFavorite(id: String) {
@@ -405,7 +451,7 @@ object Repo {
 
     /** Changes the noise control mode and loads that mode's preset, if this output has one. */
     fun setListeningMode(mode: ListeningMode) {
-        _state.update { it.copy(listeningMode = mode) }
+        editDevice { it.copy(listeningMode = mode) }
         val state = _state.value
         val preset = Profiles.presetIdFor(state, output.value.key)?.let(::findPreset) ?: return
         if (state.current.id != preset.id) loadPreset(preset)

@@ -1,5 +1,15 @@
 package io.github.dragjon.eigentone.ui
 
+import androidx.compose.ui.layout.positionInRoot
+
+import androidx.compose.ui.layout.onGloballyPositioned
+
+import kotlinx.coroutines.flow.first
+
+import androidx.compose.ui.layout.onSizeChanged
+
+import kotlin.math.pow
+
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -27,6 +37,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.horizontalDrag
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -115,6 +126,59 @@ fun SettingsSection(
     val requester = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
     // Every tab stays built, so only a section on the page in view answers, not one of the same name elsewhere.
     val pageShown = LocalPageShown.current
+    // The section's size, and how much of the page's top lies under the floating strip, so a section brought into
+    // view stops with its heading just below the strip rather than under it.
+    var sectionWidth by remember { mutableStateOf(0f) }
+    // The heading's height, and the panel's full height, which it has from the first frame of unfolding even
+    // while it's still shown only in part.
+    var headingHeight by remember { mutableStateOf(0f) }
+    var panelHeight by remember { mutableStateOf(0f) }
+    val topCover = with(androidx.compose.ui.platform.LocalDensity.current) { LocalTopCover.current.toPx() }
+    fun wholeSection() = androidx.compose.ui.geometry.Rect(0f, -topCover, sectionWidth, headingHeight + panelHeight)
+    val followScope = rememberCoroutineScope()
+    var following by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    // Where the section is, for working out how far the page has to move to show all of it.
+    val sectionPlace = remember { arrayOfNulls<androidx.compose.ui.layout.LayoutCoordinates>(1) }
+    val page = LocalPageScroll.current
+    val bottomRoom = with(androidx.compose.ui.platform.LocalDensity.current) { FOLLOW_BOTTOM_ROOM_DP.dp.toPx() }
+    /**
+     * Opening, the page scrolls once, alongside the unfolding, to where the whole section will be in view, so the
+     * heading moves up to make room rather than the new rows unfolding off the bottom of the screen (user decision).
+     * One scroll to the end place, rather than chasing the growing panel, which scrolled twice.
+     */
+    fun followOpening() {
+        following?.cancel()
+        following = followScope.launch {
+            // Waits for the panel to be built and measured at its full height, which it is from the first frame
+            // of unfolding, then scrolls once to where the whole section will show.
+            panelHeight = 0f
+            kotlinx.coroutines.withTimeoutOrNull(FOLD_MS.toLong()) {
+                androidx.compose.runtime.snapshotFlow { panelHeight }.first { it > 0f }
+            }
+            val place = sectionPlace[0]
+            if (page == null || place == null || !place.isAttached) {
+                requester.bringIntoView(wholeSection())
+                return@launch
+            }
+            // The page's own scroll, moved on the same curve and time as the unfolding, so the heading rises as the
+            // panel grows. Only as far as the panel needs, and never so far the heading goes under the strip.
+            val view = page.viewport()
+            val top = place.positionInRoot().y - view.top
+            val bottom = top + headingHeight + panelHeight
+            val wanted = minOf(bottom - (view.height - bottomRoom), top - topCover)
+            if (wanted <= 0f) return@launch
+            val from = page.state.value
+            val start = android.os.SystemClock.uptimeMillis()
+            while (true) {
+                val t = ((android.os.SystemClock.uptimeMillis() - start).toFloat() / FOLD_MS).coerceIn(0f, 1f)
+                // The page can only go as far as its content has grown so far; it catches up as the panel opens.
+                page.state.scrollTo((from + wanted * FastOutSlowInEasing.transform(t)).toInt())
+                if (t >= 1f && page.state.value >= (from + wanted).toInt() - 1) break
+                if (android.os.SystemClock.uptimeMillis() - start > FOLD_MS * 3) break
+                androidx.compose.runtime.withFrameNanos { }
+            }
+        }
+    }
     LaunchedEffect(title) {
         if (title == null) return@LaunchedEffect
         androidx.compose.runtime.snapshotFlow { pageShown() && SectionFocus.request == title }.collect { wanted ->
@@ -122,7 +186,7 @@ fun SettingsSection(
             open = true
             // Waits for the tab to slide in and the section to unfold, then brings all of it into view.
             delay(FOLD_MS + 120L)
-            requester.bringIntoView()
+            requester.bringIntoView(wholeSection())
             SectionFocus.request = null
         }
     }
@@ -134,11 +198,18 @@ fun SettingsSection(
     val flash = remember { androidx.compose.animation.core.Animatable(0f) }
     val flashScope = rememberCoroutineScope()
     val glow = maxOf(held, flash.value)
-    Column(Modifier.fillMaxWidth().bringIntoViewRequester(requester)) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .bringIntoViewRequester(requester)
+            .onSizeChanged { sectionWidth = it.width.toFloat() }
+            .onGloballyPositioned { sectionPlace[0] = it },
+    ) {
         if (title != null) {
             Row(
                 Modifier
                     .fillMaxWidth()
+                    .onSizeChanged { headingHeight = it.height.toFloat() }
                     // A folding heading is a big, easy target: the legend, its summary and the space around them.
                     .heightIn(min = if (folds) 64.dp else 40.dp)
                     .then(
@@ -157,6 +228,7 @@ fun SettingsSection(
                                     flash.animateTo(0f, tween(320))
                                 }
                                 open = !open
+                                if (open) followOpening() else following?.cancel()
                             }
                         } else {
                             Modifier
@@ -210,6 +282,7 @@ fun SettingsSection(
             Column(
                 Modifier
                     .fillMaxWidth()
+                    .onSizeChanged { panelHeight = it.height.toFloat() }
                     .clip(PanelShape)
                     .background(Palette.Surface)
                     // Rows appearing or going inside a panel, such as a setting that only shows when it applies,
@@ -223,6 +296,17 @@ fun SettingsSection(
 
 /** How long a section takes to fold open or closed. */
 internal const val FOLD_MS = 260
+
+/** How much of the top of a page lies under something floating over it, such as the status strip. */
+val LocalTopCover = androidx.compose.runtime.compositionLocalOf { 0.dp }
+
+/** Room kept below an opened section, clear of the floating save bar's edge. */
+private const val FOLLOW_BOTTOM_ROOM_DP = 16
+
+/** The scroll of the page a section is on, and where that page shows on screen. */
+class PageScroll(val state: androidx.compose.foundation.ScrollState, val viewport: () -> androidx.compose.ui.geometry.Rect)
+
+val LocalPageScroll = androidx.compose.runtime.compositionLocalOf<PageScroll?> { null }
 
 /** A section another part of the app wants shown, by its title. The section clears it once it has opened. */
 object SectionFocus {
@@ -511,6 +595,8 @@ fun ValueTrack(
     onChange: (Float) -> Unit,
     onFinished: () -> Unit,
     resetTo: Float = default,
+    /** Draws the whole track in these colours, left to right, instead of filled and unfilled, as for a hue. */
+    trackColours: List<androidx.compose.ui.graphics.Color>? = null,
 ) {
     val current by rememberUpdatedState(value)
     val change by rememberUpdatedState(onChange)
@@ -541,7 +627,19 @@ fun ValueTrack(
                 var lastTapAt = 0L
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
-                    val drag = awaitHorizontalTouchSlopOrCancellation(down.id) { event, _ -> event.consume() }
+                    // Only a drag that starts on the handle moves it, so a finger landing elsewhere on the track
+                    // and sliding can't change the setting by accident (tester feedback). The reach is a
+                    // finger's width either side of the narrow handle.
+                    val handleX = TRACK_HANDLE_DP.dp.toPx() / 2 +
+                        (current.coerceIn(range) - range.start) / span * (size.width - TRACK_HANDLE_DP.dp.toPx())
+                    val onHandle = kotlin.math.abs(down.position.x - handleX) <= HANDLE_GRAB_DP.dp.toPx()
+                    val drag = if (onHandle) {
+                        awaitHorizontalTouchSlopOrCancellation(down.id) { event, _ -> event.consume() }
+                    } else {
+                        // Off the handle, only a tap counts, which a double tap uses to reset.
+                        waitForUpOrCancellation()
+                        null
+                    }
                     if (drag == null) {
                         // Released without dragging sideways, or a vertical scroll took over.
                         val up = currentEvent.changes.firstOrNull { it.id == down.id }
@@ -613,10 +711,46 @@ fun ValueTrack(
         val high = maxOf(from, to)
         val beforeHandle = to - handleWidth / 2 - gap
         val afterHandle = to + handleWidth / 2 + gap
+        if (trackColours != null) {
+            // One continuous band of colour, with the handle in the page colour's ring so it reads on any hue.
+            drawRoundRect(
+                androidx.compose.ui.graphics.Brush.horizontalGradient(trackColours, startX = handleWidth / 2, endX = size.width - handleWidth / 2),
+                topLeft = Offset(0f, top),
+                size = Size(size.width, trackHeight),
+                cornerRadius = outer,
+            )
+            drawRoundRect(
+                Palette.Surface,
+                topLeft = Offset(to - handleWidth / 2 - gap / 2, centre - handleHeight / 2),
+                size = Size(handleWidth + gap, handleHeight),
+                cornerRadius = CornerRadius(handleWidth / 2 + gap / 2),
+            )
+            drawRoundRect(
+                Palette.Text,
+                topLeft = Offset(to - handleWidth / 2, centre - handleHeight / 2),
+                size = Size(handleWidth, handleHeight),
+                cornerRadius = CornerRadius(handleWidth / 2),
+            )
+            return@Canvas
+        }
         // Unfilled track either side of the filled part, then the filled part, each kept clear of the handle.
         piece(0f, minOf(low, beforeHandle), unfilled, roundStart = true, roundEnd = low > to)
         piece(maxOf(high, afterHandle), size.width, unfilled, roundStart = high < to, roundEnd = true)
         piece(from, beforeHandle, Palette.LitFill, roundStart = true, roundEnd = false)
+        // Notches at even steps along the track, as Material marks a stepped slider's stops, so a setting
+        // can be read and matched by eye. Small and quiet, so the default's stop still stands out.
+        val notch = 1.25.dp.toPx()
+        val step = notchStep(range)
+        var k = kotlin.math.ceil(range.start / step - 1e-4f).toInt()
+        while (k * step < range.endInclusive - step * 1e-3f) {
+            val mark = k * step
+            k++
+            if (mark <= range.start + step * 1e-3f) continue
+            val x = xOf(mark)
+            if (kotlin.math.abs(x - to) < handleWidth / 2 + gap + notch) continue
+            val onFill = x in low..high
+            drawCircle(if (onFill) Palette.OnLit.copy(alpha = 0.5f) else Palette.TextDim.copy(alpha = 0.45f), notch, Offset(x, centre))
+        }
         // Small stops mark the default, and the zero point on centred controls, where the handle isn't.
         val dot = 2.dp.toPx()
         listOf(default.coerceIn(range), origin.coerceIn(range)).distinct().filter { it > range.start && it < range.endInclusive }.forEach { mark ->
@@ -634,7 +768,23 @@ fun ValueTrack(
     }
 }
 
+/**
+ * The step between a slider's notches: a round figure that splits the range into about five, such as
+ * 5 dB on a ±12 dB control, matching the equaliser's faders, or 0.2 on one from 0 to 1.
+ */
+internal fun notchStep(range: ClosedFloatingPointRange<Float>): Float {
+    val span = (range.endInclusive - range.start).coerceAtLeast(1e-6f)
+    val magnitude = 10.0.pow(kotlin.math.floor(kotlin.math.log10(span / 8.0))).toFloat()
+    return listOf(1f, 2f, 2.5f, 5f, 10f, 20f, 25f)
+        .map { it * magnitude }
+        .filter { span / it in 3f..10f }
+        .minByOrNull { kotlin.math.abs(span / it - 5f) }
+        ?: (span / 5f)
+}
+
 private const val TRACK_HANDLE_DP = 4
+/** How far either side of a slider's handle a touch still grabs it: a 48 dp target. */
+private const val HANDLE_GRAB_DP = 24
 private const val TRACK_HANDLE_HEIGHT_DP = 40
 private const val TRACK_HEIGHT_DP = 16
 private const val TRACK_GAP_DP = 6
@@ -750,15 +900,21 @@ val SectionSpacing = Arrangement.spacedBy(12.dp)
  * on or off, and confirming. Everyday taps stay silent, so these mean something.
  */
 object Haptics {
+    /** Off when touch feedback is turned off under Accessibility. */
+    @Volatile var enabled = true
+
     fun tick(view: android.view.View) {
+        if (!enabled) return
         view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
     }
 
     fun limit(view: android.view.View) {
+        if (!enabled) return
         view.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK)
     }
 
     fun toggle(view: android.view.View, on: Boolean) {
+        if (!enabled) return
         view.performHapticFeedback(
             if (android.os.Build.VERSION.SDK_INT >= 34) {
                 if (on) android.view.HapticFeedbackConstants.TOGGLE_ON else android.view.HapticFeedbackConstants.TOGGLE_OFF
@@ -769,6 +925,7 @@ object Haptics {
     }
 
     fun confirm(view: android.view.View) {
+        if (!enabled) return
         view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
     }
 

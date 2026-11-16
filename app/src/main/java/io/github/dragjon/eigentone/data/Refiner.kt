@@ -321,10 +321,10 @@ class Refiner(seed: Long = 1L, private val options: Options = Options()) {
             val faders = GraphicEq.normalized(tone.graphicDb, bands)
             val added = GraphicEq.interpolated(change, N, bands)
             return tone.copy(
-                graphicDb = faders.indices.map { GraphicEq.snap(faders[it] + added[it]) },
+                graphicDb = faders.indices.map { GraphicEq.snapChange(faders[it] + added[it]) },
                 graphicDetail = tone.graphicDetail?.let { detail ->
                     val fine = GraphicEq.interpolated(change, N, detail.bands)
-                    FaderDetail(detail.bands, detail.gains.indices.map { GraphicEq.snap(detail.gains[it] + fine[it]) })
+                    FaderDetail(detail.bands, detail.gains.indices.map { GraphicEq.snapChange(detail.gains[it] + fine[it]) })
                 },
             )
         }

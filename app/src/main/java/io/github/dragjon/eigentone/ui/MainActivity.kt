@@ -73,7 +73,22 @@ class MainActivity : ComponentActivity() {
                     pendingWindowTheme = mode
                 }
             }
-            EigentoneTheme(dark) { MenuHost { EigentoneApp(onSetEnabled = ::setEnabled) } }
+            val seeds = remember { Repo.state.map { it.themeColor }.distinctUntilChanged() }
+            val seed by seeds.collectAsStateWithLifecycle(Repo.state.value.themeColor)
+            val access by remember {
+                Repo.state.map { Access(it.textScale, it.highContrast, it.haptics) }.distinctUntilChanged()
+            }.collectAsStateWithLifecycle(Access.of(Repo.state.value))
+            Haptics.enabled = access.haptics
+            // Larger text on top of the phone's own size, for the whole app.
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(
+                    density.density,
+                    density.fontScale * access.textScale.toFloat(),
+                ),
+            ) {
+                EigentoneTheme(dark, ThemePreview.seed ?: seed, access.highContrast) { MenuHost { EigentoneApp(onSetEnabled = ::setEnabled) } }
+            }
         }
         // Otherwise reopening from recents after Android closed the app would load the preset again.
         if (savedInstanceState == null) handleShortcut(intent)
@@ -148,5 +163,12 @@ class MainActivity : ComponentActivity() {
             Log.w("Eigentone", "Could not start engine", e)
             Repo.status.value = Repo.status.value.copy(error = appText(R.string.ui_android_blocked_the_background_service, e.message))
         }
+    }
+}
+
+/** The accessibility settings that change the whole app, read together so they change it once. */
+private data class Access(val textScale: Double, val highContrast: Boolean, val haptics: Boolean) {
+    companion object {
+        fun of(s: io.github.dragjon.eigentone.data.AppState) = Access(s.textScale, s.highContrast, s.haptics)
     }
 }

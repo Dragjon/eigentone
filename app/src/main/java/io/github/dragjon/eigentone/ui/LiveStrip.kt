@@ -126,6 +126,8 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
     SharedTransitionLayout(
         Modifier
             .fillMaxWidth()
+            // A rounded card inset from the screen's edges (tester feedback), rather than a band across it.
+            .padding(start = STRIP_INSET_DP.dp, end = STRIP_INSET_DP.dp, top = STRIP_INSET_TOP_DP.dp, bottom = STRIP_INSET_BOTTOM_DP.dp)
             .layout { measurable, constraints ->
                 val placeable = measurable.measure(constraints)
                 val taken = if (closedHeight[0] > 0) closedHeight[0].coerceAtMost(placeable.height) else placeable.height
@@ -133,7 +135,9 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
             }
             // Lifts off the page as it opens, so it reads as lying over it.
             .graphicsLayer {
-                shadowElevation = STRIP_DRAWER_SHADOW_DP.dp.toPx() * grow.value
+                // A soft shadow even while shut, so it reads as floating over the page, and a deeper one open.
+                shadowElevation = (STRIP_REST_SHADOW_DP + (STRIP_DRAWER_SHADOW_DP - STRIP_REST_SHADOW_DP) * grow.value).dp.toPx()
+                shape = StripShape
                 clip = false
             },
     ) {
@@ -141,6 +145,7 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
     Column(
         Modifier
             .fillMaxWidth()
+            .clip(StripShape)
             .background(Palette.Strip)
             // Where the strip and its drawer are, so a tap anywhere else can close the drawer.
             .onGloballyPositioned { StripDrawer.bounds = it.boundsInRoot() },
@@ -186,7 +191,14 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
         AnimatedVisibility(
             visible = !expanded,
             enter = fadeIn(tween(STRIP_MS)),
-            exit = fadeOut(tween(STRIP_MS / 2)),
+            exit = fadeOut(tween(STRIP_MS / 3)),
+            // Opening, the icons give up their room at once and fade over the end of the name, so the name is laid out
+            // in full from the first frame rather than cut short ("soundco…") until they've gone (tester feedback).
+            modifier = Modifier.layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                val room = if (expanded) 0 else placeable.width
+                layout(room, placeable.height) { placeable.place(room - placeable.width, 0) }
+            },
         ) {
             val bar = this
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -256,6 +268,12 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
 }
 
 private fun effectKey(name: String) = "strip-effect-$name"
+
+private const val STRIP_INSET_DP = 12
+private const val STRIP_INSET_TOP_DP = 4
+private const val STRIP_INSET_BOTTOM_DP = 4
+private const val STRIP_REST_SHADOW_DP = 3f
+private val StripShape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
 
 /** The icons travel on the same curve and timing as the drawer that carries them. */
 @OptIn(ExperimentalSharedTransitionApi::class)

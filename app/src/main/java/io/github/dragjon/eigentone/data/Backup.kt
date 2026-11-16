@@ -123,7 +123,7 @@ object BackupCodec {
             vocalsDb = safe(tone.vocalsDb, 0.0).coerceIn(-toneLimit, toneLimit),
             bassTunerDb = safe(tone.bassTunerDb, 0.0).coerceIn(-toneLimit, toneLimit),
             bassTunerHz = safe(tone.bassTunerHz, 80.0).coerceIn(30.0, 250.0),
-            graphicDb = tone.graphicDb.take(bands).map { GraphicEq.snap(safe(it, 0.0)) },
+            graphicDb = tone.graphicDb.take(bands).map { GraphicEq.snapChange(safe(it, 0.0)) },
             graphicBands = bands,
             surround = safe(tone.surround, 0.0).coerceIn(0.0, 1.0),
             strength = safe(tone.strength, 1.0).coerceIn(0.0, 1.5),
@@ -140,9 +140,9 @@ object BackupCodec {
                 info.copy(aim = ShapeText.cleanCurve(info.aim)).takeIf { it.aim.isNotEmpty() }
             },
             graphicDetail = tone.graphicDetail?.takeIf { it.bands in GraphicEq.BAND_OPTIONS && it.bands > bands && it.gains.size == it.bands }
-                ?.let { FaderDetail(it.bands, it.gains.map { db -> GraphicEq.snap(safe(db, 0.0)) }) },
+                ?.let { FaderDetail(it.bands, it.gains.map { db -> GraphicEq.snapChange(safe(db, 0.0)) }) },
             shape = tone.shape?.takeIf { it.name.isNotBlank() }?.let { shape ->
-                AppliedShape(shape.name.take(Tone.MAX_SHAPE_LABEL), shape.faders.take(bands).map { GraphicEq.snap(safe(it, 0.0)) })
+                AppliedShape(shape.name.take(Tone.MAX_SHAPE_LABEL), shape.faders.take(bands).map { GraphicEq.snapChange(safe(it, 0.0)) })
             },
         ).withMergedBass()
     }

@@ -153,7 +153,7 @@ fun SlidingToggle(
                         )
                     }
                     if (option.showLabel) {
-                        Text(
+                        WholeWordText(
                             option.label,
                             style = MaterialTheme.typography.labelLarge,
                             color = if (on) Palette.OnLit else Palette.Text,
@@ -503,3 +503,36 @@ fun Modifier.litGlow(on: Boolean, strength: Float = 0.16f): Modifier = this.draw
 /** The tallest a list menu grows before it scrolls, short enough to stay clear of the navigation bar. */
 internal const val MENU_MAX_DP = 480
 
+/**
+ * Text that wraps only between words. Where a word won't fit its line, as on a narrow phone or with large
+ * text, the type steps down a little until it does, rather than splitting the word (tester feedback:
+ * "Parametri / c" on a 720p screen).
+ */
+@Composable
+fun WholeWordText(
+    text: String,
+    style: androidx.compose.ui.text.TextStyle,
+    color: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
+    textAlign: TextAlign? = null,
+    maxLines: Int = 1,
+) {
+    var scale by androidx.compose.runtime.remember(text) { androidx.compose.runtime.mutableFloatStateOf(1f) }
+    Text(
+        text,
+        style = style.copy(fontSize = style.fontSize * scale, lineHeight = style.lineHeight * scale),
+        color = color,
+        textAlign = textAlign,
+        maxLines = maxLines,
+        modifier = modifier,
+        onTextLayout = { layout ->
+            val splitsWord = (0 until layout.lineCount - 1).any { line ->
+                val end = layout.getLineEnd(line)
+                end in 1 until text.length && !text[end - 1].isWhitespace() && !text[end].isWhitespace()
+            }
+            if ((splitsWord || layout.hasVisualOverflow) && scale > MIN_TEXT_SCALE) scale = (scale - 0.06f).coerceAtLeast(MIN_TEXT_SCALE)
+        },
+    )
+}
+
+private const val MIN_TEXT_SCALE = 0.7f

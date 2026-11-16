@@ -1,0 +1,7 @@
+- Notches on every slider, and a ±5 and ±15 dB scale on the faders
+- Faders reach their full range on any preset
+- Save or discard changes on the device tab
+- Clearer messages, with Undo and Redo
+- Pick the app's colour, on any Android version
+- New accessibility settings: text size, contrast, vibration, longer messages
+- Fits small screens, and a floating status strip

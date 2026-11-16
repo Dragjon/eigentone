@@ -1,5 +1,13 @@
 package io.github.dragjon.eigentone.ui
 
+import androidx.compose.ui.layout.positionInRoot
+
+import androidx.compose.ui.layout.onGloballyPositioned
+
+import androidx.compose.ui.draw.drawBehind
+
+import androidx.compose.ui.layout.onSizeChanged
+
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -107,6 +115,8 @@ import io.github.dragjon.eigentone.data.PresetOrganiser
 import io.github.dragjon.eigentone.engine.PresetShortcuts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
@@ -142,6 +152,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.dragjon.eigentone.R
 import io.github.dragjon.eigentone.data.AppState
+import io.github.dragjon.eigentone.data.DeviceSettings
 import io.github.dragjon.eigentone.data.Disclosure
 import io.github.dragjon.eigentone.data.AutoEqCatalog
 import io.github.dragjon.eigentone.data.BackupCodec
@@ -566,19 +577,6 @@ private fun AppScreen(
         Scaffold(
             containerColor = Palette.Background,
             topBar = { TopBar(state, status, showCurve = tab != Tab.EQ, settingsOpen = tab == Tab.SYSTEM, onSettings = toggleSettings, onSetEnabled) },
-            // Messages wear the same card as the unsaved bar, so the two floating notes look like one family.
-            snackbarHost = {
-                SnackbarHost(snackbar) { data ->
-                    androidx.compose.material3.Snackbar(
-                        snackbarData = data,
-                        shape = PanelShape,
-                        containerColor = Palette.Note,
-                        contentColor = Palette.NoteText,
-                        actionColor = Palette.NoteText,
-                        dismissActionContentColor = Palette.TextDim,
-                    )
-                }
-            },
             bottomBar = {
                 // Settings lives in the top bar, which leaves the bottom for the four everyday tabs. They share
                 // the width equally, with labels of similar length, so the spacing is even edge to edge.
@@ -607,12 +605,28 @@ private fun AppScreen(
             },
         ) { padding ->
             androidx.activity.compose.BackHandler(enabled = tab == Tab.SYSTEM) { setTab(beforeSettings) }
+            var pageOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+            var pageSize by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
             Box(
                 Modifier
                     .fillMaxSize()
-                    .padding(padding),
+                    .padding(padding)
+                    .onGloballyPositioned {
+                        pageOrigin = it.positionInRoot()
+                        pageSize = androidx.compose.ui.geometry.Size(it.size.width.toFloat(), it.size.height.toFloat())
+                    }
+                    // Sees each touch first and leaves it be, so a tap away from the faders lets the chosen one go.
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                            FaderFocus.touched(down.position + pageOrigin)
+                        }
+                    },
                 contentAlignment = Alignment.TopCenter,
             ) {
+                // The strip's band height, so each page starts below it and then scrolls up under it.
+                var stripBandPx by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                val stripBand = with(androidx.compose.ui.platform.LocalDensity.current) { stripBandPx.toDp() }
                 // Every tab stays built once made, so a switch only slides pages rather than first building one.
                 // The rest are built shortly after the app appears, one at a time, so opening stays quick.
                 var built by remember { mutableStateOf(setOf(tab)) }
@@ -639,7 +653,14 @@ private fun AppScreen(
                         ) { if (it == t) 1f else 0f }
                         val seen = if (t == tab) (state to status).also { lastSeen[t] = it } else lastSeen.getOrPut(t) { state to status }
                         val shownNow = remember(t) { { pages.targetState == t } }
-                        CompositionLocalProvider(LocalPageShown provides shownNow) {
+                        val pageScroll = remember(t) {
+                            PageScroll(scrolls.getValue(t)) { androidx.compose.ui.geometry.Rect(pageOrigin, pageSize) }
+                        }
+                        CompositionLocalProvider(
+                            LocalPageShown provides shownNow,
+                            LocalTopCover provides stripBand + PAGE_TOP_DP.dp,
+                            LocalPageScroll provides pageScroll,
+                        ) {
                             // The whole width scrolls, so the space beside the page works too, as on a tablet or in landscape.
                             Box(
                                 Modifier
@@ -671,7 +692,7 @@ private fun AppScreen(
                                         .widthIn(max = 640.dp)
                                         .fillMaxWidth()
                                         // Room at the end, so the last setting can scroll clear of the floating save bar.
-                                        .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = UNSAVED_BAR_ROOM_DP.dp),
+                                        .padding(start = 16.dp, end = 16.dp, top = stripBand + PAGE_TOP_DP.dp, bottom = UNSAVED_BAR_ROOM_DP.dp),
                                     verticalArrangement = SectionSpacing,
                                 ) {
                                     when (t) {
@@ -686,6 +707,25 @@ private fun AppScreen(
                         }
                     }
                 }
+                // The status strip floats over the top of the page (tester feedback): the page scrolls on up under it,
+                // seen faintly through a band of the page colour that fades away below the strip.
+                val stripFade = Palette.Background
+                Box(
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .onSizeChanged { stripBandPx = it.height }
+                        .drawBehind {
+                            drawRect(
+                                androidx.compose.ui.graphics.Brush.verticalGradient(
+                                    0f to stripFade.copy(alpha = STRIP_BAND_ALPHA),
+                                    0.6f to stripFade.copy(alpha = STRIP_BAND_ALPHA),
+                                    1f to stripFade.copy(alpha = 0f),
+                                ),
+                            )
+                        }
+                        .tourTarget(TourStop.STRIP),
+                ) { LiveStrip(state, showCurve = tab != Tab.EQ) }
                 // Floats over the page rather than sitting in it, so appearing can never move anything,
                 // such as a fader under a finger that's still dragging it.
                 val savedVersion = Repo.allPresets(state).firstOrNull { it.id == state.current.id }
@@ -695,19 +735,61 @@ private fun AppScreen(
                 // Kept while the bar slides away, so it leaves showing what it said rather than going blank.
                 var lastSaved by remember { mutableStateOf(savedVersion) }
                 if (unsaved) lastSaved = savedVersion ?: state.current
-                // Rises from the bottom when there's something to save, and sinks back the same way.
-                AnimatedVisibility(
-                    visible = unsaved,
-                    enter = slideInVertically(tween(SCREEN_MS, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(SCREEN_MS)),
-                    exit = slideOutVertically(tween(SCREEN_MS, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(SCREEN_MS)),
+                // The device tab's own changes, which live outside presets, wait to be saved the same way.
+                val deviceSaved by Repo.deviceSaved.collectAsStateWithLifecycle()
+                var lastDeviceSaved by remember { mutableStateOf(deviceSaved) }
+                if (deviceSaved != null) lastDeviceSaved = deviceSaved
+                // Each bar's height, so a message can sit just above whichever bars are showing.
+                var deviceBarPx by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                var unsavedBarPx by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                Column(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .widthIn(max = 640.dp)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(BAR_GAP_DP.dp),
+                ) {
+                    // Rises from the bottom when there's something to save, and sinks back the same way.
+                    AnimatedVisibility(
+                        visible = deviceSaved != null,
+                        enter = slideInVertically(tween(SCREEN_MS, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(SCREEN_MS)),
+                        exit = slideOutVertically(tween(SCREEN_MS, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(SCREEN_MS)),
+                    ) {
+                        Box(Modifier.onSizeChanged { deviceBarPx = it.height }) {
+                            lastDeviceSaved?.let { DeviceUnsavedBar(state, it) }
+                        }
+                    }
+                    AnimatedVisibility(
+                        visible = unsaved,
+                        enter = slideInVertically(tween(SCREEN_MS, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(SCREEN_MS)),
+                        exit = slideOutVertically(tween(SCREEN_MS, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(SCREEN_MS)),
+                        modifier = Modifier.tourTarget(TourStop.SAVE),
+                    ) {
+                        Box(Modifier.onSizeChanged { unsavedBarPx = it.height }) {
+                            lastSaved?.let { UnsavedBar(state, it) }
+                        }
+                    }
+                }
+                // Messages wear the same card as the save bars and sit just above whichever are showing. They're
+                // apart from the bars' own layout and glide to their new place on the bars' own curve and time, so a
+                // bar sliding away carries the message smoothly down rather than dropping it once the bar has gone.
+                val density = androidx.compose.ui.platform.LocalDensity.current
+                val barsPx = (if (deviceSaved != null) deviceBarPx else 0) + (if (unsaved) unsavedBarPx else 0)
+                val barsCount = (if (deviceSaved != null) 1 else 0) + (if (unsaved) 1 else 0)
+                val noticeLift by androidx.compose.animation.core.animateDpAsState(
+                    with(density) { barsPx.toDp() } + BAR_GAP_DP.dp * barsCount,
+                    tween(SCREEN_MS, easing = FastOutSlowInEasing),
+                    label = "noticeLift",
+                )
+                NoticeHost(
+                    snackbar,
+                    longer = state.longNotices,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .widthIn(max = 640.dp)
                         .padding(horizontal = 12.dp, vertical = 8.dp)
-                        .tourTarget(TourStop.SAVE),
-                ) {
-                    lastSaved?.let { UnsavedBar(state, it) }
-                }
+                        .padding(bottom = noticeLift),
+                )
             }
         }
     }
@@ -776,6 +858,8 @@ private fun TopBar(
 ) {
     // Here because the strip below always shows the live spectrum. It still stops when the app is closed.
     AnalyserEffect(state.analyser)
+    // The strip floats on the page below the bar rather than sitting in it (tester feedback).
+    Column(Modifier.fillMaxWidth()) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -819,7 +903,8 @@ private fun TopBar(
                     softWrap = false,
                     modifier = Modifier.alignByBaseline(),
                 )
-                if (version.isNotEmpty()) {
+                // Left out with Large or Larger text, where there's no room for it beside the name (tester feedback).
+                if (version.isNotEmpty() && state.textScale <= 1.0) {
                     Text(
                         version,
                         style = Readout.copy(fontSize = MaterialTheme.typography.labelMedium.fontSize),
@@ -863,7 +948,7 @@ private fun TopBar(
             )
         }
     }
-    Box(Modifier.tourTarget(TourStop.STRIP)) { LiveStrip(state, showCurve) }
+    }
     }
 }
 
@@ -1115,7 +1200,6 @@ private fun EqTab(state: AppState) {
     } else {
         val snackbar = LocalSnackbar.current
         val snackScope = LocalSnackScope.current
-        val undoLabel = stringResource(R.string.ui_undo)
         val filterDeleted = stringResource(R.string.ui_filter_deleted)
         val dynamicPlaced = remember(state) {
             val target = Processing.target(state.copy(bypass = false), 0.0)
@@ -1148,18 +1232,19 @@ private fun EqTab(state: AppState) {
                 val remaining = Repo.state.value.current.filters
                 selectedId = remaining.getOrNull(index.coerceAtMost(remaining.lastIndex))?.id
                 // Deleting a preset offers Undo, and so does deleting a filter.
-                snackScope.launch {
-                    val result = snackbar.showSnackbar(
-                        filterDeleted,
-                        actionLabel = undoLabel,
-                        withDismissAction = true,
-                        duration = SnackbarDuration.Short,
-                    )
-                    if (result == SnackbarResult.ActionPerformed) {
+                snackScope.offerUndo(
+                    snackbar,
+                    filterDeleted,
+                    undo = {
                         Repo.undo()
                         selectedId = deletedId
-                    }
-                }
+                    },
+                    redo = {
+                        Repo.redo()
+                        val left = Repo.state.value.current.filters
+                        selectedId = left.getOrNull(index.coerceAtMost(left.lastIndex))?.id
+                    },
+                )
             },
         )
         }
@@ -1234,26 +1319,23 @@ private fun UnsavedBar(state: AppState, saved: Preset, modifier: Modifier = Modi
                 )
             }
         }
-        val undoLabel = stringResource(R.string.ui_undo)
         TextButton(onClick = {
             Repo.discardEdits()
             // Discard is a step in the undo history, so the message can offer it straight back.
-            scope.launch {
-                val result = snackbar.showSnackbar(
-                    appText(R.string.ui_edits_discarded, saved.name),
-                    actionLabel = undoLabel,
-                    withDismissAction = true,
-                    duration = SnackbarDuration.Long,
-                )
-                if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) Repo.undo()
-            }
+            scope.offerUndo(snackbar, appText(R.string.ui_edits_discarded, saved.name), undo = Repo::undo, redo = Repo::redo)
         }) { Text(stringResource(R.string.ui_discard)) }
         val view = androidx.compose.ui.platform.LocalView.current
         Button(onClick = {
             if (own) {
                 Haptics.confirm(view)
                 Repo.overwriteCurrent()
-                scope.notify(snackbar, appText(R.string.ui_updated, saved.name))
+                // Saving over a preset can be taken back, which leaves the edits waiting to be saved again.
+                scope.offerUndo(
+                    snackbar,
+                    appText(R.string.ui_updated, saved.name),
+                    undo = { Repo.update { s -> s.copy(presets = s.presets.map { if (it.id == saved.id) saved else it }) } },
+                    redo = { if (Repo.state.value.current.id == saved.id) Repo.overwriteCurrent() },
+                )
             } else {
                 naming = true
             }
@@ -1265,6 +1347,235 @@ private fun UnsavedBar(state: AppState, saved: Preset, modifier: Modifier = Modi
             naming = false
             scope.notify(snackbar, appText(R.string.ui_saved_as, name))
         }
+    }
+}
+
+/**
+ * [value], but only once it has held for [settleMs], so something that flips quickly back and forth, such
+ * as a slider swept through zero, changes what's shown once rather than on every flip.
+ */
+@Composable
+private fun rememberSettled(value: Boolean, settleMs: Long = SHOW_SETTLE_MS): Boolean {
+    var settled by remember { mutableStateOf(value) }
+    LaunchedEffect(value) {
+        if (value == settled) return@LaunchedEffect
+        kotlinx.coroutines.delay(settleMs)
+        settled = value
+    }
+    return settled
+}
+
+private const val SHOW_SETTLE_MS = 500L
+private const val BAR_GAP_DP = 8
+/** Space between the strip and the page's first panel, matching the space above the strip. */
+private const val PAGE_TOP_DP = 8
+private const val STRIP_BAND_ALPHA = 0.88f
+
+/**
+ * The colour the app is made from: the phone's own wallpaper colours where Android has them, one of a few
+ * swatches, or any hue of your own.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun ThemeColourRow(state: AppState) {
+    val context = LocalContext.current
+    val wallpaperAvailable = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+    val seed = state.themeColor
+    val custom = seed != null && seed !in SeedScheme.SWATCHES
+    // Kept apart from the saved colour while the hue is dragged, so the whole app isn't recoloured every frame.
+    val lastPreview = remember { longArrayOf(0L) }
+    var hue by remember(seed) { mutableStateOf(seed?.let { SeedScheme.hueOf(Color(it.toInt())).toFloat() } ?: 220f) }
+    val names = listOf(
+        R.string.ui_colour_blue, R.string.ui_colour_teal, R.string.ui_colour_green, R.string.ui_colour_amber,
+        R.string.ui_colour_orange, R.string.ui_colour_red, R.string.ui_colour_pink, R.string.ui_colour_purple,
+    )
+    fun pick(value: Long?) = Repo.update { it.copy(themeColor = value) }
+    Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.ui_theme_colour), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
+            InfoButton(Help.themeColour)
+        }
+        androidx.compose.foundation.layout.FlowRow(
+            Modifier
+                .fillMaxWidth()
+                .selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (wallpaperAvailable) {
+                val wallpaper = remember(context) { androidx.compose.material3.dynamicLightColorScheme(context).primary }
+                ColourSwatch(wallpaper, stringResource(R.string.ui_colour_phone), selected = seed == null, wallpaper = true) { pick(null) }
+            }
+            SeedScheme.SWATCHES.forEachIndexed { i, colour ->
+                // Before Android 12 the blue stands for the default, so choosing it clears the choice.
+                val chosen = seed == colour || (!wallpaperAvailable && seed == null && colour == SeedScheme.DEFAULT_SEED)
+                ColourSwatch(Color(colour.toInt()), stringResource(names[i]), selected = chosen) {
+                    pick(if (!wallpaperAvailable && colour == SeedScheme.DEFAULT_SEED) null else colour)
+                }
+            }
+            ColourSwatch(Color(SeedScheme.fromHue(hue).toInt()), stringResource(R.string.ui_colour_custom), selected = custom, rainbow = true) {
+                pick(SeedScheme.fromHue(hue))
+            }
+        }
+        if (custom) {
+            ValueTrack(
+                label = stringResource(R.string.ui_colour_hue),
+                readout = "${hue.toInt()}°",
+                value = hue,
+                range = 0f..359f,
+                origin = 0f,
+                default = hue,
+                onChange = {
+                    hue = it
+                    // Recolours the app as the finger slides. Recolouring redraws the whole app, so it's done at most
+                    // ten times a second, and the handle itself still follows the finger every frame.
+                    val now = android.os.SystemClock.uptimeMillis()
+                    if (now - lastPreview[0] >= HUE_PREVIEW_MS) {
+                        lastPreview[0] = now
+                        ThemePreview.seed = SeedScheme.fromHue(it)
+                    }
+                },
+                onFinished = {
+                    pick(SeedScheme.fromHue(hue))
+                    ThemePreview.seed = null
+                },
+                trackColours = RAINBOW,
+            )
+        }
+    }
+}
+
+/** One round colour to choose, ringed while chosen. */
+@Composable
+private fun ColourSwatch(colour: Color, name: String, selected: Boolean, wallpaper: Boolean = false, rainbow: Boolean = false, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(44.dp)
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .semantics { contentDescription = name },
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.foundation.Canvas(Modifier.size(40.dp)) {
+            val ring = 2.5.dp.toPx()
+            if (selected) drawCircle(Palette.Text, radius = size.minDimension / 2, style = androidx.compose.ui.graphics.drawscope.Stroke(ring))
+            val inner = size.minDimension / 2 - ring * 2
+            if (rainbow) {
+                drawCircle(
+                    androidx.compose.ui.graphics.Brush.sweepGradient(
+                        listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red),
+                    ),
+                    radius = inner,
+                )
+                drawCircle(colour, radius = inner * 0.5f)
+            } else {
+                drawCircle(colour, radius = inner)
+            }
+            // The phone's colours are marked with a small dot of the page colour, so it's told apart from a swatch.
+            if (wallpaper) drawCircle(Palette.Surface, radius = inner * 0.3f)
+        }
+    }
+}
+
+/** Settings that make the app easier to read, feel and keep up with. */
+@Composable
+private fun AccessibilitySection(state: AppState) {
+    SettingsSection(stringResource(R.string.ui_accessibility)) {
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.ui_text_size), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
+                InfoButton(Help.textSize)
+            }
+            val scales = TEXT_SCALES
+            SlidingToggle(
+                options = listOf(
+                    ToggleOption(stringResource(R.string.ui_text_size_phone)),
+                    ToggleOption(stringResource(R.string.ui_text_size_large)),
+                    ToggleOption(stringResource(R.string.ui_text_size_larger)),
+                ),
+                selected = scales.indexOfFirst { kotlin.math.abs(it - state.textScale) < 0.01 }.coerceAtLeast(0),
+                onSelect = { i -> Repo.update { it.copy(textScale = scales[i]) } },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        RowDivider()
+        SwitchSetting(stringResource(R.string.ui_high_contrast), Help.highContrast, state.highContrast) { on ->
+            Repo.update { it.copy(highContrast = on) }
+        }
+        RowDivider()
+        SwitchSetting(stringResource(R.string.ui_haptics), Help.haptics, state.haptics) { on ->
+            Repo.update { it.copy(haptics = on) }
+        }
+        RowDivider()
+        SwitchSetting(stringResource(R.string.ui_long_notices), Help.longNotices, state.longNotices) { on ->
+            Repo.update { it.copy(longNotices = on) }
+        }
+    }
+}
+
+private val TEXT_SCALES = listOf(1.0, 1.15, 1.3)
+private const val HUE_PREVIEW_MS = 100L
+
+/** The hues round the wheel, as the theme would make them, for the hue slider's track. */
+private val RAINBOW: List<Color> = (0..12).map { Color(SeedScheme.fromHue(it * 30f).toInt()) }
+
+/** Shown while the device tab has changes waiting, so they can be kept or put back as a preset's can. */
+@Composable
+private fun DeviceUnsavedBar(state: AppState, saved: DeviceSettings) {
+    val scope = LocalSnackScope.current
+    val snackbar = LocalSnackbar.current
+    val output by Repo.output.collectAsStateWithLifecycle()
+    val parts = remember(saved, state) { DeviceSettings.of(state).changedParts(saved) }
+    val words = parts.map {
+        when (it) {
+            DeviceSettings.Part.PRESET -> stringResource(R.string.ui_device_changes_preset)
+            DeviceSettings.Part.MODE -> stringResource(R.string.ui_device_changes_mode)
+            DeviceSettings.Part.AUTO_SWITCH -> stringResource(R.string.ui_device_changes_auto)
+            DeviceSettings.Part.EARS -> stringResource(R.string.ui_device_changes_ears)
+            DeviceSettings.Part.QUIET -> stringResource(R.string.ui_device_changes_quiet)
+        }
+    }
+    val summary = when (words.size) {
+        0 -> ""
+        1 -> words[0]
+        else -> stringResource(R.string.ui_changes_and, words.dropLast(1).joinToString(", "), words.last())
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .shadow(6.dp, PanelShape)
+            .clip(PanelShape)
+            .background(Palette.Note)
+            .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                stringResource(R.string.ui_device_unsaved, output.label),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Palette.Text,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (summary.isNotEmpty()) {
+                Text(summary, style = MaterialTheme.typography.bodySmall, color = Palette.TextDim, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        TextButton(onClick = {
+            val dropped = Repo.discardDevice() ?: return@TextButton
+            scope.offerUndo(
+                snackbar,
+                appText(R.string.ui_device_discarded),
+                undo = { Repo.restoreDevice(dropped) },
+                redo = { Repo.discardDevice() },
+            )
+        }) { Text(stringResource(R.string.ui_discard)) }
+        val view = androidx.compose.ui.platform.LocalView.current
+        Button(onClick = {
+            Haptics.confirm(view)
+            Repo.saveDevice()
+            scope.notify(snackbar, appText(R.string.ui_device_saved))
+        }) { Text(stringResource(R.string.ui_save), maxLines = 1) }
     }
 }
 
@@ -1679,22 +1990,22 @@ private fun ToneSection(state: AppState, saved: Tone?) {
                     }
                     Repo.commit()
                     // This tab has no undo key of its own, so the reset offers one.
-                    snackScope.launch {
-                        val result = snackbar.showSnackbar(
-                            appText(R.string.ui_tone_reset),
-                            actionLabel = appText(R.string.ui_undo),
-                            withDismissAction = true,
-                            duration = SnackbarDuration.Short,
-                        )
-                        if (result == SnackbarResult.ActionPerformed) Repo.undo()
-                    }
+                    snackScope.offerUndo(snackbar, appText(R.string.ui_tone_reset), undo = Repo::undo, redo = Repo::redo)
                 }) { Text(stringResource(R.string.ui_reset_tone)) }
             }
         },
     ) {
         ToneSlider(stringResource(R.string.ui_bass), Help.bass, tone.bassDb, saved?.bassDb ?: 0.0) { v -> Repo.editTone { it.copy(bassDb = v) } }
-        // Only means something once there's a bass change to place.
-        if (tone.bassDb != 0.0 && Disclosure.bassDetail(state)) {
+        // Only means something once there's a bass change to place. They come and go half a second after the
+        // bass settles, so sliding it through zero doesn't flick them in and out and jolt the page (tester feedback).
+        val bassPlaced = rememberSettled(tone.bassDb != 0.0)
+        val bassAdded = rememberSettled(tone.bassDb > 0.0)
+        AnimatedVisibility(
+            visible = bassPlaced && Disclosure.bassDetail(state),
+            enter = expandVertically(tween(SCREEN_MS, easing = FastOutSlowInEasing)) + fadeIn(tween(SCREEN_MS)),
+            exit = shrinkVertically(tween(SCREEN_MS, easing = FastOutSlowInEasing)) + fadeOut(tween(SCREEN_MS)),
+        ) {
+          Column {
             RowDivider()
             SliderSetting(
                 title = stringResource(R.string.ui_bass_frequency),
@@ -1707,9 +2018,15 @@ private fun ToneSection(state: AppState, saved: Tone?) {
                 onFinished = Repo::commit,
                 resetTo = (saved?.bassHz ?: Tone.DEFAULT_BASS_HZ).toFloat(),
             )
+          }
         }
         // Only shapes bass that's been added, so it only shows then.
-        if (tone.bassDb > 0.0 && Disclosure.bassDetail(state)) {
+        AnimatedVisibility(
+            visible = bassAdded && Disclosure.bassDetail(state),
+            enter = expandVertically(tween(SCREEN_MS, easing = FastOutSlowInEasing)) + fadeIn(tween(SCREEN_MS)),
+            exit = shrinkVertically(tween(SCREEN_MS, easing = FastOutSlowInEasing)) + fadeOut(tween(SCREEN_MS)),
+        ) {
+          Column {
             RowDivider()
             Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1729,6 +2046,7 @@ private fun ToneSection(state: AppState, saved: Tone?) {
                     },
                 )
             }
+          }
         }
         RowDivider()
         ToneSlider(stringResource(R.string.help_vocals_title), Help.vocals, tone.vocalsDb, saved?.vocalsDb ?: 0.0) { v -> Repo.editTone { it.copy(vocalsDb = v) } }
@@ -1901,21 +2219,17 @@ private fun EarCorrectionRows(state: AppState) {
     val ears = state.earsFor(key)
     val record = state.hearings[key]
     val measured = remember(record) { record?.result() }
-    fun setEars(new: io.github.dragjon.eigentone.data.EarCorrection?) = Repo.update {
+    fun setEars(new: io.github.dragjon.eigentone.data.EarCorrection?) = Repo.editDevice {
         it.copy(earCorrections = if (new == null) it.earCorrections - key else it.earCorrections + (key to new))
     }
     val snackbar = LocalSnackbar.current
     val snackScope = LocalSnackScope.current
-    val undoLabel = stringResource(R.string.ui_undo)
 
     /** Replacing or removing a correction acts at once, so it can be taken back for a moment. */
     fun replaceEars(new: io.github.dragjon.eigentone.data.EarCorrection?, message: String) {
         val old = state.earCorrections[key]
         setEars(new)
-        snackScope.launch {
-            val result = snackbar.showSnackbar(message, actionLabel = undoLabel, withDismissAction = true, duration = SnackbarDuration.Short)
-            if (result == SnackbarResult.ActionPerformed) setEars(old)
-        }
+        snackScope.offerUndo(snackbar, message, undo = { setEars(old) }, redo = { setEars(new) })
     }
 
     if (Profiles.supportsModes(key)) {
@@ -2071,7 +2385,7 @@ private fun EqualLoudnessRows(state: AppState, attenuation: Double) {
     val strength = state.loudnessStrengthFor(output.key)
     val added = remember(quieter, strength) { EqualLoudness.correction(quieter, strength) }
     fun at(hz: Double) = if (added.isEmpty()) 0.0 else GraphicEq.interpolate(added.map { it.hz to it.db }, hz)
-    fun setUsual(db: Double) = Repo.update { it.copy(loudnessUsual = it.loudnessUsual + (output.key to db.coerceIn(0.0, USUAL_MAX_DB))) }
+    fun setUsual(db: Double) = Repo.editDevice { it.copy(loudnessUsual = it.loudnessUsual + (output.key to db.coerceIn(0.0, USUAL_MAX_DB))) }
 
     LoudnessGraph(added, Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp))
     Text(
@@ -2113,7 +2427,7 @@ private fun EqualLoudnessRows(state: AppState, attenuation: Double) {
         range = 0f..1f,
         default = 1f,
         detail = stringResource(R.string.ui_strength_for, output.label),
-        onChange = { v -> Repo.update { it.copy(loudnessStrengths = it.loudnessStrengths + (output.key to kotlin.math.round(v * 20.0) / 20.0)) } },
+        onChange = { v -> Repo.editDevice { it.copy(loudnessStrengths = it.loudnessStrengths + (output.key to kotlin.math.round(v * 20.0) / 20.0)) } },
     )
 }
 
@@ -2345,9 +2659,6 @@ private fun reason(error: Throwable?): String = error?.message ?: error?.javaCla
 private fun android.content.Context.openSafely(intent: Intent): Boolean =
     runCatching { startActivity(intent) }.isSuccess
 
-private fun CoroutineScope.notify(snackbar: SnackbarHostState, message: String) {
-    launch { snackbar.showSnackbar(message, withDismissAction = true, duration = SnackbarDuration.Short) }
-}
 
 /**
  * Everything about what's connected: its correction, the preset it switches to, your ears, and how it adapts
@@ -2447,7 +2758,7 @@ private fun HeadphonesTab(state: AppState) {
                 Help.loudness,
                 false,
                 detail = stringResource(R.string.ui_quiet_turn_on, output.label),
-            ) { on -> Repo.update { it.copy(loudness = on) } }
+            ) { on -> Repo.editDevice { it.copy(loudness = on) } }
         }
     }
 
@@ -2517,20 +2828,31 @@ private fun OutputSection(state: AppState, outputKey: String, outputLabel: Strin
             if (assigned == null && correction != null) {
                 Button(
                     onClick = {
-                        Repo.assignToOutput(outputKey, correction.id)
+                        Repo.assignToOutput(outputKey, correction.id, draft = true)
                         Repo.loadPreset(correction)
                     },
                     modifier = Modifier.padding(bottom = 8.dp),
                 ) { Text(stringResource(R.string.ui_use_correction, correction.name)) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                FilledTonalButton(
-                    enabled = canAssign && !alreadyAssigned,
-                    onClick = { Repo.assignToOutput(assignKey, state.current.id) },
+                if (alreadyAssigned) {
+                    // Already done, so said as a fact rather than shown as a button that does nothing (tester feedback).
+                    Icon(Icons.Filled.Check, contentDescription = null, tint = Palette.Lit, modifier = Modifier.size(20.dp))
+                    Text(
+                        stringResource(R.string.ui_current_preset_assigned),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Palette.TextDim,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                } else FilledTonalButton(
+                    enabled = canAssign,
+                    onClick = { Repo.assignToOutput(assignKey, state.current.id, draft = true) },
                     modifier = Modifier.weight(1f, fill = false),
                 ) {
                     Text(
-                        if (alreadyAssigned) stringResource(R.string.ui_current_preset_assigned) else stringResource(R.string.ui_assign, state.current.name),
+                        stringResource(R.string.ui_assign, state.current.name),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -2538,7 +2860,7 @@ private fun OutputSection(state: AppState, outputKey: String, outputLabel: Strin
                 if (assigned != null) {
                     // Clears the mode's own choice first, then the output's main one.
                     val clearKey = if (assignKey in state.outputProfiles) assignKey else outputKey
-                    TextButton(onClick = { Repo.assignToOutput(clearKey, null) }) { Text(stringResource(R.string.ui_clear)) }
+                    TextButton(onClick = { Repo.assignToOutput(clearKey, null, draft = true) }) { Text(stringResource(R.string.ui_clear)) }
                 }
             }
         }
@@ -2559,7 +2881,7 @@ private fun OutputSection(state: AppState, outputKey: String, outputLabel: Strin
         }
         RowDivider()
         SwitchSetting(stringResource(R.string.ui_switch_automatically), Help.autoSwitch, state.autoSwitch) { on ->
-            Repo.update { it.copy(autoSwitch = on) }
+            Repo.editDevice { it.copy(autoSwitch = on) }
         }
     }
 }
@@ -2619,18 +2941,21 @@ private fun PresetListSection(state: AppState) {
                         {
                             val before = Repo.state.value
                             Repo.deletePreset(preset.id)
-                            scope.launch {
-                                val result = snackbar.showSnackbar(
-                                    appText(R.string.ui_deleted, preset.name),
-                                    actionLabel = appText(R.string.ui_undo),
-                                    duration = SnackbarDuration.Short,
-                                )
-                                if (result == SnackbarResult.ActionPerformed) {
+                            scope.offerUndo(
+                                snackbar,
+                                appText(R.string.ui_deleted, preset.name),
+                                undo = {
                                     Repo.update {
-                                        it.copy(presets = before.presets, outputProfiles = before.outputProfiles)
+                                        it.copy(
+                                            presets = before.presets,
+                                            outputProfiles = before.outputProfiles,
+                                            appProfiles = before.appProfiles,
+                                            favorites = before.favorites,
+                                        )
                                     }
-                                }
-                            }
+                                },
+                                redo = { Repo.deletePreset(preset.id) },
+                            )
                         }
                     } else {
                         null
@@ -2800,13 +3125,8 @@ private fun ManageSection(state: AppState) {
             when {
                 text == null -> notify(snackbar, appText(R.string.ui_could_not_read_that_file_2))
                 Repo.restoreBackup(text) -> {
-                    val result = snackbar.showSnackbar(
-                        appText(R.string.ui_backup_restored),
-                        actionLabel = appText(R.string.ui_undo),
-                        withDismissAction = true,
-                        duration = SnackbarDuration.Long,
-                    )
-                    if (result == SnackbarResult.ActionPerformed) Repo.update { before }
+                    val after = Repo.state.value
+                    offerUndo(snackbar, appText(R.string.ui_backup_restored), undo = { Repo.update { before } }, redo = { Repo.update { after } })
                 }
                 else -> notify(snackbar, appText(R.string.ui_that_isn_t_an_eigentone_backup))
             }
@@ -3067,6 +3387,8 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
             )
         }
         RowDivider()
+        ThemeColourRow(state)
+        RowDivider()
         SwitchSetting(
             stringResource(R.string.ui_advanced_controls),
             Help.advanced,
@@ -3075,6 +3397,8 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
         ) { on -> Repo.update { it.copy(advancedControls = on) } }
     }
 
+
+    AccessibilitySection(state)
 
     SettingsSection(stringResource(R.string.ui_engine), trailing = { InfoButton(Help.power) }) {
         if (Disclosure.engine(state)) {

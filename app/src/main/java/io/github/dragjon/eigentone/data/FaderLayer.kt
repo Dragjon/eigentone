@@ -38,7 +38,8 @@ object FaderLayer {
             if (moved[i] == before.getOrElse(i) { Double.NaN }) return@map kept
             val rest = rest(base.getOrElse(i) { 0.0 })
             if (moved[i] == GraphicEq.snap(rest)) 0.0
-            else (moved[i] - rest).coerceIn(-GraphicEq.MAX_DB, GraphicEq.MAX_DB)
+            // Up to twice the travel, so a fader on a preset that cuts can still reach the top, and the reverse.
+            else (moved[i] - rest).coerceIn(-GraphicEq.MAX_CHANGE_DB, GraphicEq.MAX_CHANGE_DB)
         }
 
     /** Whether the preset itself shapes the sound, so the faders don't start flat. */

@@ -564,7 +564,7 @@
     <string name="ui_none" formatted="false">None</string>
     <string name="ui_use_correction" formatted="false">Use %1$s correction</string>
     <string name="ui_assign" formatted="false">Assign %1$s</string>
-    <string name="ui_current_preset_assigned" formatted="false">Current preset assigned</string>
+    <string name="ui_current_preset_assigned" formatted="false">The preset in use is the one assigned</string>
     <string name="ui_your_presets" formatted="false">Your presets</string>
     <string name="ui_liberty_4_nc_correction" formatted="false">Liberty 4 NC correction</string>
     <string name="ui_general" formatted="false">General</string>
@@ -1037,4 +1037,44 @@
     <string name="ui_compare_presets" formatted="false">Compare presets</string>
     <string name="ui_refine_this" formatted="false">Refine this sound</string>
     <string name="ui_refine_this_detail" formatted="false">Close but not quite? Fine-tune it by comparing pairs</string>
+    <string name="ui_notice_undone" formatted="false">Undone: %1$s</string>
+    <string name="ui_device_unsaved" formatted="false">Unsaved settings for %1$s</string>
+    <string name="ui_device_changes_preset" formatted="false">assigned preset</string>
+    <string name="ui_device_changes_mode" formatted="false">noise mode</string>
+    <string name="ui_device_changes_auto" formatted="false">switching automatically</string>
+    <string name="ui_device_changes_ears" formatted="false">ear correction</string>
+    <string name="ui_device_changes_quiet" formatted="false">quiet listening</string>
+    <string name="ui_device_discarded" formatted="false">Device settings put back as they were saved.</string>
+    <string name="ui_device_saved" formatted="false">Device settings saved.</string>
+    <string name="ui_theme_colour" formatted="false">Colour</string>
+    <string name="ui_colour_phone" formatted="false">Your phone\'s colours</string>
+    <string name="ui_colour_blue" formatted="false">Blue</string>
+    <string name="ui_colour_teal" formatted="false">Teal</string>
+    <string name="ui_colour_green" formatted="false">Green</string>
+    <string name="ui_colour_amber" formatted="false">Amber</string>
+    <string name="ui_colour_orange" formatted="false">Orange</string>
+    <string name="ui_colour_red" formatted="false">Red</string>
+    <string name="ui_colour_pink" formatted="false">Pink</string>
+    <string name="ui_colour_purple" formatted="false">Purple</string>
+    <string name="ui_colour_custom" formatted="false">Your own colour</string>
+    <string name="ui_colour_hue" formatted="false">Hue</string>
+    <string name="help_theme_colour_title" formatted="false">Colour</string>
+    <string name="help_theme_colour_body" formatted="false">The colour the app\'s Material You theme is made from. Your phone\'s colours follow your wallpaper, from Android 12. Otherwise pick a swatch, or the rainbow to choose any hue with the slider. The sound isn\'t affected.</string>
+    <string name="ui_accessibility" formatted="false">Accessibility</string>
+    <string name="ui_text_size" formatted="false">Text size</string>
+    <string name="ui_text_size_phone" formatted="false">Phone\'s</string>
+    <string name="ui_text_size_large" formatted="false">Large</string>
+    <string name="ui_text_size_larger" formatted="false">Larger</string>
+    <string name="help_text_size_title" formatted="false">Text size</string>
+    <string name="help_text_size_body" formatted="false">Makes the app\'s text larger than your phone\'s own text size, by about a seventh or a third. Your phone\'s font size setting still applies on top.</string>
+    <string name="ui_high_contrast" formatted="false">Higher contrast</string>
+    <string name="help_high_contrast_title" formatted="false">Higher contrast</string>
+    <string name="help_high_contrast_body" formatted="false">Draws grey text, outlines, dividers and slider tracks closer to the main text colour, so they\'re easier to make out.</string>
+    <string name="ui_haptics" formatted="false">Vibration</string>
+    <string name="help_haptics_title" formatted="false">Vibration</string>
+    <string name="help_haptics_body" formatted="false">A light tap when a slider or fader passes its default or reaches an end, and when you flip the power switch, Bypass or Save. Your phone\'s own touch feedback setting can also turn these off.</string>
+    <string name="ui_long_notices" formatted="false">Longer messages</string>
+    <string name="help_long_notices_title" formatted="false">Longer messages</string>
+    <string name="help_long_notices_body" formatted="false">Messages at the bottom of the screen, and the Undo they offer, stay twice as long before they go.</string>
+    <string name="ui_pick_a_fader" formatted="false">Pick a fader</string>
 </resources>

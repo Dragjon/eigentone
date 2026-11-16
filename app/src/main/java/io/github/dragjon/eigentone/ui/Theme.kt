@@ -5,8 +5,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -200,52 +198,28 @@ object Palette {
     val Glow get() = Color.Transparent
 }
 
-private val DarkScheme = darkColorScheme(
-    primary = DarkColors.lit,
-    onPrimary = DarkColors.onLit,
-    secondaryContainer = DarkColors.surfaceHigh,
-    onSecondaryContainer = DarkColors.text,
-    background = DarkColors.background,
-    onBackground = DarkColors.text,
-    surface = DarkColors.background,
-    onSurface = DarkColors.text,
-    surfaceVariant = DarkColors.surfaceHigh,
-    onSurfaceVariant = DarkColors.textDim,
-    surfaceContainer = DarkColors.surface,
-    surfaceContainerLow = DarkColors.surface,
-    surfaceContainerHigh = DarkColors.surfaceHigh,
-    surfaceContainerHighest = DarkColors.surfaceHigh,
-    inverseSurface = DarkColors.text,
-    inverseOnSurface = DarkColors.background,
-    inversePrimary = Color(0xFF7A5A1C),
-    outline = DarkColors.outline,
-    outlineVariant = DarkColors.line,
-    error = DarkColors.danger,
-)
+/**
+ * The same colours with quiet text, hairlines and tracks drawn nearer the main text, for anyone who finds
+ * the dim greys hard to read.
+ */
+internal fun ThemeColors.contrasted(): ThemeColors {
+    fun toward(from: Color, to: Color, amount: Float) = androidx.compose.ui.graphics.lerp(from, to, amount)
+    return copy(
+        textDim = toward(textDim, text, 0.5f),
+        line = toward(line, outline, 0.6f),
+        outline = toward(outline, text, 0.35f),
+        track = toward(track, text, 0.3f),
+        stripDim = toward(stripDim, stripText, 0.5f),
+    )
+}
 
-private val LightScheme = lightColorScheme(
-    // Material fills buttons and switches with this, so it's the fill. Text fields are given the text orange.
-    primary = LightColors.litFill,
-    onPrimary = LightColors.onLit,
-    secondaryContainer = LightColors.surfaceHigh,
-    onSecondaryContainer = LightColors.text,
-    background = LightColors.background,
-    onBackground = LightColors.text,
-    surface = LightColors.background,
-    onSurface = LightColors.text,
-    surfaceVariant = LightColors.surfaceHigh,
-    onSurfaceVariant = LightColors.textDim,
-    surfaceContainer = LightColors.surface,
-    surfaceContainerLow = LightColors.surface,
-    surfaceContainerHigh = LightColors.surfaceHigh,
-    surfaceContainerHighest = LightColors.surfaceHigh,
-    inverseSurface = LightColors.text,
-    inverseOnSurface = LightColors.background,
-    inversePrimary = Color(0xFFFFC24A),
-    outline = LightColors.outline,
-    outlineVariant = LightColors.line,
-    error = LightColors.danger,
-)
+/**
+ * A colour being tried while the hue slider moves. The theme wears it at once, so the app recolours as the
+ * finger slides; it's saved as the setting once the finger lifts, and cleared.
+ */
+object ThemePreview {
+    var seed by mutableStateOf<Long?>(null)
+}
 
 /** Whether this choice means dark right now. Follows the device live, including a dark mode schedule. */
 @Composable
@@ -360,18 +334,21 @@ private fun fromScheme(s: androidx.compose.material3.ColorScheme, fixed: ThemeCo
 }
 
 @Composable
-fun EigentoneTheme(dark: Boolean, content: @Composable () -> Unit) {
+fun EigentoneTheme(dark: Boolean, seed: Long? = null, highContrast: Boolean = false, content: @Composable () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    // Colours from the wallpaper from Android 12. Before that there are none to take, so the fixed palettes stand in.
-    val dynamic = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
-    val scheme = when {
-        dynamic && dark -> androidx.compose.material3.dynamicDarkColorScheme(context)
-        dynamic -> androidx.compose.material3.dynamicLightColorScheme(context)
-        dark -> DarkScheme
-        else -> LightScheme
+    // Colours from the wallpaper from Android 12, unless a colour of their own is picked. Before Android 12 there
+    // are none to take, so Material You's colours are made from Eigentone's blue, or the colour picked, instead
+    // of the old fixed palettes (tester feedback).
+    val wallpaper = seed == null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+    val scheme = androidx.compose.runtime.remember(seed, dark, wallpaper) {
+        when {
+            wallpaper && dark -> androidx.compose.material3.dynamicDarkColorScheme(context)
+            wallpaper -> androidx.compose.material3.dynamicLightColorScheme(context)
+            else -> SeedScheme.scheme(seed ?: SeedScheme.DEFAULT_SEED, dark)
+        }
     }
-    val colors = androidx.compose.runtime.remember(scheme, dark) {
-        if (dynamic) fromScheme(scheme, if (dark) DarkColors else LightColors, dark) else if (dark) DarkColors else LightColors
+    val colors = androidx.compose.runtime.remember(scheme, dark, highContrast) {
+        fromScheme(scheme, if (dark) DarkColors else LightColors, dark).let { if (highContrast) it.contrasted() else it }
     }
     // Set before anything below reads it, so a change can't show one frame of the old theme.
     if (Palette.colors != colors) Palette.colors = colors

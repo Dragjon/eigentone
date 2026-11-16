@@ -49,7 +49,7 @@ object BandSwitch {
             detail.bands,
             detail.gains.indices.map { i ->
                 val w = weight[i].coerceIn(0.0, 1.0)
-                GraphicEq.snap(detail.gains[i] * (1 - w) + coarse[i] * w)
+                GraphicEq.snapChange(detail.gains[i] * (1 - w) + coarse[i] * w)
             },
         )
     }
