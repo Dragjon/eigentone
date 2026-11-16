@@ -103,5 +103,5 @@ HUGE THANKS to the goated [Natcuber](https://github.com/Natcuber) for suggesting
 | Material | Source |
 |---|---|
 | **Fonts** | Barlow and JetBrains Mono, under the SIL Open Font License 1.1 |
-| **Headphone data** | The Liberty 4 NC presets, headphone corrections and target curves use [AutoEq](https://github.com/jaakkopasanen/AutoEq) results and targets (MIT License). The Liberty presets only appear while those earbuds are connected. |
+| **Headphone data** | Headphone corrections, target curves and the built-in presets made for particular headphones use [AutoEq](https://github.com/jaakkopasanen/AutoEq) results and targets (MIT License). Presets made for one pair of headphones only appear while those headphones are connected. |
 | **Research** | Shapes and targets use figures from ISO 226:2003 (equal-loudness contours), ANSI S3.5 band weights, and Sean Olive and colleagues' Harman listening research, including "The Perception and Measurement of Headphone Sound Quality" (Acoustics Today, 2022). |

@@ -94,7 +94,7 @@ For an app where the user judges by ear or eye, the comparison is the product.
 
 ### 2.6 Context decides what's offered, everywhere at once
 - Features only appear where they make sense: peak finding and the sweep only for headphones and earbuds, never for the phone speaker; presets made for specific earbuds only while those earbuds are connected.
-- **What went wrong:** the earbuds-only presets were hidden in the preset list but still appeared in Compare curves, so other people saw the owner's Liberty 4 presets.
+- **What went wrong:** the earbuds-only presets were hidden in the preset list but still appeared in Compare curves, so other people saw presets made for one particular pair of earbuds.
 - **How to apply:** put each filtering rule in one function, and make every list that shows those items call it. When fixing a leak in one place, search for every other list of the same thing.
 
 ### 2.7 Keep often-used options next to what they change
