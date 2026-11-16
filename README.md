@@ -66,6 +66,12 @@ Every feature is listed in [Features](docs/FEATURES.md), and [Eigentone and Wave
 > [!NOTE]
 > Eigentone is a pre-release, tested on three phones so far. If something doesn't work on yours, please [open an issue](https://github.com/Dragjon/eigentone/issues). [Installing and updating](docs/INSTALL.md) has the details.
 
+## On Windows
+
+Eigentone is on Windows 11 too, as [Eigentone for Windows](https://github.com/Dragjon/eigentone-windows). It has the same presets, curves and tools, laid out as an audio studio for a bigger screen, and it shapes every app through a plug-in in Windows' own audio engine. It adds a tray icon, shortcuts that work from any app, and presets per app.
+
+Download the installer from its [releases](https://github.com/Dragjon/eigentone-windows/releases). It's an early pre-release too. Presets move between your phone and your PC with share codes and backups, which both versions read.
+
 ## Documentation
 
 | For listeners | What's inside |
