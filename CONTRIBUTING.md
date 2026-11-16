@@ -57,7 +57,7 @@ For anything bigger than a small fix, please open an issue first, or comment on 
 - **Kotlin and Jetpack Compose**, following the style of the code around your change.
 - **Comments say why, not what**, in plain sentences.
 - **Text people read** in the app is plain and short, in British English ("colour", "equaliser"), and goes in `app/src/main/res/values/strings_ui.xml` rather than in the code.
-- **Interface rules that Eigentone keeps:** touch targets of at least 48 dp; anything that acts at once can be undone; unsaved changes are visible straight away; a control does nothing on an accidental touch; and every gesture has a button a screen reader can use. [Design philosophies](DESIGN_PHILOSOPHIES.md) explains each one and why it's there.
+- **Interface rules that Eigentone keeps:** touch targets of at least 48 dp; anything that acts at once can be undone; unsaved changes are visible straight away; a control does nothing on an accidental touch; and every gesture has a button a screen reader can use. [Design philosophies](docs/DESIGN-PHILOSOPHIES.md) explains each one and why it's there.
 - **Commit messages** start with a short line saying what the change does, such as "Keep fader labels clear of the handles", with more detail below it if needed.
 - **No analytics, ads or tracking**, and no network use beyond what the user asks for. See [Privacy](docs/PRIVACY.md).
 

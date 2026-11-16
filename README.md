@@ -72,7 +72,7 @@ Download the APK from [Releases](https://github.com/Dragjon/eigentone/releases) 
 | [Known limits](docs/KNOWN-LIMITS.md) | What Android doesn't allow without root, and the workarounds |
 | [Building Eigentone](docs/BUILDING.md) | Build from source, and where things are in the code |
 | [Contributing](CONTRIBUTING.md) | How to report bugs, suggest ideas, translate, or send code |
-| [Design philosophies](DESIGN_PHILOSOPHIES.md) | The interaction rules the app follows, and why |
+| [Design philosophies](docs/DESIGN-PHILOSOPHIES.md) | The interaction rules the app follows, and why |
 | [Changelog](CHANGELOG.md) | What changed in each release |
 
 ## Contributing

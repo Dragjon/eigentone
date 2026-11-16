@@ -1,5 +1,7 @@
 # Design Philosophies
 
+[← Back to the README](../README.md)
+
 The interaction and UX practices behind Eigentone, written so the next app starts where this one ended rather than where it began. Colours, fonts and theming are left out on purpose; this is about structure, behaviour, wording and process.
 
 Every rule below was paid for. Each comes with **what went wrong** in Eigentone (found by the owner, a tester, or an audit) and **how to apply it** next time.
