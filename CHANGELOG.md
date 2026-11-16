@@ -15,6 +15,8 @@ What changed in each release since 0.33.0, newest first. Every release is publis
 - **The page fades into the bars** at the top and bottom instead of stopping at a hard edge, and the tab bar is shorter.
 - **EQ precision.** Under Settings, with Advanced controls on, choose Standard (128 bands) or Fine (256 bands). Fine follows narrow parametric filters about twice as closely, but changes to the whole sound, such as Bypass and switching presets, take about twice as long to apply. A phone that refuses Fine uses Standard, and Status shows the bands in use.
 - The small curve in the status strip slides in and out as you move to and from the Equaliser, instead of popping.
+- **Settings fades in** from the gear rather than sliding in like a tab, and fades back out.
+- The device name in the status strip reveals smoothly as space opens up, with a soft fade where it's cut off instead of "…".
 - Unsaved-changes bars and messages sit just above the tabs.
 
 ## 0.42.0

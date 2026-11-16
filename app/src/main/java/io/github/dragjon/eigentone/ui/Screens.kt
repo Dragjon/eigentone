@@ -248,6 +248,10 @@ private const val SEARCH_FROM_PRESETS = 6
 /** Just after the theme toggle's thumb has finished sliding, so recolouring the app never stalls it midway. */
 private const val THEME_SWITCH_AFTER_MS = 260L
 private const val TAB_SLIDE_MS = 240
+/** In a fade-through, how much of the time the old page takes to fade out before the new one fades in. */
+private const val FADE_THROUGH_SPLIT = 0.35f
+/** The size the new page grows from as it fades in. */
+private const val FADE_THROUGH_SCALE = 0.96f
 
 /** How long after the app appears the tabs not yet visited are built, so the opening isn't slowed by them. */
 private const val TAB_PREBUILD_DELAY_MS = 400L
@@ -725,10 +729,25 @@ private fun AppScreen(
                                     .graphicsLayer {
                                         val p = presence.value
                                         val entering = t == pages.targetState
-                                        val sign = if (pages.targetState.ordinal >= pages.currentState.ordinal) 1f else -1f
-                                        translationX = (if (entering) sign else -sign) * (1f - p) * size.width / 3f
-                                        // Fades over the first half: the new page arrives quickly, the old one leaves quickly.
-                                        alpha = if (entering) (p * 2f).coerceAtMost(1f) else ((p - 0.5f) * 2f).coerceIn(0f, 1f)
+                                        if (pages.targetState == Tab.SYSTEM || pages.currentState == Tab.SYSTEM) {
+                                            // Settings opens from the gear rather than sitting beside the tabs, so it fades
+                                            // through instead of sliding, which would place it to the right of the last tab
+                                            // (user decision). The old page fades out first, then Settings fades in while
+                                            // growing very slightly, and the reverse on the way back.
+                                            translationX = 0f
+                                            val arriving = ((p - FADE_THROUGH_SPLIT) / (1f - FADE_THROUGH_SPLIT)).coerceIn(0f, 1f)
+                                            alpha = if (entering) arriving else ((p - (1f - FADE_THROUGH_SPLIT)) / FADE_THROUGH_SPLIT).coerceIn(0f, 1f)
+                                            val scale = if (entering) FADE_THROUGH_SCALE + (1f - FADE_THROUGH_SCALE) * arriving else 1f
+                                            scaleX = scale
+                                            scaleY = scale
+                                        } else {
+                                            val sign = if (pages.targetState.ordinal >= pages.currentState.ordinal) 1f else -1f
+                                            translationX = (if (entering) sign else -sign) * (1f - p) * size.width / 3f
+                                            // Fades over the first half: the new page arrives quickly, the old one leaves quickly.
+                                            alpha = if (entering) (p * 2f).coerceAtMost(1f) else ((p - 0.5f) * 2f).coerceIn(0f, 1f)
+                                            scaleX = 1f
+                                            scaleY = 1f
+                                        }
                                     }
                                     .verticalScroll(scrolls.getValue(t)),
                                 contentAlignment = Alignment.TopCenter,

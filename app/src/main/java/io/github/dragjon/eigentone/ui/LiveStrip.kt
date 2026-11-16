@@ -26,6 +26,7 @@ import androidx.compose.ui.layout.layout
 import kotlin.math.roundToInt
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.LaunchedEffect
@@ -178,14 +179,37 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
                 .grownBy(nameScale)
                 .size(22.dp),
         )
+        // Laid out once at full length and uncovered as room grows, so when the curve or the icons come and go the name
+        // reveals smoothly rather than being re-cut a letter at a time (user decision). A short fade at its end shows
+        // where it's cut off, and only when it is.
+        var nameCut by remember { mutableStateOf(false) }
+        val fadeEnd = with(androidx.compose.ui.platform.LocalDensity.current) { NAME_FADE_DP.dp.toPx() }
         Text(
             output.label,
             style = MaterialTheme.typography.bodySmall.copy(fontSize = 16.sp, lineHeight = 22.sp),
             color = Palette.StripText,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            softWrap = false,
+            overflow = TextOverflow.Clip,
+            onTextLayout = { nameCut = it.hasVisualOverflow },
             modifier = Modifier
                 .weight(1f)
+                .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    if (nameCut) {
+                        drawRect(
+                            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                listOf(androidx.compose.ui.graphics.Color.Black, androidx.compose.ui.graphics.Color.Transparent),
+                                startX = size.width - fadeEnd,
+                                endX = size.width,
+                            ),
+                            topLeft = androidx.compose.ui.geometry.Offset(size.width - fadeEnd, 0f),
+                            size = androidx.compose.ui.geometry.Size(fadeEnd, size.height),
+                            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+                        )
+                    }
+                }
                 .grownBy(nameScale),
         )
         AnimatedVisibility(
@@ -304,6 +328,8 @@ val LocalOpenEffect = androidx.compose.runtime.compositionLocalOf<(String) -> Un
 private const val STRIP_MS = 280
 /** How long the small curve takes to slide in or out of the strip, in step with the pages sliding. */
 private const val CURVE_SLIDE_MS = 300
+/** The fade at the end of a device name that's cut off. */
+private const val NAME_FADE_DP = 20
 
 /** After the app has opened and its tabs have been built. */
 private const val STRIP_REHEARSE_DELAY_MS = 1800L

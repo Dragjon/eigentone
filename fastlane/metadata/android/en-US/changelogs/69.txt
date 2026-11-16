@@ -2,3 +2,4 @@
 - A smaller tab bar, and the page fades into the bars at the top and bottom
 - EQ precision: Standard or Fine (256 bands), under Settings
 - The status strip's small curve slides in and out between tabs
+- Settings fades in, and the strip's device name reveals smoothly
