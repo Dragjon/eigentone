@@ -222,6 +222,11 @@ data class AppState(
     val nightMode: Double = 0.0,
     val balance: Double = 0.0,
     val lowLatency: Boolean = false,
+    /**
+     * Fine EQ precision: 256 bands rather than 128, which follows narrow filters about twice as closely but
+     * makes every change of the whole sound take about twice as long to apply. Falls back to 128 if refused.
+     */
+    val fineEq: Boolean = false,
     val engineMode: EngineMode = EngineMode.AUTO,
     val autoSwitch: Boolean = true,
     /** Output key to preset id. See [Profiles] for per-mode keys. */

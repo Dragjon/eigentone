@@ -3420,6 +3420,22 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
             Repo.update { it.copy(lowLatency = on) }
         }
         RowDivider()
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.ui_eq_precision), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
+                InfoButton(Help.eqPrecision)
+            }
+            SlidingToggle(
+                options = listOf(
+                    ToggleOption(stringResource(R.string.ui_eq_precision_standard)),
+                    ToggleOption(stringResource(R.string.ui_eq_precision_fine)),
+                ),
+                selected = if (state.fineEq) 1 else 0,
+                onSelect = { i -> Repo.update { it.copy(fineEq = i == 1) } },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        RowDivider()
         }
         SwitchSetting(stringResource(R.string.ui_start_automatically), Help.startOnBoot, state.startOnBoot) { on ->
             Repo.update { it.copy(startOnBoot = on) }

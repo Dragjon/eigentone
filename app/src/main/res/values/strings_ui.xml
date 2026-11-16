@@ -1077,4 +1077,9 @@
     <string name="help_long_notices_title" formatted="false">Longer messages</string>
     <string name="help_long_notices_body" formatted="false">Messages at the bottom of the screen, and the Undo they offer, stay twice as long before they go.</string>
     <string name="ui_pick_a_fader" formatted="false">Pick a fader</string>
+    <string name="ui_eq_precision" formatted="false">EQ precision</string>
+    <string name="ui_eq_precision_standard" formatted="false">Standard</string>
+    <string name="ui_eq_precision_fine" formatted="false">Fine</string>
+    <string name="help_eq_precision_title" formatted="false">EQ precision</string>
+    <string name="help_eq_precision_body" formatted="false">How closely the sound follows your EQ curve. Standard uses 128 bands, which is plenty for headphone corrections, the graphic EQ and tone. Fine uses 256 bands, which follows narrow parametric filters about twice as closely, but every change to the whole sound, such as Bypass, comparisons and switching presets, takes about twice as long to apply. Changing it restarts the EQ, which can interrupt the sound for a moment. If the phone refuses Fine, Standard is used, and Status shows the bands in use.</string>
 </resources>

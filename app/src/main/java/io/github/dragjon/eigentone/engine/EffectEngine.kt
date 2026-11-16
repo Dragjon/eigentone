@@ -67,6 +67,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
     private var mbcBands: Int? = null
     private var activeMode: EngineMode? = null
     private var builtLowLatency: Boolean? = null
+    private var builtFineEq: Boolean? = null
     private var builtMode: EngineMode? = null
     private var error: String? = null
     private var spatialError: String? = null
@@ -98,7 +99,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
 
     fun apply(state: AppState) {
         latest = state
-        if (builtMode != state.engineMode || builtLowLatency != state.lowLatency) rebuild(state)
+        if (builtMode != state.engineMode || builtLowLatency != state.lowLatency || builtFineEq != state.fineEq) rebuild(state)
         chains.values.forEach { push(it, state) }
         reverbRoom = Processing.reverbFor(state, suspended)
         reverbLevel = ReverbRoom.reverbLevel(state.current.tone.reverbAmount)
@@ -220,6 +221,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         activeMode = null
         builtMode = null
         builtLowLatency = null
+        builtFineEq = null
         onStatus(EngineStatus())
     }
 
@@ -241,6 +243,10 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         error = null
         builtMode = state.engineMode
         builtLowLatency = state.lowLatency
+        builtFineEq = state.fineEq
+        // Each rebuild asks the phone again from the finest count it wants, so changing EQ precision takes effect.
+        // Within one build, every session keeps the count the first was given.
+        mapper = null
         activeMode = null
 
         if (state.engineMode != EngineMode.SESSIONS) {
@@ -258,7 +264,7 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
     /** Tries the finest band count first, because support varies between devices. */
     private fun attach(session: Int, label: String): Boolean {
         val lowLatency = builtLowLatency == true
-        val counts = mapper?.let { listOf(it.bandCount) } ?: BAND_COUNTS
+        val counts = mapper?.let { listOf(it.bandCount) } ?: if (builtFineEq == true) FINE_BAND_COUNTS else BAND_COUNTS
         // Fewer compressor bands costs the tamers, which is far better than losing the whole EQ.
         val mbcOptions = mbcBands?.let { listOf(it) } ?: listOf(Dynamics.FULL_BANDS, Dynamics.BASIC_BANDS)
         var failure: Exception? = null
@@ -524,6 +530,11 @@ class EffectEngine(private val onStatus: (EngineStatus) -> Unit) {
         private const val FRAME_MS_LOW_LATENCY = 10f
         private const val MAX_EFFECT_STRENGTH = 1000
         private val BAND_COUNTS = listOf(128, 64, 32, 16)
+        /**
+         * Fine precision tries 256 first. Each band is a separate call into the audio system, about 0.3 ms on a
+         * Galaxy A54, so a full update takes about 160 ms at 256 bands against 80 ms at 128.
+         */
+        private val FINE_BAND_COUNTS = listOf(256) + BAND_COUNTS
         private const val LOG_SWITCH_MS = 5L
     }
 }

@@ -39,7 +39,7 @@ object Disclosure {
 
     fun matchBypass(s: AppState) = s.advancedControls || !s.matchBypass
 
-    fun engine(s: AppState) = s.advancedControls || s.engineMode != EngineMode.AUTO || s.lowLatency
+    fun engine(s: AppState) = s.advancedControls || s.engineMode != EngineMode.AUTO || s.lowLatency || s.fineEq
 
     fun status(s: AppState) = s.advancedControls
 
