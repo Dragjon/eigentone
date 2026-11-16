@@ -41,10 +41,10 @@ We take inspiration from KDE Plasma's motto: **simple by default, powerful when 
 
 | Reason | What it means |
 |---|---|
-| 🆓 **Everything is free** | No paid tier and nothing locked. Reverb, surround and the compressor are free like the rest. |
-| 🔓 **It's open source** | GPL v3, so anyone can check what it does with their audio, build it themselves, or improve it. |
-| 👂 **It fits you, not just your headphones** | AutoEq corrections fix the headphones. The hearing check, a separate EQ for each ear and *Find my sound* fit the sound to you. |
-| ⚖️ **It's honest about what it changes** | Comparisons and Bypass are loudness-matched, so louder never wins by accident, and it warns when a setting could clip. |
+| **Everything is free** | No paid tier and nothing locked. Reverb, surround and the compressor are free like the rest. |
+| **It's open source** | GPL v3, so anyone can check what it does with their audio, build it themselves, or improve it. |
+| **It fits you, not just your headphones** | AutoEq corrections fix the headphones. The hearing check, a separate EQ for each ear and *Find my sound* fit the sound to you. |
+| **It's honest about what it changes** | Comparisons and Bypass are loudness-matched, so louder never wins by accident, and it warns when a setting could clip. |
 
 ## Highlights
 

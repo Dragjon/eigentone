@@ -13,12 +13,12 @@ Thanks for thinking of helping. Eigentone is free and open source, and it's bett
 
 | Way to help | Code needed? | How |
 |---|---|---|
-| 📱 **Try it on your phone** | No | Eigentone has only been tested on three phones, and Android's audio differs from one maker to the next. Tell us how it works on yours, good or bad. |
-| 🐞 **Report a bug** | No | Open an [issue](https://github.com/Dragjon/eigentone/issues), as [below](#reporting-a-bug) |
-| 💡 **Suggest an idea** | No | Say what you were trying to do and what got in the way. That helps more than a finished design. |
-| 🌍 **Translate the app** | A little | See [Translating](#translating) |
-| 📝 **Improve the docs** | No | A clearer sentence, a missing step or a fixed typo are all welcome |
-| 🛠️ **Write code** | Yes | Fixes, features, tests and tidying, as [below](#contributing-code) |
+| **Try it on your phone** | No | Eigentone has only been tested on three phones, and Android's audio differs from one maker to the next. Tell us how it works on yours, good or bad. |
+| **Report a bug** | No | Open an [issue](https://github.com/Dragjon/eigentone/issues), as [below](#reporting-a-bug) |
+| **Suggest an idea** | No | Say what you were trying to do and what got in the way. That helps more than a finished design. |
+| **Translate the app** | A little | See [Translating](#translating) |
+| **Improve the docs** | No | A clearer sentence, a missing step or a fixed typo are all welcome |
+| **Write code** | Yes | Fixes, features, tests and tidying, as [below](#contributing-code) |
 
 ## Reporting a bug
 

@@ -12,11 +12,11 @@ Eigentone uses Android's `DynamicsProcessing` effect on the phone's mixed output
 
 ```mermaid
 flowchart LR
-    A["🎵 Any app"] --> B["Input gain<br/>preamp, headroom<br/>and balance"]
+    A["Any app"] --> B["Input gain<br/>preamp, headroom<br/>and balance"]
     B --> C["One EQ per channel<br/>128 bands"]
     C --> D["Multiband compressor<br/>compressor, night mode, leveller,<br/>Clarity and dynamic filters"]
     D --> E["Limiter"]
-    E --> F["🎧 Your headphones"]
+    E --> F["Your headphones"]
 
     P["Parametric filters"] -.-> C
     G["Graphic EQ"] -.-> C
