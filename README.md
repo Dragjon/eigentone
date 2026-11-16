@@ -24,11 +24,11 @@
 </p>
 
 <p align="center">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/01-equaliser-0.42.png" width="19%" alt="Equaliser tab: the EQ curve over the live spectrum, and the graphic EQ faders with their dB scale">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/02-effects-0.42.png" width="19%" alt="Effects tab: preset strength, preamp and tone controls">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/03-presets-0.42.png" width="19%" alt="Presets tab: search, and your presets with favourites starred">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/04-headphones-0.42.png" width="19%" alt="Earbuds tab, named after what is connected: headphone correction and the preset that loads automatically">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/05-settings-0.42.png" width="19%" alt="Settings: volume, level, stereo, theme, the colour picker and Advanced controls">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/01-equaliser-0.43.png" width="19%" alt="Equaliser tab: the EQ curve over the live spectrum, and the graphic EQ faders with their dB scale">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/02-effects-0.43.png" width="19%" alt="Effects tab: bass, vocals and treble, with Space and Clarity folded below">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/03-presets-0.43.png" width="19%" alt="Presets tab: search, and your presets with favourites starred">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/04-headphones-0.43.png" width="19%" alt="Earbuds tab, named after what is connected: headphone correction and the preset that loads automatically">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/05-settings-0.43.png" width="19%" alt="Settings: volume, level, stereo, theme, the colour picker and Advanced controls">
 </p>
 
 > *Eigentones are the natural resonant tones of an enclosed space. "Eigen" is German for "own", so the name reads as "your own tone".*
