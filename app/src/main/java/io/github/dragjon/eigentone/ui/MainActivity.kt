@@ -76,16 +76,19 @@ class MainActivity : ComponentActivity() {
             val seeds = remember { Repo.state.map { it.themeColor }.distinctUntilChanged() }
             val seed by seeds.collectAsStateWithLifecycle(Repo.state.value.themeColor)
             val access by remember {
-                Repo.state.map { Access(it.textScale, it.highContrast, it.haptics) }.distinctUntilChanged()
+                Repo.state.map { Access.of(it) }.distinctUntilChanged()
             }.collectAsStateWithLifecycle(Access.of(Repo.state.value))
             Haptics.enabled = access.haptics
-            // Larger text on top of the phone's own size, for the whole app.
+            // Larger text on top of the phone's own size, for the whole app; or, with controls scaled too, everything
+            // larger, as Android's display size does, so buttons and spacing keep pace with the text (user decision).
             val density = androidx.compose.ui.platform.LocalDensity.current
+            val scale = access.textScale.toFloat()
             androidx.compose.runtime.CompositionLocalProvider(
-                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(
-                    density.density,
-                    density.fontScale * access.textScale.toFloat(),
-                ),
+                androidx.compose.ui.platform.LocalDensity provides if (access.scaleControls) {
+                    androidx.compose.ui.unit.Density(density.density * scale, density.fontScale)
+                } else {
+                    androidx.compose.ui.unit.Density(density.density, density.fontScale * scale)
+                },
             ) {
                 EigentoneTheme(dark, ThemePreview.seed ?: seed, access.highContrast) { MenuHost { EigentoneApp(onSetEnabled = ::setEnabled) } }
             }
@@ -169,8 +172,8 @@ class MainActivity : ComponentActivity() {
 }
 
 /** The accessibility settings that change the whole app, read together so they change it once. */
-private data class Access(val textScale: Double, val highContrast: Boolean, val haptics: Boolean) {
+private data class Access(val textScale: Double, val scaleControls: Boolean, val highContrast: Boolean, val haptics: Boolean) {
     companion object {
-        fun of(s: io.github.dragjon.eigentone.data.AppState) = Access(s.textScale, s.highContrast, s.haptics)
+        fun of(s: io.github.dragjon.eigentone.data.AppState) = Access(s.textScale, s.scaleControls, s.highContrast, s.haptics)
     }
 }

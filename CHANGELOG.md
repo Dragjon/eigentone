@@ -7,7 +7,13 @@ What changed in each release since 0.33.0, newest first. Every release is publis
 > [!NOTE]
 > Every release is a pre-release until the first official one.
 
-**Releases:** [0.44.0](#0440) · [0.43.1](#0431) · [0.43.0](#0430) · [0.42.0](#0420) · [0.41.3](#0413) · [0.41.2](#0412) · [0.41.1](#0411) · [0.41.0](#0410) · [0.40.2](#0402) · [0.40.1](#0401) · [0.40.0](#0400) · [0.39.1](#0391) · [0.39.0](#0390) · [0.38.1](#0381) · [0.38.0](#0380) · [0.37.0](#0370) · [0.36.0](#0360) · [0.35.0](#0350) · [0.34.0](#0340)
+**Releases:** [0.44.1](#0441) · [0.44.0](#0440) · [0.43.1](#0431) · [0.43.0](#0430) · [0.42.0](#0420) · [0.41.3](#0413) · [0.41.2](#0412) · [0.41.1](#0411) · [0.41.0](#0410) · [0.40.2](#0402) · [0.40.1](#0401) · [0.40.0](#0400) · [0.39.1](#0391) · [0.39.0](#0390) · [0.38.1](#0381) · [0.38.0](#0380) · [0.37.0](#0370) · [0.36.0](#0360) · [0.35.0](#0350) · [0.34.0](#0340)
+
+## 0.44.1
+
+- **Larger controls too.** With Text size on Large or Larger, a new switch under Settings, Accessibility grows the whole app with the text: buttons, sliders, the strip and the space between them, as Android's display size does.
+- **A darker darkest colour.** The Lightness slider goes much deeper at its dark end, most of all in the light theme, where a deep colour on white still reads clearly.
+- **Even line breaks.** Text that wraps splits into lines of about the same length, instead of leaving a word or two alone on the last line. From Android 13.
 
 ## 0.44.0
 

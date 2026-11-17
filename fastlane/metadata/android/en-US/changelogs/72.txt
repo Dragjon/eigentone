@@ -1,0 +1,3 @@
+- Larger controls too: grow buttons and sliders with the text
+- The Lightness slider goes darker, most in the light theme
+- Wrapped text breaks into even lines (Android 13 and later)

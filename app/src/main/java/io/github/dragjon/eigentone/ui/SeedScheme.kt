@@ -40,7 +40,12 @@ object SeedScheme {
         // A colour of one's own also carries how vivid and how light it is. The swatches are as designed.
         val own = if (seed in SWATCHES) null else picked(seed)
         val vivid = own?.saturation?.toDouble() ?: 1.0
-        val shift = own?.let { ((it.lightness - 0.5f) * 2 * MAX_TONE_SHIFT).roundToInt() } ?: 0
+        // Further towards dark than light, and furthest by day, where a deep colour on white still reads well; at
+        // night the colour is drawn light, and too dark it would lose its text (user decision).
+        val shift = own?.let {
+            val t = (it.lightness - 0.5f) * 2
+            (t * if (t >= 0f) MAX_TONE_SHIFT else if (dark) MAX_DARK_SHIFT_NIGHT else MAX_DARK_SHIFT_DAY).roundToInt()
+        } ?: 0
         val p = Tonal(hue, PRIMARY_CHROMA * vivid)
         val s = Tonal(hue, SECONDARY_CHROMA * vivid)
         val t = Tonal(hue + 60.0, TERTIARY_CHROMA * vivid)
@@ -219,11 +224,15 @@ object SeedScheme {
     }
 
     /** The lightness range a picked colour spans, a swatch's 50 in the middle. */
-    private const val PICK_TONE_LOW = 35.0
+    // Down to 25, so the swatch shows how deep the darkest choice goes (user decision).
+    private const val PICK_TONE_LOW = 25.0
     private const val PICK_TONE_HIGH = 65.0
 
     /** How far the accent's tone moves at either end of the lightness slider, kept small so text on it stays readable. */
     private const val MAX_TONE_SHIFT = 10
+    /** How far darker the accent can go at the slider's dark end: furthest by day. */
+    private const val MAX_DARK_SHIFT_DAY = 20
+    private const val MAX_DARK_SHIFT_NIGHT = 14
 
     // Lab chroma, a little above Material's CAM16 figures, which run lower for the same vividness.
     private const val PRIMARY_CHROMA = 48.0

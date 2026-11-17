@@ -1889,6 +1889,13 @@ private fun AccessibilitySection(state: AppState) {
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+        // Only means something once the text is larger than the phone's.
+        if (state.textScale > 1.0) {
+            RowDivider()
+            SwitchSetting(stringResource(R.string.ui_scale_controls), Help.scaleControls, state.scaleControls) { on ->
+                Repo.update { it.copy(scaleControls = on) }
+            }
+        }
         RowDivider()
         SwitchSetting(stringResource(R.string.ui_high_contrast), Help.highContrast, state.highContrast) { on ->
             Repo.update { it.copy(highContrast = on) }

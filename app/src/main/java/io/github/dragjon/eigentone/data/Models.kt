@@ -288,6 +288,8 @@ data class AppState(
     val themeColor: Long? = null,
     /** How much larger than the phone's own text size the app's text is: 1, 1.15 or 1.3. */
     val textScale: Double = 1.0,
+    /** Buttons, controls and spacing grow with [textScale] too, so the whole app is larger, not only its text. */
+    val scaleControls: Boolean = false,
     /** Dim text and hairlines drawn darker (or lighter at night), so everything reads more clearly. */
     val highContrast: Boolean = false,
     /** Touch feedback when sliders pass their default or reach an end, and for switches and Save. */

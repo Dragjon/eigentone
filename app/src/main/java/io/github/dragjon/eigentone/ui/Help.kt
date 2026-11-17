@@ -39,6 +39,7 @@ object Help {
     val themeColour = Tip(R.string.help_theme_colour_title, R.string.help_theme_colour_body)
     val textSize = Tip(R.string.help_text_size_title, R.string.help_text_size_body)
     val highContrast = Tip(R.string.help_high_contrast_title, R.string.help_high_contrast_body)
+    val scaleControls = Tip(R.string.help_scale_controls_title, R.string.help_scale_controls_body)
     val haptics = Tip(R.string.help_haptics_title, R.string.help_haptics_body)
     val longNotices = Tip(R.string.help_long_notices_title, R.string.help_long_notices_body)
     val advanced = Tip(R.string.help_advanced_title, R.string.help_advanced_body)

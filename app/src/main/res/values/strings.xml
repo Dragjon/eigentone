@@ -12,4 +12,7 @@
     <string name="ui_colour_lightness">Lightness</string>
     <string name="ui_strip_now_playing">Playing: %1$s</string>
     <string name="ui_strip_show_playing">Show which app is playing</string>
+    <string name="ui_scale_controls">Larger controls too</string>
+    <string name="help_scale_controls_title">Larger controls too</string>
+    <string name="help_scale_controls_body">Buttons, sliders and the space between them grow with the text, so the whole app is larger, as Android\'s display size makes it. Some pages then need more scrolling.</string>
 </resources>

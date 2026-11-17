@@ -273,7 +273,7 @@ private val Engraved = FontFamily(
 
 val ReadoutFamily = FontFamily(Font(R.font.jetbrains_mono))
 
-private val Type = Typography(
+private val TypeBase = Typography(
     displaySmall = TextStyle(fontFamily = Engraved, fontSize = 38.sp, lineHeight = 44.sp, fontWeight = FontWeight.Medium),
     headlineMedium = TextStyle(fontFamily = Engraved, fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.SemiBold),
     headlineSmall = TextStyle(fontFamily = Engraved, fontSize = 26.sp, lineHeight = 32.sp, fontWeight = FontWeight.SemiBold),
@@ -297,6 +297,27 @@ private val Type = Typography(
     ),
     labelMedium = TextStyle(fontFamily = Engraved, fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
     labelSmall = TextStyle(fontFamily = Engraved, fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium),
+)
+
+/**
+ * Wrapped text breaks into lines of about even length, rather than leaving a word or two alone on the last line, such
+ * as "back as it was / saved." (tester feedback). Android balances lines from version 13; before that it wraps as usual.
+ */
+private fun TextStyle.balanced() = copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading)
+
+private val Type = TypeBase.copy(
+    displaySmall = TypeBase.displaySmall.balanced(),
+    headlineMedium = TypeBase.headlineMedium.balanced(),
+    headlineSmall = TypeBase.headlineSmall.balanced(),
+    titleLarge = TypeBase.titleLarge.balanced(),
+    titleMedium = TypeBase.titleMedium.balanced(),
+    titleSmall = TypeBase.titleSmall.balanced(),
+    bodyLarge = TypeBase.bodyLarge.balanced(),
+    bodyMedium = TypeBase.bodyMedium.balanced(),
+    bodySmall = TypeBase.bodySmall.balanced(),
+    labelLarge = TypeBase.labelLarge.balanced(),
+    labelMedium = TypeBase.labelMedium.balanced(),
+    labelSmall = TypeBase.labelSmall.balanced(),
 )
 
 /** A panel's engraved legend. */
