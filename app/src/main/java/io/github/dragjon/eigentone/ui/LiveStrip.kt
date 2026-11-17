@@ -4,6 +4,7 @@ package io.github.dragjon.eigentone.ui
 
 import androidx.compose.ui.semantics.Role
 import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.foundation.layout.width
@@ -71,6 +72,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.border
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -85,7 +87,13 @@ import io.github.dragjon.eigentone.data.Repo
 import io.github.dragjon.eigentone.dsp.Eq
 
 private const val MINI_POINTS = 48
-private const val STRIP_HEIGHT_DP = 38
+/**
+ * How faded an effect's icon is in the strip while the effect is off: still 3:1 against the strip in the light theme,
+ * which half strength fell short of (about 2.5:1, MD3 audit).
+ */
+private const val OFF_ICON_ALPHA = 0.62f
+/** The shut strip's least height, matching the tab bar's, which a second line for the playing app grows past. */
+private const val STRIP_HEIGHT_DP = 48
 private const val MINI_BARS = 24
 private const val MINI_RANGE_DB = 18.0
 
@@ -147,7 +155,12 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
         Modifier
             .fillMaxWidth()
             .clip(StripShape)
-            .background(Palette.Strip)
+            // Frosted, as the bars are (user decision).
+            // Frosted with its own blur, the same glass as the tab bar's (user decision). The top's frosting beneath it
+            // fades out towards its foot, so a plain tint there showed the page sharp through the strip.
+            .glass(Palette.Strip)
+            // The same faint outline as the tab bar, the strip's partner at the bottom.
+            .border(1.dp, Palette.Line.copy(alpha = 0.6f), StripShape)
             // Where the strip and its drawer are, so a tap anywhere else can close the drawer.
             .onGloballyPositioned { StripDrawer.bounds = it.boundsInRoot() },
     ) {
@@ -184,16 +197,25 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
         // where it's cut off, and only when it is.
         var nameCut by remember { mutableStateOf(false) }
         val fadeEnd = with(androidx.compose.ui.platform.LocalDensity.current) { NAME_FADE_DP.dp.toPx() }
+        // The app playing through Eigentone right now, after the output's name, as Wavelet shows it (user decision).
+        // Kept while it fades away, so the name doesn't empty first.
+        val nowPlaying by Repo.nowPlaying.collectAsStateWithLifecycle()
+        val stripContext = androidx.compose.ui.platform.LocalContext.current
+        val playingName = remember(nowPlaying) { nowPlaying?.let { appLabel(stripContext, it) } }
+        var lastPlaying by remember { mutableStateOf("") }
+        if (playingName != null) lastPlaying = playingName
+        // The name, with the playing app small and quiet below it, so neither is squeezed (user decision).
+        Column(Modifier.weight(1f)) {
         Text(
             output.label,
-            style = MaterialTheme.typography.bodySmall.copy(fontSize = 16.sp, lineHeight = 22.sp),
+            style = MaterialTheme.typography.bodyLarge,
             color = Palette.StripText,
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Clip,
             onTextLayout = { nameCut = it.hasVisualOverflow },
             modifier = Modifier
-                .weight(1f)
+                .fillMaxWidth()
                 .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
                 .drawWithContent {
                     drawContent()
@@ -213,6 +235,22 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
                 .grownBy(nameScale),
         )
         AnimatedVisibility(
+            visible = playingName != null && working,
+            enter = fadeIn(tween(STRIP_MS)) + expandVertically(tween(STRIP_MS)),
+            exit = fadeOut(tween(STRIP_MS / 2)) + androidx.compose.animation.shrinkVertically(tween(STRIP_MS)),
+        ) {
+            val described = stringResource(R.string.ui_strip_now_playing, lastPlaying)
+            Text(
+                lastPlaying,
+                style = MaterialTheme.typography.bodySmall,
+                color = Palette.StripDim,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.semantics { contentDescription = described },
+            )
+        }
+        }
+        AnimatedVisibility(
             visible = !expanded,
             enter = fadeIn(tween(STRIP_MS)),
             exit = fadeOut(tween(STRIP_MS / 3)),
@@ -225,7 +263,7 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
             },
         ) {
             val bar = this
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (clipping) EffectPill(stringResource(R.string.ui_clip_risk), Palette.StripDanger)
                 effects.forEach { effect ->
                     EffectTag(
@@ -314,10 +352,13 @@ fun LiveStrip(state: AppState, showCurve: Boolean) {
 private fun effectKey(name: String) = "strip-effect-$name"
 
 private const val STRIP_INSET_DP = 12
-private const val STRIP_INSET_TOP_DP = 4
+// Close under the top bar, so the strip reads as part of the top rather than floating apart from it (user decision).
+private const val STRIP_INSET_TOP_DP = 0
 private const val STRIP_INSET_BOTTOM_DP = 4
-private const val STRIP_REST_SHADOW_DP = 3f
-private val StripShape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+// No shadow while shut, which made it float apart from the bar; it lifts only as the drawer opens (user decision).
+private const val STRIP_REST_SHADOW_DP = 0f
+// The tab bar's shape, so the strip and the tab bar read as a pair (user decision).
+private val StripShape = TabPillShape
 
 /** The icons travel on the same curve and timing as the drawer that carries them. */
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -391,8 +432,8 @@ private fun androidx.compose.animation.AnimatedVisibilityScope.StripDetails(
     Column(
         Modifier
             .fillMaxWidth()
-            // The strip's own colour, a shade lighter, so the drawer belongs to the strip yet reads apart from its bar (user decision).
-            .background(Palette.StripPanel)
+            // No colour of its own: the strip's frosted surface carries on behind it, so the drawer is the strip
+            // opening (user decision).
             .padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 8.dp),
     ) {
         // A faint line where the bar ends and its drawer begins.
@@ -440,6 +481,46 @@ private fun androidx.compose.animation.AnimatedVisibilityScope.StripDetails(
                 Icon(if (effect.on) Icons.Filled.Check else Icons.Filled.Close, contentDescription = null, tint = colour, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(stringResource(if (effect.on) R.string.ui_state_on else R.string.ui_mode_off), style = Readout, color = colour)
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = Palette.DrawerDim,
+                    modifier = Modifier.padding(start = 4.dp).size(18.dp),
+                )
+            }
+        }
+        // Naming the app that's playing needs access Android lists under notifications, so the drawer offers it
+        // where the name would show, until it's granted.
+        var mediaAllowed by remember { mutableStateOf(io.github.dragjon.eigentone.engine.MediaWatcher.isAllowed(context)) }
+        androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+            mediaAllowed = io.github.dragjon.eigentone.engine.MediaWatcher.isAllowed(context)
+            onPauseOrDispose { }
+        }
+        if (!mediaAllowed) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp)
+                    .animateEnterExit(
+                        enter = fadeIn(tween(STRIP_MS, delayMillis = effects.size * ROW_STAGGER_MS)),
+                        exit = fadeOut(tween(STRIP_MS / 2)),
+                    )
+                    .clip(KeyShape)
+                    .clickable(role = Role.Button) {
+                        context.startActivity(
+                            android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = Palette.DrawerDim, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.ui_strip_show_playing), style = MaterialTheme.typography.bodyMedium, color = Palette.DrawerText)
+                    Text(stringResource(R.string.ui_android_lists_this_under_notification_ac), style = MaterialTheme.typography.bodySmall, color = Palette.DrawerDim)
+                }
                 Icon(
                     Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
@@ -512,7 +593,10 @@ private fun effectLabel(name: String): Int = when (name) {
     else -> R.string.ui_fx_comp
 }
 
-/** An icon for the effect, then a tick or a cross, so the state doesn't rely on colour alone. */
+/**
+ * An icon for the effect, lit in the theme's colour while it's on, and dim and faded while it's off, so the state shows
+ * in brightness as well as colour. A tick or a cross after each crowded the strip (user decision).
+ */
 @Composable
 private fun EffectTag(effect: EffectState, iconModifier: Modifier = Modifier) {
     val colour = if (effect.on) Palette.StripOn else Palette.StripDim
@@ -522,12 +606,11 @@ private fun EffectTag(effect: EffectState, iconModifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = description },
     ) {
-        Icon(painterResource(effectIcon(effect.name)), contentDescription = null, tint = colour, modifier = iconModifier.size(16.dp))
         Icon(
-            if (effect.on) Icons.Filled.Check else Icons.Filled.Close,
+            painterResource(effectIcon(effect.name)),
             contentDescription = null,
-            tint = colour,
-            modifier = Modifier.size(10.dp),
+            tint = if (effect.on) colour else colour.copy(alpha = OFF_ICON_ALPHA),
+            modifier = iconModifier.size(18.dp),
         )
     }
 }
@@ -547,8 +630,7 @@ private fun effectIcon(name: String): Int = when (name) {
 private fun EffectPill(name: String, colour: androidx.compose.ui.graphics.Color = Palette.StripOn) {
     Text(
         name,
-        fontSize = 11.sp,
-        lineHeight = 14.sp,
+        style = MaterialTheme.typography.labelSmall,
         color = colour,
         maxLines = 1,
     )
@@ -562,13 +644,15 @@ private fun PlayingDot() {
         val modifier = Modifier
             .size(8.dp)
             .semantics { contentDescription = appText(R.string.ui_music_is_playing) }
-        val pulse by rememberInfiniteTransition(label = "playing").animateFloat(
+        // Read only while drawing, so the pulse repaints this dot and nothing else. Read while composing, it rebuilt
+        // the strip around it every frame for as long as music played, which older phones felt as a laggy strip.
+        val pulse = rememberInfiniteTransition(label = "playing").animateFloat(
             initialValue = 0.35f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(tween(PULSE_MS, easing = LinearEasing), RepeatMode.Reverse),
             label = "pulse",
         )
-        Canvas(modifier) { drawCircle(Palette.StripOn.copy(alpha = pulse)) }
+        Canvas(modifier) { drawCircle(Palette.StripOn.copy(alpha = pulse.value)) }
     }
 }
 
@@ -590,14 +674,15 @@ private fun MiniCurve(state: AppState, outputKey: String, working: Boolean) {
     val leftColour = when {
         !working -> strip.textDim
         right != null -> strip.leftEar
-        else -> strip.lit
+        // The second accent, as the EQ's own curve (user decision).
+        else -> Palette.Accent
     }
     val rightColour = if (working) strip.rightEar else strip.textDim
 
     Canvas(
         Modifier
             .size(width = 52.dp, height = 26.dp)
-            .clip(RoundedCornerShape(4.dp))
+            .clip(Corner.tiny)
             .background(strip.bar)
             .semantics { contentDescription = appText(R.string.ui_current_sound_curve) },
     ) {

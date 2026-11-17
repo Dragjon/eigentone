@@ -17,8 +17,15 @@ import android.util.Log
  */
 class EigentoneListener : NotificationListenerService()
 
-/** Reports which app is playing, for per-app presets. Does nothing until access has been granted. */
-class MediaWatcher(private val context: Context, private val onPlaying: (String) -> Unit) {
+/**
+ * Reports which app is playing, for per-app presets, and which is playing right now, or none, for the strip.
+ * Does nothing until access has been granted.
+ */
+class MediaWatcher(
+    private val context: Context,
+    private val onPlaying: (String) -> Unit,
+    private val onNowPlaying: (String?) -> Unit = {},
+) {
     private val handler = Handler(Looper.getMainLooper())
     private val component = ComponentName(context, EigentoneListener::class.java)
     private val sessions = context.getSystemService(MediaSessionManager::class.java)
@@ -61,6 +68,7 @@ class MediaWatcher(private val context: Context, private val onPlaying: (String)
         if (attached) runCatching { sessions.removeOnActiveSessionsChangedListener(sessionsChanged) }
         attached = false
         untrack()
+        onNowPlaying(null)
     }
 
     private fun track(controllers: List<MediaController>) {
@@ -82,8 +90,9 @@ class MediaWatcher(private val context: Context, private val onPlaying: (String)
 
     /** Pausing keeps the last app, so resuming can't undo a preset chosen by hand in between. */
     private fun report(controllers: List<MediaController>) {
-        val playing = controllers.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING } ?: return
-        onPlaying(playing.packageName)
+        val playing = controllers.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
+        onNowPlaying(playing?.packageName)
+        if (playing != null) onPlaying(playing.packageName)
     }
 
     companion object {

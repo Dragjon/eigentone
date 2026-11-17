@@ -7,7 +7,28 @@ What changed in each release since 0.33.0, newest first. Every release is publis
 > [!NOTE]
 > Every release is a pre-release until the first official one.
 
-**Releases:** [0.43.1](#0431) · [0.43.0](#0430) · [0.42.0](#0420) · [0.41.3](#0413) · [0.41.2](#0412) · [0.41.1](#0411) · [0.41.0](#0410) · [0.40.2](#0402) · [0.40.1](#0401) · [0.40.0](#0400) · [0.39.1](#0391) · [0.39.0](#0390) · [0.38.1](#0381) · [0.38.0](#0380) · [0.37.0](#0370) · [0.36.0](#0360) · [0.35.0](#0350) · [0.34.0](#0340)
+**Releases:** [0.44.0](#0440) · [0.43.1](#0431) · [0.43.0](#0430) · [0.42.0](#0420) · [0.41.3](#0413) · [0.41.2](#0412) · [0.41.1](#0411) · [0.41.0](#0410) · [0.40.2](#0402) · [0.40.1](#0401) · [0.40.0](#0400) · [0.39.1](#0391) · [0.39.0](#0390) · [0.38.1](#0381) · [0.38.0](#0380) · [0.37.0](#0370) · [0.36.0](#0360) · [0.35.0](#0350) · [0.34.0](#0340)
+
+## 0.44.0
+
+- **A quieter, modern design.** Choices such as Graphic and Parametric, the theme and the shape chips are marked with a faint tint of your colour and lit words instead of a solid block. Faders and sliders are thin tracks with ring handles, filled while you hold them. Buttons other than a screen's main action are outlines, panels sit only just off the page, and sections have more room between them.
+- **A second accent colour.** The EQ curve, its handles on the parametric graph, the strip's small curve and the power switch take a colour picked to pair with yours, such as coral with blue, so the sound itself stands out from the controls.
+- **A new status strip.** It's frosted like the tab bar and sits just under the top bar, which is frosted too and fades into the page with no edge. Effects show as icons, lit in your colour while they're on.
+- **See what's playing.** The strip names the app playing through Eigentone. It needs the same access as per-app presets, which the strip's drawer and the welcome now offer.
+- **Colour your way.** Saturation and Lightness sliders join Hue. While you drag one, the strip and lit controls follow at once and the rest of the app follows when you pause.
+- **The app icon matches your colour**, in eight colours, taking the nearest to a colour of your own or your wallpaper's, and the welcome's logo follows it too. Your home screen may need the icon added again after it changes.
+- **A smoother welcome.** One dot follows your swipe, Skip and Next sit at the bottom, and the last step fits on one screen.
+- **Predictive back.** Swipe back from Settings and it shrinks away to show the page it opened over.
+- **Advanced controls has its own Controls section** in Settings, and the gear turns while Settings is open.
+- **Tidier Earbuds tab.** The assigned preset reads as one setting with its own Assign button, and the noise mode's three choices are the same width.
+- **Fixes:**
+  - Colour sliders kept only the first change.
+  - A colour slider cut short could leave its colour on the whole app.
+  - Switching between Graphic and Parametric dropped a frame.
+  - The parametric graph's chosen handle could hide under another.
+  - A section opened from the strip stopped low on the screen.
+  - Two light-theme colours fell short of readable contrast.
+  - The strip could lag on older phones while music played.
 
 ## 0.43.1
 

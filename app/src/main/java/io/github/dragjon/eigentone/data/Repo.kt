@@ -82,6 +82,9 @@ object Repo {
     /** The app playing audio, when notification access has been given. Set by the service. */
     val playingApp = MutableStateFlow<String?>(null)
 
+    /** The app playing right now, or none while nothing plays, shown under the output in the strip. */
+    val nowPlaying = MutableStateFlow<String?>(null)
+
     private val _canUndo = MutableStateFlow(false)
     val canUndo: StateFlow<Boolean> = _canUndo.asStateFlow()
 

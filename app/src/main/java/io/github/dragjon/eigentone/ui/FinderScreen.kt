@@ -292,8 +292,10 @@ fun SideCard(label: String, selected: Boolean, musicActive: Boolean, modifier: M
         modifier
             .heightIn(min = 140.dp)
             .clip(PanelShape)
-            .background(if (selected) Palette.LitFill else Palette.Surface)
-            .border(1.dp, if (selected) Palette.LitFill else Palette.Outline, PanelShape)
+            // The one playing in the quiet style the app uses for a choice: a faint tint and a lit edge and words,
+            // rather than a solid block (user decision).
+            .background(if (selected) Palette.LitFill.copy(alpha = QUIET_TINT) else Palette.Surface)
+            .border(if (selected) 2.dp else 1.dp, if (selected) Palette.LitFill else Palette.KeyBorder, PanelShape)
             .semantics { this.selected = selected }
             .clickable(role = Role.RadioButton, onClickLabel = stringResource(R.string.ui_play_version, label), onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -302,7 +304,7 @@ fun SideCard(label: String, selected: Boolean, musicActive: Boolean, modifier: M
             Text(
                 label,
                 style = MaterialTheme.typography.headlineMedium,
-                color = if (selected) Palette.OnLit else Palette.Text,
+                color = if (selected) Palette.LitBright else Palette.Text,
             )
             Spacer(Modifier.height(4.dp))
             Text(
@@ -312,7 +314,7 @@ fun SideCard(label: String, selected: Boolean, musicActive: Boolean, modifier: M
                     else -> stringResource(R.string.ui_selected)
                 },
                 style = MaterialTheme.typography.bodySmall,
-                color = if (selected) Palette.OnLit else Palette.TextDim,
+                color = if (selected) Palette.LitBright else Palette.TextDim,
             )
         }
     }

@@ -134,13 +134,13 @@ fun SettingsSection(
     var headingHeight by remember { mutableStateOf(0f) }
     var panelHeight by remember { mutableStateOf(0f) }
     val topCover = with(androidx.compose.ui.platform.LocalDensity.current) { LocalTopCover.current.toPx() }
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
     fun wholeSection() = androidx.compose.ui.geometry.Rect(0f, -topCover, sectionWidth, headingHeight + panelHeight)
     val followScope = rememberCoroutineScope()
     var following by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     // Where the section is, for working out how far the page has to move to show all of it.
     val sectionPlace = remember { arrayOfNulls<androidx.compose.ui.layout.LayoutCoordinates>(1) }
     val page = LocalPageScroll.current
-    val bottomRoom = with(androidx.compose.ui.platform.LocalDensity.current) { (LocalBottomCover.current + FOLLOW_BOTTOM_ROOM_DP.dp).toPx() }
     /**
      * Opening, the page scrolls once, alongside the unfolding, to where the whole section will be in view, so the
      * heading moves up to make room rather than the new rows unfolding off the bottom of the screen (user decision).
@@ -161,11 +161,11 @@ fun SettingsSection(
                 return@launch
             }
             // The page's own scroll, moved on the same curve and time as the unfolding, so the heading rises as the
-            // panel grows. Only as far as the panel needs, and never so far the heading goes under the strip.
+            // panel grows. Up to just below the strip each time: scrolling only as far as the panel needed left a
+            // short section low, with empty page above it (tester feedback).
             val view = page.viewport()
             val top = place.positionInRoot().y - view.top
-            val bottom = top + headingHeight + panelHeight
-            val wanted = minOf(bottom - (view.height - bottomRoom), top - topCover)
+            val wanted = top - topCover + FOCUS_TUCK_DP * density
             if (wanted <= 0f) return@launch
             val from = page.state.value
             val start = android.os.SystemClock.uptimeMillis()
@@ -184,9 +184,18 @@ fun SettingsSection(
         androidx.compose.runtime.snapshotFlow { pageShown() && SectionFocus.request == title }.collect { wanted ->
             if (!wanted) return@collect
             open = true
-            // Waits for the tab to slide in and the section to unfold, then brings all of it into view.
+            // Waits for the tab to slide in and the section to unfold, then scrolls its heading to just below the strip.
+            // Bringing it into view only scrolled as little as would show it, which left a section further down the
+            // page low on the screen with empty page above it (tester feedback).
             delay(FOLD_MS + 120L)
-            requester.bringIntoView(wholeSection())
+            val place = sectionPlace[0]
+            if (page != null && place != null && place.isAttached) {
+                val view = page.viewport()
+                val by = place.positionInRoot().y - view.top - topCover + FOCUS_TUCK_DP * density
+                page.state.animateScrollTo((page.state.value + by).toInt().coerceIn(0, page.state.maxValue))
+            } else {
+                requester.bringIntoView(wholeSection())
+            }
             SectionFocus.request = null
         }
     }
@@ -303,8 +312,15 @@ val LocalTopCover = androidx.compose.runtime.compositionLocalOf { 0.dp }
 /** How much of the bottom of a page lies under the tabs, which the page now runs beneath. */
 val LocalBottomCover = androidx.compose.runtime.compositionLocalOf { 0.dp }
 
-/** Room kept below an opened section, clear of the floating save bar's edge. */
-private const val FOLLOW_BOTTOM_ROOM_DP = 16
+/** How much a slider's value grows while its handle is held, and how quickly it grows and settles back. */
+private const val READOUT_HELD_SCALE = 1.18f
+private const val READOUT_GROW_MS = 120
+private const val READOUT_SHRINK_MS = 260
+/**
+ * How far a section brought into view tucks up into the room kept below the strip. Its heading is tall, with the
+ * legend centred, so this keeps the space above the legend about the same as below the strip elsewhere.
+ */
+private const val FOCUS_TUCK_DP = 8
 
 /** The scroll of the page a section is on, and where that page shows on screen. */
 class PageScroll(val state: androidx.compose.foundation.ScrollState, val viewport: () -> androidx.compose.ui.geometry.Rect)
@@ -412,7 +428,7 @@ fun TipOnTap(tip: Tip, modifier: Modifier = Modifier, content: @Composable () ->
 
 /** Label, info button and an optional current value. Shared by every setting. */
 @Composable
-private fun SettingLabel(title: String, tip: Tip?, modifier: Modifier = Modifier, color: Color = Palette.Text) {
+internal fun SettingLabel(title: String, tip: Tip?, modifier: Modifier = Modifier, color: Color = Palette.Text) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Text(
             title,
@@ -545,6 +561,14 @@ fun SliderSetting(
     resetTo: Float = default,
 ) {
     val changed = abs(value - default) > (range.endInclusive - range.start) * 0.005f
+    // While the handle's held, the number grows a little, as Poweramp's do, so the value being set stands out
+    // (tester feedback). Kept small, and read only while drawing, so dragging doesn't rebuild the row.
+    var held by remember { mutableStateOf(false) }
+    val grow = animateFloatAsState(
+        if (held) READOUT_HELD_SCALE else 1f,
+        tween(if (held) READOUT_GROW_MS else READOUT_SHRINK_MS, easing = FastOutSlowInEasing),
+        label = "readout",
+    )
     Column(
         Modifier
             .fillMaxWidth()
@@ -556,7 +580,14 @@ fun SliderSetting(
                 readout,
                 style = Readout,
                 color = if (changed) Palette.Lit else Palette.TextDim,
-                modifier = Modifier.padding(start = 8.dp),
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    // Grows from its right edge, where it lines up with the other values, so it doesn't shift sideways.
+                    .graphicsLayer {
+                        scaleX = grow.value
+                        scaleY = grow.value
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f)
+                    },
             )
         }
         ValueTrack(
@@ -569,6 +600,7 @@ fun SliderSetting(
             onChange = onChange,
             onFinished = onFinished,
             resetTo = resetTo,
+            onHeld = { held = it },
         )
         if (detail != null) {
             Text(detail, style = MaterialTheme.typography.bodySmall, color = Palette.TextDim)
@@ -600,8 +632,11 @@ fun ValueTrack(
     resetTo: Float = default,
     /** Draws the whole track in these colours, left to right, instead of filled and unfilled, as for a hue. */
     trackColours: List<androidx.compose.ui.graphics.Color>? = null,
+    /** Told when the handle is taken hold of and let go, such as to grow the value shown beside it. */
+    onHeld: (Boolean) -> Unit = {},
 ) {
     val current by rememberUpdatedState(value)
+    val heldNow by rememberUpdatedState(onHeld)
     val change by rememberUpdatedState(onChange)
     val finished by rememberUpdatedState(onFinished)
     val resetValue by rememberUpdatedState(resetTo)
@@ -611,6 +646,8 @@ fun ValueTrack(
     val defaultNow by rememberUpdatedState(default)
     // Material's own colour for the unfilled track, a touch deeper so it still shows on a light panel.
     val unfilled = Palette.Track2
+    // Whether the handle's held, which fills its ring.
+    var holding by remember { mutableStateOf(false) }
 
     Canvas(
         Modifier
@@ -663,6 +700,9 @@ fun ValueTrack(
                     // The handle travels the width less its own, so the value keeps pace with the finger.
                     val width = (size.width - TRACK_HANDLE_DP.dp.toPx()).coerceAtLeast(1f)
                     var running = current
+                    holding = true
+                    heldNow(true)
+                    try {
                     horizontalDrag(drag.id) { event ->
                         val moved = event.positionChange().x
                         val before = running
@@ -672,14 +712,30 @@ fun ValueTrack(
                         change(running)
                         event.consume()
                     }
-                    finished()
+                    } finally {
+                        // Even when the drag is cut short, so the value always settles back, and what it was dragged
+                        // to is kept. Skipped on a cut-short drag, a colour slider's preview stayed on the whole app,
+                        // never kept or cleared.
+                        holding = false
+                        heldNow(false)
+                        finished()
+                    }
                 }
             },
     ) {
-        // Material 3's slider: a thick rounded track, filled from the origin, with a tall narrow handle that
-        // stands a little clear of the track on either side.
+        // As quiet as the graph (user decision): a thin track lit from the origin, and a hollow ring for a handle,
+        // as the parametric EQ's nodes are, filled while it's held.
         val handleWidth = TRACK_HANDLE_DP.dp.toPx()
-        val handleHeight = minOf(TRACK_HANDLE_HEIGHT_DP.dp.toPx(), size.height)
+        val knob = handleWidth / 2
+        val ring = KNOB_RING_DP.dp.toPx()
+        fun drawKnob(colour: androidx.compose.ui.graphics.Color, x: Float) {
+            if (holding) {
+                drawCircle(colour, knob, Offset(x, size.height / 2))
+            } else {
+                drawCircle(Palette.Surface, knob, Offset(x, size.height / 2))
+                drawCircle(colour, knob - ring / 2, Offset(x, size.height / 2), style = androidx.compose.ui.graphics.drawscope.Stroke(ring))
+            }
+        }
         val trackHeight = TRACK_HEIGHT_DP.dp.toPx()
         val gap = TRACK_GAP_DP.dp.toPx()
         val usable = size.width - handleWidth
@@ -722,18 +778,7 @@ fun ValueTrack(
                 size = Size(size.width, trackHeight),
                 cornerRadius = outer,
             )
-            drawRoundRect(
-                Palette.Surface,
-                topLeft = Offset(to - handleWidth / 2 - gap / 2, centre - handleHeight / 2),
-                size = Size(handleWidth + gap, handleHeight),
-                cornerRadius = CornerRadius(handleWidth / 2 + gap / 2),
-            )
-            drawRoundRect(
-                Palette.Text,
-                topLeft = Offset(to - handleWidth / 2, centre - handleHeight / 2),
-                size = Size(handleWidth, handleHeight),
-                cornerRadius = CornerRadius(handleWidth / 2),
-            )
+            drawKnob(Palette.Text, to)
             return@Canvas
         }
         // Unfilled track either side of the filled part, then the filled part, each kept clear of the handle.
@@ -762,12 +807,7 @@ fun ValueTrack(
             val onFill = x in low..high
             drawCircle(if (onFill) Palette.OnLit else Palette.TextDim, dot, Offset(x, centre))
         }
-        drawRoundRect(
-            Palette.LitFill,
-            topLeft = Offset(to - handleWidth / 2, centre - handleHeight / 2),
-            size = Size(handleWidth, handleHeight),
-            cornerRadius = CornerRadius(handleWidth / 2),
-        )
+        drawKnob(Palette.LitFill, to)
     }
 }
 
@@ -785,12 +825,16 @@ internal fun notchStep(range: ClosedFloatingPointRange<Float>): Float {
         ?: (span / 5f)
 }
 
-private const val TRACK_HANDLE_DP = 4
+/** A slider handle's diameter: a ring, as the graph's nodes are. */
+private const val TRACK_HANDLE_DP = 20
+/** The width of the handle's ring while it isn't held. */
+private const val KNOB_RING_DP = 2
 /** How far either side of a slider's handle a touch still grabs it: a 48 dp target. */
 private const val HANDLE_GRAB_DP = 24
-private const val TRACK_HANDLE_HEIGHT_DP = 40
-private const val TRACK_HEIGHT_DP = 16
-private const val TRACK_GAP_DP = 6
+/** A thin track, as the graph's lines are (user decision). */
+private const val TRACK_HEIGHT_DP = 4
+/** The track's clearance either side of the handle. */
+private const val TRACK_GAP_DP = 2
 
 /**
  * Whether Android's own spatial audio is on. It can only be read, because only system apps can change it,
@@ -875,9 +919,14 @@ fun NothingPlayingHint(modifier: Modifier = Modifier) {
 
 /** A switch that's on has a light knob in a light theme (user decision), rather than a dark one. */
 @Composable
-fun switchColors() = androidx.compose.material3.SwitchDefaults.colors(
-    checkedThumbColor = if (Palette.dark) androidx.compose.material3.MaterialTheme.colorScheme.onPrimary else androidx.compose.ui.graphics.Color.White,
-    checkedIconColor = Palette.LitFill,
+fun switchColors(
+    /** In the second accent, for the one switch that matters most. */
+    accent: Boolean = false,
+) = androidx.compose.material3.SwitchDefaults.colors(
+    // From the palette rather than Material's scheme, so a switch follows a colour slider while it's dragged.
+    checkedThumbColor = if (Palette.dark) (if (accent) Palette.OnAccent else Palette.OnLit) else androidx.compose.ui.graphics.Color.White,
+    checkedTrackColor = if (accent) Palette.Accent else Palette.LitFill,
+    checkedIconColor = if (accent) Palette.Accent else Palette.LitFill,
 )
 
 /** Text fields take the lit text colour when focused, since their label and cursor have to be read. */
@@ -896,7 +945,8 @@ fun fieldColors(
 )
 
 /** The gaps between sections, kept in one place. */
-val SectionSpacing = Arrangement.spacedBy(12.dp)
+// A little more than before, as the quieter panels leave more of the grouping to space (user decision).
+val SectionSpacing = Arrangement.spacedBy(16.dp)
 
 /**
  * Touch feedback for the moments that matter: passing a default, reaching an end, switching something

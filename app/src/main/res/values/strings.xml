@@ -7,4 +7,9 @@
     <string name="widget_bypass">Bypass</string>
     <string name="widget_next">Next</string>
     <string name="media_access_label">Eigentone per-app presets</string>
+    <string name="ui_controls_section">Controls</string>
+    <string name="ui_colour_saturation">Saturation</string>
+    <string name="ui_colour_lightness">Lightness</string>
+    <string name="ui_strip_now_playing">Playing: %1$s</string>
+    <string name="ui_strip_show_playing">Show which app is playing</string>
 </resources>

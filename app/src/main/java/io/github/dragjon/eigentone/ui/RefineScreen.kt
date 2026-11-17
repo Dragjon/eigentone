@@ -316,7 +316,7 @@ private fun Outcome(title: String, body: String, refiner: Refiner, change: List<
 @Composable
 private fun ChangeCurve(change: List<Double>) {
     val measurer = rememberTextMeasurer()
-    val labelStyle = TextStyle(color = Palette.TextDim, fontSize = 10.sp, fontFamily = ReadoutFamily)
+    val labelStyle = ChartLabel.copy(color = Palette.TextDim)
     val freqs = Refiner.FREQS
     val description = freqs.indices.filter { change[it] != 0.0 }.joinToString {
         "${GraphicEq.formatFrequency(freqs[it])} ${String.format(Locale.US, "%+.1f dB", change[it])}"

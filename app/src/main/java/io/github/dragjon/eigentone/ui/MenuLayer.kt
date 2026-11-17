@@ -6,6 +6,7 @@ import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -62,6 +63,9 @@ private class MenuEntry {
     var anchor = Rect.Zero
     var bounds = Rect.Zero
     var below = true
+
+    /** Where to put the menu's top-left corner instead of under its control, such as on the status strip's. */
+    var pin: (() -> Rect)? = null
 }
 
 private class MenuLayer {
@@ -140,7 +144,10 @@ private fun BoxScope.MenuSurface(menu: MenuEntry, layer: MenuLayer) {
                     .padding(MENU_SHADOW_ROOM_DP.dp)
                     .shadow(8.dp, PanelShape)
                     .clip(PanelShape)
-                    .background(Palette.Tooltip)
+                    // Frosted, as the bars are, showing the page and the bars beneath it (user decision).
+                    .glass(Palette.Tooltip)
+                    // The same faint outline as the tab bar, so a menu stands apart from the page under it (tester feedback).
+                    .border(1.dp, Palette.Line.copy(alpha = 0.6f), PanelShape)
                     .heightIn(max = MENU_MAX_DP.dp)
                     .widthIn(min = 112.dp, max = 280.dp)
                     .width(IntrinsicSize.Max)
@@ -162,6 +169,14 @@ private fun BoxScope.MenuSurface(menu: MenuEntry, layer: MenuLayer) {
             val a = menu.anchor
             val w = menuSize.width
             val h = menuSize.height
+            // Pinned: its visible corner exactly on the given corner, so nothing of what it covers pokes out beside it.
+            menu.pin?.invoke()?.takeIf { it != Rect.Zero }?.let { pin ->
+                menu.below = true
+                val px = (pin.left.toInt() - room).coerceIn(0, (constraints.maxWidth - w).coerceAtLeast(0))
+                val py = (pin.top.toInt() - room).coerceAtMost((constraints.maxHeight - h - margin).coerceAtLeast(0))
+                menuSize.place(px, py)
+                return@layout
+            }
             // Under the control where there's room, over it where there isn't, and never off the side of the screen.
             val x = (a.left.toInt() - room).coerceIn(0, (constraints.maxWidth - w).coerceAtLeast(0))
             val fitsBelow = a.bottom + h <= constraints.maxHeight - margin
@@ -182,6 +197,7 @@ private fun BoxScope.MenuSurface(menu: MenuEntry, layer: MenuLayer) {
 fun MotionMenu(
     expanded: Boolean,
     onDismissRequest: () -> Unit,
+    pin: (() -> Rect)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val layer = checkNotNull(LocalMenuLayer.current) { "MotionMenu needs a MenuHost" }
@@ -189,6 +205,7 @@ fun MotionMenu(
     SideEffect {
         menu.content = content
         menu.dismiss = onDismissRequest
+        menu.pin = pin
         menu.expanded = expanded
     }
     DisposableEffect(layer) {

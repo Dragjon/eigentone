@@ -55,7 +55,7 @@ class AudioService : Service() {
 
     private val engine = EffectEngine { Repo.status.value = it }
     private lateinit var audioManager: AudioManager
-    private val mediaWatcher by lazy { MediaWatcher(this, Repo::onPlayingAppChanged) }
+    private val mediaWatcher by lazy { MediaWatcher(this, Repo::onPlayingAppChanged) { Repo.nowPlaying.value = it } }
     private var lastNotified: Pair<Boolean, String>? = null
     private var settleJob: Job? = null
     @Volatile private var outputDeviceType = AudioDeviceInfo.TYPE_BUILTIN_SPEAKER

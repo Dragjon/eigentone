@@ -591,8 +591,6 @@ private fun AppScreen(
             SectionFocus.request = appText(section)
         },
     ) {
-        // What the page draws, so the tab bar can show it frosted beneath itself.
-        val pageHaze = remember { dev.chrisbanes.haze.HazeState() }
         Scaffold(
             containerColor = Palette.Background,
             topBar = { TopBar(state, status, showCurve = tab != Tab.EQ, settingsOpen = tab == Tab.SYSTEM, onSettings = toggleSettings, onSetEnabled) },
@@ -623,22 +621,20 @@ private fun AppScreen(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .shadow(TAB_PILL_SHADOW_DP.dp, TabPillShape)
-                        .clip(TabPillShape)
-                        .hazeEffect(
-                            state = pageHaze,
-                            style = dev.chrisbanes.haze.HazeStyle(
-                                backgroundColor = Palette.Background,
-                                tints = listOf(dev.chrisbanes.haze.HazeTint(barColour.copy(alpha = TAB_BAR_BLUR_TINT))),
-                                blurRadius = TAB_BAR_BLUR_DP.dp,
-                                noiseFactor = 0f,
-                                fallbackTint = dev.chrisbanes.haze.HazeTint(barColour.copy(alpha = TAB_BAR_ALPHA)),
-                            ),
+                        // Softer by day, where a shadow on white reads far stronger than on the dark page (tester feedback).
+                        .shadow(
+                            (if (Palette.dark) TAB_PILL_SHADOW_DP else TAB_PILL_SHADOW_LIGHT_DP).dp,
+                            TabPillShape,
+                            ambientColor = Color.Black.copy(alpha = if (Palette.dark) 1f else LIGHT_SHADOW_ALPHA),
+                            spotColor = Color.Black.copy(alpha = if (Palette.dark) 1f else LIGHT_SHADOW_ALPHA),
                         )
+                        .clip(TabPillShape)
+                        // Clear lets more of the page show through, so the pill reads as floating over it.
+                        .glass(barColour)
                         // A faint outline gives the pill a crisp edge against the dark page (user decision).
                         .border(1.dp, Palette.Line.copy(alpha = 0.6f), TabPillShape)
                         // Room above and below the tabs to roughly match the room at their sides, so the bar doesn't feel squeezed.
-                        .padding(horizontal = 4.dp, vertical = 12.dp)
+                        .padding(horizontal = 4.dp, vertical = TAB_BAR_PAD_DP.dp)
                         .tourTarget(TourStop.TABS)
                         .selectableGroup(),
                 ) {
@@ -659,7 +655,28 @@ private fun AppScreen(
                 }
             },
         ) { padding ->
-            androidx.activity.compose.BackHandler(enabled = tab == Tab.SYSTEM) { setTab(beforeSettings) }
+            // Android's predictive back (MD3 audit): as Back is swiped, Settings shrinks towards the swipe's edge and the
+            // page it opened over shows beneath, so where Back leads is seen before letting go. Let go to return, or
+            // swipe back out to stay.
+            var backProgress by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+            var backFromLeft by remember { mutableStateOf(true) }
+            androidx.activity.compose.PredictiveBackHandler(enabled = tab == Tab.SYSTEM) { events ->
+                try {
+                    events.collect { event ->
+                        backFromLeft = event.swipeEdge == androidx.activity.BackEventCompat.EDGE_LEFT
+                        backProgress = event.progress
+                    }
+                    setTab(beforeSettings)
+                    // Kept shrunk while it fades away, then made ready for next time.
+                    tabScope.launch {
+                        kotlinx.coroutines.delay(TAB_SLIDE_MS.toLong())
+                        backProgress = 0f
+                    }
+                } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                    backProgress = 0f
+                    throw e
+                }
+            }
             var pageOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
             var pageSize by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
             // The page runs on under both bars, which fade into it, so these keep its content clear of them.
@@ -670,8 +687,6 @@ private fun AppScreen(
             Box(
                 Modifier
                     .fillMaxSize()
-                    // What the tab bar shows, frosted, beneath it.
-                    .hazeSource(pageHaze)
                     .onGloballyPositioned {
                         pageOrigin = it.positionInRoot()
                         pageSize = androidx.compose.ui.geometry.Size(it.size.width.toFloat(), it.size.height.toFloat())
@@ -705,6 +720,9 @@ private fun AppScreen(
                 val lastSeen = remember { HashMap<Tab, Pair<AppState, EngineStatus>>() }
                 // Tabs slide towards where they sit in the bar, so moving right slides the page left, and back.
                 val pages = androidx.compose.animation.core.updateTransition(tab, label = "tab")
+                // The pages alone are what the glass surfaces show frosted beneath them; the strip and notes, drawn
+                // after, are glass themselves.
+                Box(Modifier.fillMaxSize().hazeSource(GlassHaze, GLASS_PAGE_Z), contentAlignment = Alignment.TopCenter) {
                 Tab.entries.forEach { t ->
                     if (t !in built && t != tab) return@forEach
                     androidx.compose.runtime.key(t) {
@@ -734,7 +752,8 @@ private fun AppScreen(
                                     .layout { measurable, constraints ->
                                         val placeable = measurable.measure(constraints)
                                         layout(placeable.width, placeable.height) {
-                                            val inView = t == pages.targetState || presence.value > 0f
+                                            val inView = t == pages.targetState || presence.value > 0f ||
+                                                (t == beforeSettings && pages.targetState == Tab.SYSTEM && backProgress > 0f)
                                             placeable.place(if (inView) 0 else placeable.width * 2, 0)
                                         }
                                     }
@@ -752,6 +771,18 @@ private fun AppScreen(
                                             val scale = if (entering) FADE_THROUGH_SCALE + (1f - FADE_THROUGH_SCALE) * arriving else 1f
                                             scaleX = scale
                                             scaleY = scale
+                                            val back = backProgress
+                                            if (back > 0f) {
+                                                if (t == Tab.SYSTEM) {
+                                                    // Material's back motion: down to 90%, edging away from the swipe.
+                                                    val shrink = 1f - BACK_SHRINK * back
+                                                    scaleX = shrink
+                                                    scaleY = shrink
+                                                    translationX = (if (backFromLeft) 1f else -1f) * BACK_SHIFT * size.width * back
+                                                } else if (t == beforeSettings) {
+                                                    alpha = maxOf(alpha, back)
+                                                }
+                                            }
                                         } else {
                                             val sign = if (pages.targetState.ordinal >= pages.currentState.ordinal) 1f else -1f
                                             translationX = (if (entering) sign else -sign) * (1f - p) * size.width / 3f
@@ -784,26 +815,45 @@ private fun AppScreen(
                         }
                     }
                 }
+                }
                 // The status strip floats over the top of the page (tester feedback): the page scrolls on up under it,
                 // seen faintly through a band of the page colour that fades away below the strip.
                 val stripFade = Palette.Bar
+                // One frosting from the top of the screen down behind the strip, under the top bar, which is clear, and
+                // fading out below the strip. Two frostings, the bar's and one below it, each blurred only their own
+                // part of the page, so a sharp line showed where they met (tester feedback).
+                val topPx = with(androidx.compose.ui.platform.LocalDensity.current) { topInset.toPx() }
+                Box(
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .height(topInset + stripBand)
+                        .hazeEffect(GlassHaze, glassStyle(stripFade)) {
+                            // The page alone, not the bars drawn over it.
+                            canDrawArea = { it.zIndex < GLASS_BARS_Z }
+                            inputScale = GLASS_INPUT_SCALE
+                            val total = (topPx + stripBandPx).coerceAtLeast(1f)
+                            val barEnd = (topPx / total).coerceIn(0f, 1f)
+                            mask = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                0f to Color.Black,
+                                barEnd to Color.Black,
+                                barEnd + (1f - barEnd) * 0.45f to Color.Black.copy(alpha = BAR_EDGE_ALPHA),
+                                1f to Color.Transparent,
+                            )
+                        },
+                )
                 Box(
                     Modifier
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
                         .padding(top = topInset)
                         .onSizeChanged { stripBandPx = it.height }
-                        .drawBehind {
-                            drawRect(
-                                androidx.compose.ui.graphics.Brush.verticalGradient(
-                                    0f to stripFade,
-                                    0.45f to stripFade.copy(alpha = BAR_EDGE_ALPHA),
-                                    1f to stripFade.copy(alpha = 0f),
-                                ),
-                            )
-                        }
+                        // Shown through a menu over it, and frosted itself over the page alone.
+                        .hazeSource(GlassHaze, GLASS_BARS_Z)
                         .tourTarget(TourStop.STRIP),
-                ) { LiveStrip(state, showCurve = tab != Tab.EQ) }
+                ) {
+                    LiveStrip(state, showCurve = tab != Tab.EQ)
+                }
                 // Floats over the page rather than sitting in it, so appearing can never move anything,
                 // such as a fader under a finger that's still dragging it.
                 val savedVersion = Repo.allPresets(state).firstOrNull { it.id == state.current.id }
@@ -889,7 +939,8 @@ private fun NavItem(tab: Tab, selected: Boolean, device: OutputKind? = null, mod
             .padding(vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        val tint = if (selected) Palette.OnLit else Palette.TextDim
+        // Lit icon and word on a faint tint of the colour, quiet like the rest of the app (user decision).
+        val tint = if (selected) Palette.LitBright else Palette.TextDim
         // Chosen, the lit pill grows out from the middle with a little give, and shrinks back when left, as the tab
         // bars in WhatsApp and Telegram do (user decision).
         val grow by androidx.compose.animation.core.animateFloatAsState(
@@ -909,7 +960,7 @@ private fun NavItem(tab: Tab, selected: Boolean, device: OutputKind? = null, mod
                 bump.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = ICON_DAMPING, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium))
             }
         }
-        val pillColour = Palette.LitFill
+        val pillColour = Palette.LitFill.copy(alpha = QUIET_TINT)
         // The device tab's icon sits over the pill rather than in it, so its change animation isn't clipped.
         Box(
             contentAlignment = Alignment.Center,
@@ -933,7 +984,7 @@ private fun NavItem(tab: Tab, selected: Boolean, device: OutputKind? = null, mod
                             )
                         }
                     }
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                    .clip(Corner.medium)
                     .indication(presses, androidx.compose.material3.ripple()),
                 contentAlignment = Alignment.Center,
             ) {
@@ -980,20 +1031,19 @@ private fun TopBar(
     // Here because the strip below always shows the live spectrum. It still stops when the app is closed.
     AnalyserEffect(state.analyser)
     // The strip floats on the page below the bar rather than sitting in it (tester feedback).
-    Column(Modifier.fillMaxWidth()) {
-    val barColour = Palette.Bar
+    // Shown through a menu over it.
+    Column(Modifier.fillMaxWidth().hazeSource(GlassHaze, GLASS_BARS_Z)) {
     Column(
         Modifier
             .fillMaxWidth()
-            // Solid behind the controls, so they stay readable over a busy page. The strip's band below continues it
-            // as a fade, so the page scrolling up beneath eases into the bar rather than stopping at an edge (user decision).
-            .background(barColour)
+            // Clear: the page's one top frosting lies beneath it and carries on down behind the strip, so there's no
+            // line where the bar ends (tester feedback).
             .windowInsetsPadding(WindowInsets.statusBars),
     ) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val connectedNames = rememberConnectedOutputNames()
@@ -1049,7 +1099,8 @@ private fun TopBar(
             if (state.enabled) BypassButton(state.bypass)
             val view = androidx.compose.ui.platform.LocalView.current
             Switch(
-                colors = switchColors(),
+                // In the second accent, since it's the switch that matters most (user decision).
+                colors = switchColors(accent = true),
                 checked = state.enabled,
                 // Felt as well as seen, since it's the switch that matters most.
                 onCheckedChange = { on ->
@@ -1062,6 +1113,12 @@ private fun TopBar(
                     .semantics { contentDescription = "Eigentone" },
             )
         }
+        // The gear turns as Settings opens, and turns back as it closes (tester feedback).
+        val gearTurn by androidx.compose.animation.core.animateFloatAsState(
+            if (settingsOpen) GEAR_TURN_DEG else 0f,
+            androidx.compose.animation.core.tween(GEAR_TURN_MS, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            label = "gear",
+        )
         IconButton(onClick = onSettings) {
             Icon(
                 // Filled while Settings is open, as the tabs' icons are while they're in view.
@@ -1069,13 +1126,19 @@ private fun TopBar(
                 contentDescription = stringResource(R.string.ui_tab_system),
                 tint = if (settingsOpen) Palette.Lit else Palette.TextDim,
                 // The tour outlines the gear itself rather than its whole touch area, which would reach the switch.
-                modifier = Modifier.tourTarget(TourStop.SETTINGS),
+                modifier = Modifier
+                    .tourTarget(TourStop.SETTINGS)
+                    .graphicsLayer { rotationZ = gearTurn },
             )
         }
     }
     }
     }
 }
+
+/** How far the gear turns as Settings opens, and how long it takes. */
+private const val GEAR_TURN_DEG = 120f
+private const val GEAR_TURN_MS = 450
 
 // Room for "Bypassed" clear of the pill's rounded ends.
 private val BypassPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
@@ -1262,23 +1325,15 @@ private fun EqTab(state: AppState) {
             modifier = Modifier.weight(1f),
         )
         // Beside the mode rather than on the graph, where the ear legends sit.
-        if (showParametric) AnalyserToggle(state, Modifier)
+        // Room before it, so it sits evenly between the outlined switch and the info button.
+        if (showParametric) AnalyserToggle(state, Modifier.padding(start = 8.dp))
         if (showParametric) InfoButton(Help.eqMode)
     }
 
-    // The faders and the filter list swap with a slide that follows the switch above: Graphic is on the
-    // left, so it comes in from the left, and Parametric from the right.
-    AnimatedContent(
-        targetState = inGraphic,
-        transitionSpec = {
-            val sign = if (targetState) -1 else 1
-            (slideInHorizontally(tween(TAB_SLIDE_MS, easing = LinearOutSlowInEasing)) { sign * it / 4 } + fadeIn(tween(TAB_SLIDE_MS / 2))) togetherWith
-                (slideOutHorizontally(tween(TAB_SLIDE_MS, easing = LinearOutSlowInEasing)) { -sign * it / 4 } + fadeOut(tween(TAB_SLIDE_MS / 2))) using
-                // The panel's height changes on the same curve and time as the slide, so everything moves together.
-                androidx.compose.animation.SizeTransform(clip = false) { _, _ -> tween(TAB_SLIDE_MS, easing = LinearOutSlowInEasing) }
-        },
-        label = "eqMode",
-    ) { graphic ->
+    // The faders and the filter list: each is built the first time it's shown and then kept, so switching only
+    // slides them rather than first building the other, which cost a dropped frame as the switch began (tester
+    // feedback).
+    val eqPane: @Composable (Boolean) -> Unit = { graphic ->
     Column(verticalArrangement = SectionSpacing) {
     if (graphic) {
         GraphicEqConsole(state.current.tone, state.current.id, onBrowseShapes = LocalOpenShapes.current, onExpand = LocalOpenFaders.current)
@@ -1376,6 +1431,50 @@ private fun EqTab(state: AppState) {
     }
     }
     }
+    KeptPanes(showFirst = inGraphic, pane = eqPane)
+}
+
+/**
+ * Two panes shown one at a time, each built the first time it's shown and kept after, so a switch only moves them.
+ * They swap with a slide that follows the switch above them: the first comes in from the left, the second from the
+ * right, fading as they go, while the height eases from one to the other on the same curve.
+ */
+@Composable
+private fun KeptPanes(showFirst: Boolean, pane: @Composable (Boolean) -> Unit) {
+    var builtFirst by remember { mutableStateOf(showFirst) }
+    var builtSecond by remember { mutableStateOf(!showFirst) }
+    if (showFirst) builtFirst = true else builtSecond = true
+    // 0 is the first pane, 1 the second.
+    val at = androidx.compose.animation.core.animateFloatAsState(
+        if (showFirst) 0f else 1f,
+        tween(TAB_SLIDE_MS, easing = LinearOutSlowInEasing),
+        label = "panes",
+    )
+    androidx.compose.ui.layout.Layout(
+        content = {
+            Box(if (showFirst) Modifier else Modifier.clearAndSetSemantics { }) { if (builtFirst) pane(true) }
+            Box(if (!showFirst) Modifier else Modifier.clearAndSetSemantics { }) { if (builtSecond) pane(false) }
+        },
+    ) { measurables, constraints ->
+        val loose = constraints.copy(minHeight = 0)
+        val first = measurables[0].measure(loose)
+        val second = measurables[1].measure(loose)
+        val t = at.value
+        val width = maxOf(first.width, second.width).coerceIn(constraints.minWidth, constraints.maxWidth)
+        val height = (first.height + (second.height - first.height) * t).roundToInt().coerceAtLeast(constraints.minHeight)
+        layout(width, height) {
+            // A pane out of view is placed off to the side, where it can't be touched.
+            val away = width * 2
+            first.placeWithLayer(if (t < 1f) 0 else away, 0) {
+                alpha = (1f - t * 2f).coerceIn(0f, 1f)
+                translationX = -t * width / 4f
+            }
+            second.placeWithLayer(if (t > 0f) 0 else away, 0) {
+                alpha = (t * 2f - 1f).coerceIn(0f, 1f)
+                translationX = (1f - t) * width / 4f
+            }
+        }
+    }
 }
 
 /** The unsaved changes in a few words, such as "1 added filter, faders and bass". */
@@ -1419,7 +1518,7 @@ private fun UnsavedBar(state: AppState, saved: Preset, modifier: Modifier = Modi
             .fillMaxWidth()
             .shadow(6.dp, PanelShape)
             .clip(PanelShape)
-            .background(Palette.Note)
+            .glass(Palette.Note)
             .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1494,13 +1593,54 @@ private const val SHOW_SETTLE_MS = 500L
 private const val BAR_GAP_DP = 8
 /** Space between the strip and the page's first panel, matching the space above the strip. */
 private const val PAGE_TOP_DP = 8
+/** How far Settings shrinks, and moves aside as a share of its width, at the end of a back swipe. */
+private const val BACK_SHRINK = 0.1f
+private const val BACK_SHIFT = 0.05f
 /** How solid the fades beside the bars are partway through, where the page starts to show. */
 private const val BAR_EDGE_ALPHA = 0.85f
 /** How solid the tab bar's even tint is where the phone can't blur, before Android 12. */
 private const val TAB_BAR_ALPHA = 0.94f
 /** Over the blur, the tint can be lighter, since the blur already softens what's behind. */
-private const val TAB_BAR_BLUR_TINT = 0.75f
+internal const val TAB_BAR_BLUR_TINT = 0.75f
 private const val TAB_BAR_BLUR_DP = 24
+/** Room above and below the tabs: slim, chosen from a trial of the tab bar's looks (user decision). */
+private const val TAB_BAR_PAD_DP = 6
+
+/**
+ * What the glass surfaces show frosted beneath them. The page draws into it lowest, and the top bar and the strip
+ * above it, so a menu over the strip shows the strip through it, while the strip itself shows only the page.
+ */
+val GlassHaze = dev.chrisbanes.haze.HazeState()
+internal const val GLASS_PAGE_Z = 0f
+internal const val GLASS_BARS_Z = 1f
+
+/**
+ * A surface over the page, frosted as the tab bar is, so the bars, the strip, menus and notes all match it (user
+ * decision). Before Android 12, which can't blur, it's an even tint instead. Clip to the surface's shape first.
+ */
+fun Modifier.glass(colour: Color, tint: Float = TAB_BAR_BLUR_TINT): Modifier =
+    hazeEffect(state = GlassHaze, style = glassStyle(colour, tint)) { inputScale = GLASS_INPUT_SCALE }
+
+/**
+ * Blurs at a fraction of the screen's resolution, which looks the same under a blur this wide and costs a fraction of
+ * the work. At full resolution the frostings took about 18 ms a frame together on a Galaxy A54, so nothing could
+ * animate at the screen's rate (tester feedback).
+ */
+val GLASS_INPUT_SCALE = dev.chrisbanes.haze.HazeInputScale.Fixed(0.33f)
+
+/**
+ * The frosting itself. A vivid colour takes a stronger [tint], since mixed thinly with the dark page it turns muddy
+ * and darker than itself (tester feedback).
+ */
+fun glassStyle(colour: Color, tint: Float = TAB_BAR_BLUR_TINT) = dev.chrisbanes.haze.HazeStyle(
+    backgroundColor = Palette.Background,
+    tints = listOf(dev.chrisbanes.haze.HazeTint(colour.copy(alpha = tint))),
+    blurRadius = TAB_BAR_BLUR_DP.dp,
+    noiseFactor = 0f,
+    fallbackTint = dev.chrisbanes.haze.HazeTint(colour.copy(alpha = maxOf(tint, TAB_BAR_ALPHA))),
+)
+
+
 /** How far above the pill the band starts, so the page has room to fade into it. */
 private const val TAB_BAND_FADE_DP = 24
 /** The pill's inset from the sides, matching the strip's at the top. */
@@ -1508,8 +1648,11 @@ private const val TAB_PILL_INSET_DP = 12
 /** Space between the pill and the gesture line. */
 private const val TAB_PILL_GAP_DP = 8
 private const val TAB_PILL_SHADOW_DP = 6
+private const val TAB_PILL_SHADOW_LIGHT_DP = 3
+/** How dark shadows are in the light theme, against white. */
+private const val LIGHT_SHADOW_ALPHA = 0.35f
 // Concentric with the selected tab's highlight inside it: its 16 dp corners plus the 8 dp between them.
-private val TabPillShape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
+internal val TabPillShape = Corner.largeIncreased
 
 /**
  * The colour the app is made from: the phone's own wallpaper colours where Android has them, one of a few
@@ -1522,14 +1665,63 @@ private fun ThemeColourRow(state: AppState) {
     val wallpaperAvailable = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
     val seed = state.themeColor
     val custom = seed != null && seed !in SeedScheme.SWATCHES
-    // Kept apart from the saved colour while the hue is dragged, so the whole app isn't recoloured every frame.
-    val lastPreview = remember { longArrayOf(0L) }
-    var hue by remember(seed) { mutableStateOf(seed?.let { SeedScheme.hueOf(Color(it.toInt())).toFloat() } ?: 220f) }
+    // The picked colour's hue, saturation and lightness, kept apart from the saved colour while a slider is dragged:
+    // the sliders, the swatch and the strip follow the finger, and the rest of the app recolours once it pauses.
+    // One set of values for as long as the picker's shown. Made afresh each time the saved colour changed, they
+    // left the save on release reading the first set, so only the first change ever took (tester feedback).
+    val start = remember { seed?.takeIf { custom }?.let(SeedScheme::picked) }
+    var hue by remember { mutableStateOf(start?.hue ?: seed?.let { SeedScheme.hueOf(Color(it.toInt())).toFloat() } ?: 220f) }
+    var saturation by remember { mutableStateOf(start?.saturation ?: 1f) }
+    var lightness by remember { mutableStateOf(start?.lightness ?: 0.5f) }
+    // The colour these sliders last saved, so only a change made elsewhere, such as a swatch, moves them.
+    val lastKept = remember { longArrayOf(seed ?: 0L) }
+    LaunchedEffect(seed) {
+        if (seed != null && seed != lastKept[0]) {
+            lastKept[0] = seed
+            if (custom) {
+                val now = SeedScheme.picked(seed)
+                hue = now.hue
+                saturation = now.saturation
+                lightness = now.lightness
+            } else {
+                hue = SeedScheme.hueOf(Color(seed.toInt())).toFloat()
+            }
+        }
+    }
+    fun pick(value: Long?) = Repo.update { it.copy(themeColor = value) }
+    val previewScope = rememberCoroutineScope()
+    val preview = remember { arrayOfNulls<kotlinx.coroutines.Job>(1) }
+    fun current() = SeedScheme.fromPicked(hue, saturation, lightness)
+    // The strip takes the colour with every move, which costs little, so the colour is seen as it's dragged. The
+    // whole app takes it once the finger pauses: recolouring all of it took about 40 ms, and doing so during the
+    // drag made the slider stutter, even a few times a second (tester feedback, user decision).
+    fun showSoon() {
+        ThemePreview.strip(current())
+        preview[0]?.cancel()
+        preview[0] = previewScope.launch {
+            kotlinx.coroutines.delay(COLOUR_PREVIEW_REST_MS)
+            ThemePreview.seed = current()
+        }
+    }
+    fun keep() {
+        preview[0]?.cancel()
+        val colour = current()
+        lastKept[0] = colour
+        pick(colour)
+        ThemePreview.seed = null
+        ThemePreview.strip(null)
+    }
+    // Should the picker go mid-drag, the strip and the app go back to the saved colour.
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose {
+            ThemePreview.seed = null
+            ThemePreview.strip(null)
+        }
+    }
     val names = listOf(
         R.string.ui_colour_blue, R.string.ui_colour_teal, R.string.ui_colour_green, R.string.ui_colour_amber,
         R.string.ui_colour_orange, R.string.ui_colour_red, R.string.ui_colour_pink, R.string.ui_colour_purple,
     )
-    fun pick(value: Long?) = Repo.update { it.copy(themeColor = value) }
     Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.ui_theme_colour), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
@@ -1553,37 +1745,96 @@ private fun ThemeColourRow(state: AppState) {
                     pick(if (!wallpaperAvailable && colour == SeedScheme.DEFAULT_SEED) null else colour)
                 }
             }
-            ColourSwatch(Color(SeedScheme.fromHue(hue).toInt()), stringResource(R.string.ui_colour_custom), selected = custom, rainbow = true) {
-                pick(SeedScheme.fromHue(hue))
+            ColourSwatch(Color(current().toInt()), stringResource(R.string.ui_colour_custom), selected = custom, rainbow = true) {
+                pick(current())
             }
         }
         if (custom) {
-            ValueTrack(
+            ColourSlider(
                 label = stringResource(R.string.ui_colour_hue),
                 readout = "${hue.toInt()}°",
                 value = hue,
                 range = 0f..359f,
                 origin = 0f,
                 default = hue,
-                onChange = {
-                    hue = it
-                    // Recolours the app as the finger slides. Recolouring redraws the whole app, so it's done at most
-                    // ten times a second, and the handle itself still follows the finger every frame.
-                    val now = android.os.SystemClock.uptimeMillis()
-                    if (now - lastPreview[0] >= HUE_PREVIEW_MS) {
-                        lastPreview[0] = now
-                        ThemePreview.seed = SeedScheme.fromHue(it)
-                    }
-                },
-                onFinished = {
-                    pick(SeedScheme.fromHue(hue))
-                    ThemePreview.seed = null
-                },
+                onChange = { hue = it; showSoon() },
+                onFinished = { keep() },
                 trackColours = RAINBOW,
+            )
+            ColourSlider(
+                label = stringResource(R.string.ui_colour_saturation),
+                readout = "${(saturation * 100).roundToInt()}%",
+                value = saturation,
+                range = 0f..1f,
+                origin = 0f,
+                default = 1f,
+                onChange = { saturation = it; showSoon() },
+                onFinished = { keep() },
+                trackColours = listOf(Color(SeedScheme.fromPicked(hue, 0f, lightness).toInt()), Color(SeedScheme.fromPicked(hue, 1f, lightness).toInt())),
+            )
+            ColourSlider(
+                label = stringResource(R.string.ui_colour_lightness),
+                readout = "${(lightness * 100).roundToInt()}%",
+                value = lightness,
+                range = 0f..1f,
+                origin = 0f,
+                default = 0.5f,
+                onChange = { lightness = it; showSoon() },
+                onFinished = { keep() },
+                trackColours = listOf(
+                    Color(SeedScheme.fromPicked(hue, saturation, 0f).toInt()),
+                    Color(SeedScheme.fromPicked(hue, saturation, 0.5f).toInt()),
+                    Color(SeedScheme.fromPicked(hue, saturation, 1f).toInt()),
+                ),
             )
         }
     }
 }
+
+/** A colour slider with its name and value above it, the value growing while it's held, as the others' do. */
+@Composable
+private fun ColourSlider(
+    label: String,
+    readout: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    origin: Float,
+    default: Float,
+    onChange: (Float) -> Unit,
+    onFinished: () -> Unit,
+    trackColours: List<Color>,
+) {
+    var held by remember { mutableStateOf(false) }
+    val grow = androidx.compose.animation.core.animateFloatAsState(if (held) 1.18f else 1f, tween(if (held) 120 else 260), label = "colourReadout")
+    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = Palette.Text, modifier = Modifier.weight(1f))
+        Text(
+            readout,
+            style = Readout,
+            color = Palette.TextDim,
+            modifier = Modifier.graphicsLayer {
+                scaleX = grow.value
+                scaleY = grow.value
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f)
+            },
+        )
+    }
+    ValueTrack(
+        label = label,
+        readout = readout,
+        value = value,
+        range = range,
+        origin = origin,
+        default = default,
+        onChange = onChange,
+        onFinished = onFinished,
+        trackColours = trackColours,
+        onHeld = { held = it },
+    )
+}
+
+/** How long a colour slider has to rest before the whole app, not just the strip, takes the colour it shows. */
+private const val COLOUR_PREVIEW_REST_MS = 200L
 
 /** One round colour to choose, ringed while chosen. */
 @Composable
@@ -1654,7 +1905,6 @@ private fun AccessibilitySection(state: AppState) {
 }
 
 private val TEXT_SCALES = listOf(1.0, 1.15, 1.3)
-private const val HUE_PREVIEW_MS = 100L
 
 /** The hues round the wheel, as the theme would make them, for the hue slider's track. */
 private val RAINBOW: List<Color> = (0..12).map { Color(SeedScheme.fromHue(it * 30f).toInt()) }
@@ -1685,7 +1935,7 @@ private fun DeviceUnsavedBar(state: AppState, saved: DeviceSettings) {
             .fillMaxWidth()
             .shadow(6.dp, PanelShape)
             .clip(PanelShape)
-            .background(Palette.Note)
+            .glass(Palette.Note)
             .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1785,9 +2035,9 @@ private fun AnalyserChip(state: AppState) {
         label = { Text(stringResource(R.string.ui_live_spectrum), maxLines = 1) },
         leadingIcon = { Icon(painterResource(R.drawable.ic_spectrum), contentDescription = null, modifier = Modifier.size(18.dp)) },
         colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = Palette.LitFill,
-            selectedLabelColor = Palette.OnLit,
-            selectedLeadingIconColor = Palette.OnLit,
+            selectedContainerColor = Palette.LitFill.copy(alpha = QUIET_TINT),
+            selectedLabelColor = Palette.LitBright,
+            selectedLeadingIconColor = Palette.LitBright,
             labelColor = Palette.Text,
             iconColor = Palette.TextDim,
         ),
@@ -2017,8 +2267,8 @@ private fun TypeChip(filter: Filter, type: FilterType, label: String, modifier: 
         },
         label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = Palette.LitFill,
-            selectedLabelColor = Palette.OnLit,
+            selectedContainerColor = Palette.LitFill.copy(alpha = QUIET_TINT),
+            selectedLabelColor = Palette.LitBright,
             labelColor = Palette.Text,
         ),
     )
@@ -2303,8 +2553,8 @@ private fun ReverbRow(state: AppState, status: EngineStatus, saved: Tone?) {
                     },
                     label = { Text(stringResource(reverbName(room)), maxLines = 1) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Palette.LitFill,
-                        selectedLabelColor = Palette.OnLit,
+                        selectedContainerColor = Palette.LitFill.copy(alpha = QUIET_TINT),
+                        selectedLabelColor = Palette.LitBright,
                         labelColor = Palette.Text,
                     ),
                 )
@@ -2646,8 +2896,8 @@ private fun LimiterDetails(state: AppState) {
                 onClick = { Repo.update { it.withLimiter(style.settings) } },
                 label = { Text(stringResource(style.label), maxLines = 1) },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Palette.LitFill,
-                    selectedLabelColor = Palette.OnLit,
+                    selectedContainerColor = Palette.LitFill.copy(alpha = QUIET_TINT),
+                    selectedLabelColor = Palette.LitBright,
                     labelColor = Palette.Text,
                 ),
             )
@@ -2954,55 +3204,69 @@ private fun OutputSection(state: AppState, outputKey: String, outputLabel: Strin
     val alreadyAssigned = assigned?.id == state.current.id
 
     SettingsSection(stringResource(R.string.ui_hp_preset)) {
-        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.ui_assigned_preset), style = MaterialTheme.typography.bodyLarge, color = Palette.Text)
-                InfoButton(Help.outputPreset)
-            }
-            Text(
-                assigned?.name ?: stringResource(R.string.ui_none),
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (assigned != null) Palette.Lit else Palette.TextDim,
-                modifier = Modifier.padding(bottom = 10.dp),
-            )
-            if (assigned == null && correction != null) {
-                Button(
-                    onClick = {
-                        Repo.assignToOutput(outputKey, correction.id, draft = true)
-                        Repo.loadPreset(correction)
-                    },
-                    modifier = Modifier.padding(bottom = 8.dp),
-                ) { Text(stringResource(R.string.ui_use_correction, correction.name)) }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (alreadyAssigned) {
-                    // Already done, so said as a fact rather than shown as a button that does nothing (tester feedback).
-                    Icon(Icons.Filled.Check, contentDescription = null, tint = Palette.Lit, modifier = Modifier.size(20.dp))
+        // Rows like the rest of the tab: what's assigned, its name beneath and Clear beside it, then each way to change
+        // it as a row of its own. Buttons stacked under the name, with Clear floating between lines, read as untidy
+        // (tester feedback).
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                SettingLabel(stringResource(R.string.ui_assigned_preset), Help.outputPreset)
+                Row(
+                    Modifier.padding(bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     Text(
-                        stringResource(R.string.ui_current_preset_assigned),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Palette.TextDim,
-                        maxLines = 2,
+                        assigned?.name ?: stringResource(R.string.ui_none),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (assigned != null) Palette.Lit else Palette.TextDim,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
                     )
-                } else FilledTonalButton(
-                    enabled = canAssign,
-                    onClick = { Repo.assignToOutput(assignKey, state.current.id, draft = true) },
-                    modifier = Modifier.weight(1f, fill = false),
-                ) {
-                    Text(
-                        stringResource(R.string.ui_assign, state.current.name),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (assigned != null) {
-                    // Clears the mode's own choice first, then the output's main one.
-                    val clearKey = if (assignKey in state.outputProfiles) assignKey else outputKey
-                    TextButton(onClick = { Repo.assignToOutput(clearKey, null, draft = true) }) { Text(stringResource(R.string.ui_clear)) }
+                    // The preset in use is the assigned one, said as a fact beside it rather than as a button that
+                    // does nothing (tester feedback).
+                    if (alreadyAssigned) {
+                        Icon(
+                            Icons.Filled.Check,
+                            contentDescription = stringResource(R.string.ui_current_preset_assigned),
+                            tint = Palette.Lit,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
                 }
             }
+            if (assigned != null) {
+                // Clears the mode's own choice first, then the output's main one.
+                val clearKey = if (assignKey in state.outputProfiles) assignKey else outputKey
+                TextButton(onClick = { Repo.assignToOutput(clearKey, null, draft = true) }) { Text(stringResource(R.string.ui_clear)) }
+            }
+        }
+        if (assigned == null && correction != null) {
+            RowDivider()
+            AssignRow(
+                title = stringResource(R.string.ui_use_correction, correction.name),
+                detail = stringResource(R.string.ui_assign_correction_detail),
+                action = stringResource(R.string.ui_use_short),
+                recommended = true,
+            ) {
+                Repo.assignToOutput(outputKey, correction.id, draft = true)
+                Repo.loadPreset(correction)
+            }
+        }
+        if (!alreadyAssigned) {
+            RowDivider()
+            AssignRow(
+                title = state.current.name,
+                detail = stringResource(R.string.ui_assign_detail),
+                action = stringResource(R.string.ui_assign_short),
+                enabled = canAssign,
+            ) { Repo.assignToOutput(assignKey, state.current.id, draft = true) }
         }
         if (supportsModes) {
             RowDivider()
@@ -3012,10 +3276,12 @@ private fun OutputSection(state: AppState, outputKey: String, outputLabel: Strin
                     InfoButton(Help.noiseMode)
                 }
                 val modes = ListeningMode.entries
-                WordSegments(
-                    labels = modes.map { listeningModeLabel(it) },
+                // Equal thirds, as the theme's choice is, rather than chips as wide as their words (tester feedback).
+                SlidingToggle(
+                    options = modes.map { ToggleOption(listeningModeLabel(it)) },
                     selected = modes.indexOf(state.listeningMode),
                     onSelect = { Repo.setListeningMode(modes[it]) },
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                 )
             }
         }
@@ -3026,14 +3292,56 @@ private fun OutputSection(state: AppState, outputKey: String, outputLabel: Strin
     }
 }
 
+/**
+ * A way to change the assigned preset, as a row like the tab's others: what it is, a word on it beneath, and a button
+ * that says what tapping does. Lit text alone didn't look like something to tap (tester feedback).
+ */
+@Composable
+private fun AssignRow(
+    title: String,
+    detail: String,
+    action: String,
+    enabled: Boolean = true,
+    /** Filled rather than tonal, for the choice made for this model. */
+    recommended: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (enabled) Palette.Text else Palette.TextDim.copy(alpha = 0.6f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = Palette.TextDim)
+        }
+        if (recommended) {
+            Button(onClick = onClick, enabled = enabled) { Text(action, maxLines = 1) }
+        } else {
+            FilledTonalButton(onClick = onClick, enabled = enabled) { Text(action, maxLines = 1) }
+        }
+    }
+}
+
 @Composable
 fun segmentColors() = SegmentedButtonDefaults.colors(
-    activeContainerColor = Palette.LitFill,
-    activeContentColor = Palette.OnLit,
-    activeBorderColor = Palette.LitFill,
-    inactiveContainerColor = Palette.SurfaceHigh,
-    inactiveContentColor = Palette.Text,
-    inactiveBorderColor = Palette.Line,
+    // Quiet, as the sliding toggles are: a faint tint and lit words on the choice, an outline on the rest (user decision).
+    activeContainerColor = Palette.LitFill.copy(alpha = QUIET_TINT),
+    activeContentColor = Palette.LitBright,
+    activeBorderColor = Palette.LitFill.copy(alpha = QUIET_EDGE),
+    inactiveContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+    inactiveContentColor = Palette.TextDim,
+    inactiveBorderColor = Palette.KeyBorder,
 )
 
 @Composable
@@ -3493,6 +3801,16 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
     }
 
     Text(stringResource(R.string.ui_tab_system), style = MaterialTheme.typography.titleLarge, color = Palette.Text, modifier = Modifier.padding(horizontal = 4.dp))
+    // Which controls the whole app shows, first and on its own: beside Appearance it read as a theming option
+    // (tester feedback).
+    SettingsSection(stringResource(R.string.ui_controls_section)) {
+        SwitchSetting(
+            stringResource(R.string.ui_advanced_controls),
+            Help.advanced,
+            state.advancedControls,
+            detail = stringResource(if (state.advancedControls) R.string.ui_advanced_on else R.string.ui_advanced_off),
+        ) { on -> Repo.update { it.copy(advancedControls = on) } }
+    }
     EveryPresetSections(state)
 
     SettingsSection(stringResource(R.string.ui_appearance)) {
@@ -3528,13 +3846,6 @@ private fun SystemTab(state: AppState, status: EngineStatus) {
         }
         RowDivider()
         ThemeColourRow(state)
-        RowDivider()
-        SwitchSetting(
-            stringResource(R.string.ui_advanced_controls),
-            Help.advanced,
-            state.advancedControls,
-            detail = stringResource(if (state.advancedControls) R.string.ui_advanced_on else R.string.ui_advanced_off),
-        ) { on -> Repo.update { it.copy(advancedControls = on) } }
     }
 
 

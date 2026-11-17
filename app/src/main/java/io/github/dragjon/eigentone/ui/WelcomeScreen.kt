@@ -78,6 +78,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.vectorResource
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.height
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -177,7 +182,8 @@ fun WelcomeScreen(onSetEnabled: (Boolean) -> Unit, onFindSound: () -> Unit) {
                     .widthIn(max = 560.dp)
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                // The last step has the most on it, so it's packed a little closer to fit one screen (tester feedback).
+                verticalArrangement = Arrangement.spacedBy(if (page == STEPS - 1) 10.dp else 16.dp),
             ) {
                 when (page) {
                     STEPS -> Unit
@@ -220,17 +226,7 @@ fun WelcomeScreen(onSetEnabled: (Boolean) -> Unit, onFindSound: () -> Unit) {
             .background(Palette.Background)
             .windowInsetsPadding(WindowInsets.safeDrawing),
     ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 56.dp)
-                .padding(start = 24.dp, end = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // The arrow slides on to the line, as a swipe would.
-            StepDots(page, Modifier.weight(1f), onStart = { scope.launch { pager.animateScrollToPage(STEPS) } })
-            if (page < STEPS - 1) TextButton(onClick = ::finish) { Text(stringResource(R.string.welcome_skip)) }
-        }
+        Spacer(Modifier.height(16.dp))
         Box(
             Modifier
                 .weight(1f)
@@ -249,34 +245,46 @@ fun WelcomeScreen(onSetEnabled: (Boolean) -> Unit, onFindSound: () -> Unit) {
                 ) { shown -> if (shown == STEPS) LinePage({ powerOn.value }, Modifier.fillMaxSize()) else Page(shown, Modifier.fillMaxSize()) }
             }
         }
-        // A single hint, on the first page only, centred under the steps with an arrow that nudges the way to swipe
-        // (user decision). The last step needs none: its lit arrow says where to go.
-        Box(
+        // One bar, as Android's own onboarding has it (tester feedback): Skip on the left, where the welcome is in the
+        // middle, and the way on at the right, which becomes the way in on the last step. Swiping still works.
+        // The dots on a line of their own and the buttons below them, so a long label can never run into the dots,
+        // as Start listening did beside them (tester feedback).
+        val last = page >= STEPS - 1
+        Column(
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 56.dp),
-            contentAlignment = Alignment.Center,
+                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            if (page == 0) {
-                val nudge by androidx.compose.animation.core.rememberInfiniteTransition(label = "swipeHint").animateFloat(
-                    initialValue = 0f,
-                    targetValue = 1f,
-                    animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-                        tween(900, easing = FastOutSlowInEasing),
-                        androidx.compose.animation.core.RepeatMode.Reverse,
-                    ),
-                    label = "swipeNudge",
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.welcome_swipe_hint), style = MaterialTheme.typography.labelMedium, color = Palette.TextDim)
-                    Icon(
-                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = null,
-                        tint = Palette.TextDim,
+            StepDots(
+                position = { pager.currentPage + pager.currentPageOffsetFraction },
+                step = page,
+                modifier = Modifier,
+            )
+            androidx.compose.animation.AnimatedContent(
+                targetState = last,
+                transitionSpec = { fadeIn(tween(ARROW_LIGHT_MS)) togetherWith fadeOut(tween(ARROW_LIGHT_MS / 2)) },
+                label = "welcomeButtons",
+            ) { atLast ->
+                if (atLast) {
+                    // The way in, across the width: it slides on to the line, as a swipe would.
+                    Button(
+                        onClick = { scope.launch { pager.animateScrollToPage(STEPS) } },
                         modifier = Modifier
-                            .size(18.dp)
-                            .graphicsLayer { translationX = nudge * 4.dp.toPx() },
-                    )
+                            .fillMaxWidth()
+                            .heightIn(min = 52.dp),
+                    ) { Text(stringResource(R.string.welcome_finish), maxLines = 1) }
+                } else {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = ::finish) { Text(stringResource(R.string.welcome_skip)) }
+                        Spacer(Modifier.weight(1f))
+                        // An outline, as every step on is routine; only the way in at the end is solid (tester feedback).
+                        FilledTonalButton(
+                            onClick = { scope.launch { pager.animateScrollToPage(page + 1) } },
+                            modifier = Modifier.heightIn(min = 48.dp),
+                        ) { Text(stringResource(R.string.welcome_next), maxLines = 1) }
+                    }
                 }
             }
         }
@@ -294,7 +302,12 @@ private const val SWIPE_FLICK_DP = 300
 private const val SWIPE_NUDGE_DP = 12
 private const val STRIPS = 10
 
-/** How long the arrow after the dots takes to light up as the last step arrives. */
+/** The step dots' size, the current one's length, and the space between them. */
+private const val DOT_DP = 8
+private const val DOT_LONG_DP = 24
+private const val DOT_GAP_DP = 8
+
+/** How long Skip takes to fade and the way on to change as the last step arrives. */
 private const val ARROW_LIGHT_MS = 320
 
 /** How close to the line page the slide has to be for the app to start opening. */
@@ -353,57 +366,37 @@ private fun SweepLine(progress: Float, backward: Boolean, modifier: Modifier) {
     )
 }
 
-/** Where the welcome is, as dots: lit up to the current step. */
+/**
+ * Where the welcome is, as dots: only the current step's is lit and drawn long, as Android's page indicators are,
+ * and it moves with the finger as the page is swiped, rather than every step so far staying lit and the dots
+ * jumping between sizes once the page settles (tester feedback).
+ */
 @Composable
-private fun StepDots(step: Int, modifier: Modifier, onStart: () -> Unit) {
+private fun StepDots(position: () -> Float, step: Int, modifier: Modifier) {
     val label = stringResource(R.string.welcome_step_of, step + 1, STEPS)
-    val last = step == STEPS - 1
-    val startLabel = stringResource(R.string.welcome_finish)
-    // A pale tint of the same blue in both themes, so the ring lifts the circle rather than darkening it (user decision).
-    val ring = androidx.compose.ui.graphics.lerp(Palette.LitFill, androidx.compose.ui.graphics.Color.White, if (Palette.dark) 0.8f else 0.45f)
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Row(Modifier.semantics { contentDescription = label }, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            repeat(STEPS) { i ->
-                Box(
-                    Modifier
-                        .size(width = if (i == step) 24.dp else 8.dp, height = 8.dp)
-                        .clip(CircleShape)
-                        .background(if (i <= step) Palette.LitFill else Palette.Track),
-                )
-            }
-        }
-        // One more stop past the last step (user decision): a quiet arrow until it's next, then the same arrow in a
-        // lit circle, with no word, easing in as the last step arrives so the way in is plain without a jolt.
-        val lit by androidx.compose.animation.core.animateFloatAsState(if (last) 1f else 0f, tween(ARROW_LIGHT_MS, easing = FastOutSlowInEasing), label = "startArrow")
-        Box(
-            Modifier
-                .size(32.dp)
-                .graphicsLayer {
-                    scaleX = 0.85f + 0.15f * lit
-                    scaleY = 0.85f + 0.15f * lit
-                }
-                .clip(CircleShape)
-                .background(Palette.LitFill.copy(alpha = lit))
-                // A ring in another shade of the same blue, lighter at night and deeper by day, so the lit circle
-                // stands apart from the page without black or white (user decision), fading in with it.
-                .border(2.dp, ring.copy(alpha = lit), CircleShape)
-                .then(
-                    if (last) {
-                        Modifier
-                            .clickable(role = Role.Button, onClick = onStart)
-                            .semantics { contentDescription = startLabel }
-                    } else {
-                        Modifier
-                    },
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = androidx.compose.ui.graphics.lerp(Palette.Track, Palette.OnLit, lit),
-                modifier = Modifier.size(22.dp),
+    val lit = Palette.LitFill
+    val unlit = Palette.Track2
+    // Drawn from the pager's position as it moves, so following the finger never rebuilds the bar.
+    androidx.compose.foundation.Canvas(
+        modifier
+            .size(width = (DOT_DP * (STEPS - 1) + DOT_LONG_DP + DOT_GAP_DP * (STEPS - 1)).dp, height = DOT_DP.dp)
+            .semantics { contentDescription = label },
+    ) {
+        val at = position().coerceAtMost((STEPS - 1).toFloat())
+        val dot = DOT_DP.dp.toPx()
+        val long = DOT_LONG_DP.dp.toPx()
+        val gap = DOT_GAP_DP.dp.toPx()
+        var x = 0f
+        repeat(STEPS) { i ->
+            val near = (1f - kotlin.math.abs(at - i)).coerceIn(0f, 1f)
+            val width = dot + (long - dot) * near
+            drawRoundRect(
+                androidx.compose.ui.graphics.lerp(unlit, lit, near),
+                topLeft = Offset(x, 0f),
+                size = Size(width, dot),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(dot / 2),
             )
+            x += width + gap
         }
     }
 }
@@ -429,20 +422,97 @@ private fun Note(text: String, lit: Boolean = false) {
     )
 }
 
+/**
+ * Eigentone's mark in the theme's colour rather than its own blue: the wave in the colour's deep tone and the tick
+ * marks in its pale one, as the blue mark has them, on the same white tile.
+ */
+@Composable
+fun themedLogo(): androidx.compose.ui.graphics.painter.Painter {
+    val base = androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_logo)
+    val scheme = MaterialTheme.colorScheme
+    val dark = Palette.dark
+    // Material's primary is the pale tone at night and the deep one by day; its inverse is the other.
+    val deep = if (dark) scheme.inversePrimary else scheme.primary
+    val pale = if (dark) scheme.primary else scheme.inversePrimary
+    val vector = remember(base, deep, pale) {
+        recolour(base) { colour ->
+            when (colour) {
+                LOGO_DEEP -> deep
+                LOGO_PALE -> pale
+                else -> colour
+            }
+        }
+    }
+    return androidx.compose.ui.graphics.vector.rememberVectorPainter(vector)
+}
+
+/** The mark's own blues, as drawn in its file. */
+private val LOGO_DEEP = androidx.compose.ui.graphics.Color(0xFF1A73E8)
+private val LOGO_PALE = androidx.compose.ui.graphics.Color(0xFF8AB4F8)
+
+/** A copy of [vector] with each solid fill and stroke colour passed through [map]. */
+private fun recolour(
+    vector: androidx.compose.ui.graphics.vector.ImageVector,
+    map: (androidx.compose.ui.graphics.Color) -> androidx.compose.ui.graphics.Color,
+): androidx.compose.ui.graphics.vector.ImageVector {
+    fun androidx.compose.ui.graphics.Brush?.mapped() =
+        if (this is androidx.compose.ui.graphics.SolidColor) androidx.compose.ui.graphics.SolidColor(map(value)) else this
+    val builder = androidx.compose.ui.graphics.vector.ImageVector.Builder(
+        name = vector.name,
+        defaultWidth = vector.defaultWidth,
+        defaultHeight = vector.defaultHeight,
+        viewportWidth = vector.viewportWidth,
+        viewportHeight = vector.viewportHeight,
+        tintColor = vector.tintColor,
+        tintBlendMode = vector.tintBlendMode,
+        autoMirror = vector.autoMirror,
+    )
+    fun copy(node: androidx.compose.ui.graphics.vector.VectorNode) {
+        when (node) {
+            is androidx.compose.ui.graphics.vector.VectorGroup -> {
+                builder.addGroup(
+                    node.name, node.rotation, node.pivotX, node.pivotY, node.scaleX, node.scaleY,
+                    node.translationX, node.translationY, node.clipPathData,
+                )
+                node.forEach { copy(it) }
+                builder.clearGroup()
+            }
+            is androidx.compose.ui.graphics.vector.VectorPath -> builder.addPath(
+                pathData = node.pathData,
+                pathFillType = node.pathFillType,
+                name = node.name,
+                fill = node.fill.mapped(),
+                fillAlpha = node.fillAlpha,
+                stroke = node.stroke.mapped(),
+                strokeAlpha = node.strokeAlpha,
+                strokeLineWidth = node.strokeLineWidth,
+                strokeLineCap = node.strokeLineCap,
+                strokeLineJoin = node.strokeLineJoin,
+                strokeLineMiter = node.strokeLineMiter,
+                trimPathStart = node.trimPathStart,
+                trimPathEnd = node.trimPathEnd,
+                trimPathOffset = node.trimPathOffset,
+            )
+        }
+    }
+    vector.root.forEach { copy(it) }
+    return builder.build()
+}
+
 @Composable
 private fun Hello() {
-    // The mark in full colour: a double helix untwisting into one sound wave.
+    // The mark in full colour: a double helix untwisting into one sound wave, in the theme's colour (user decision).
     androidx.compose.foundation.Image(
-        painterResource(R.drawable.ic_logo),
+        themedLogo(),
         contentDescription = null,
         modifier = Modifier
             .padding(top = 16.dp)
             .size(88.dp)
-            .clip(RoundedCornerShape(24.dp))
+            .clip(Corner.largeIncreased)
             // The icon's own white tile, in either theme, so it looks the same as on the home screen.
             .background(androidx.compose.ui.graphics.Color.White)
             // A faint rim, so the white tile still has an edge on a light page.
-            .border(1.dp, Palette.KeyBorder, RoundedCornerShape(24.dp))
+            .border(1.dp, Palette.KeyBorder, Corner.largeIncreased)
             .padding(4.dp),
     )
     Heading(stringResource(R.string.welcome_hello_title), stringResource(R.string.welcome_hello_body))
@@ -500,8 +570,35 @@ private fun TurnOn(state: AppState, onSetEnabled: (Boolean) -> Unit) {
         )
     }
     BackgroundUse()
+    MediaAccess()
     Text(stringResource(R.string.ui_use_one_eq_at_a_time), style = MaterialTheme.typography.titleSmall, color = Palette.Text)
     Text(stringResource(R.string.ui_eq_in_a_headphone_app_such_2), style = MaterialTheme.typography.bodyMedium, color = Palette.TextDim)
+}
+
+/**
+ * Offers the access Android lists under notifications, which lets the strip name the app playing and per-app
+ * presets work (user decision). Optional, and rechecked on every return, since it's granted in Android's settings.
+ */
+@Composable
+private fun MediaAccess() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var allowed by remember { mutableStateOf(true) }
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        allowed = io.github.dragjon.eigentone.engine.MediaWatcher.isAllowed(context)
+        onPauseOrDispose { }
+    }
+    Text(stringResource(R.string.welcome_playing_title), style = MaterialTheme.typography.titleSmall, color = Palette.Text)
+    if (allowed) {
+        Note(stringResource(R.string.welcome_playing_done), lit = true)
+    } else {
+        Text(stringResource(R.string.welcome_playing_body), style = MaterialTheme.typography.bodyMedium, color = Palette.TextDim)
+        FilledTonalButton(
+            onClick = { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 52.dp),
+        ) { Text(stringResource(R.string.welcome_playing_allow)) }
+    }
 }
 
 /**
@@ -587,7 +684,7 @@ private fun FindYourSound(onStart: () -> Unit) {
 @Composable
 private fun HandsOn(state: AppState) {
     Heading(stringResource(R.string.welcome_hands_title), stringResource(R.string.welcome_hands_body))
-    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Choice(
             title = stringResource(R.string.welcome_simple),
             body = stringResource(R.string.welcome_simple_body),
@@ -600,7 +697,7 @@ private fun HandsOn(state: AppState) {
         ) { Repo.update { it.copy(advancedControls = true) } }
     }
     Text(stringResource(R.string.welcome_hands_where), style = MaterialTheme.typography.bodySmall, color = Palette.TextDim)
-    Text(stringResource(R.string.ui_theme), style = MaterialTheme.typography.titleSmall, color = Palette.Text, modifier = Modifier.padding(top = 8.dp))
+    Text(stringResource(R.string.ui_theme), style = MaterialTheme.typography.titleSmall, color = Palette.Text, modifier = Modifier.padding(top = 4.dp))
     val modes = ThemeMode.entries
     WordSegments(
         labels = listOf(stringResource(R.string.ui_theme_device), stringResource(R.string.ui_theme_light), stringResource(R.string.ui_theme_dark)),
@@ -617,14 +714,15 @@ private fun Choice(title: String, body: String, selected: Boolean, onSelect: () 
         Modifier
             .fillMaxWidth()
             .clip(PanelShape)
-            .background(if (selected) Palette.SurfaceHigh else Palette.Surface)
+            .background(if (selected) Palette.LitFill.copy(alpha = QUIET_TINT) else Palette.Surface)
             .border(if (selected) 2.dp else 1.dp, if (selected) Palette.Lit else Palette.Line, PanelShape)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            // Compact, so the last step fits on one screen without scrolling (tester feedback).
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(title, style = MaterialTheme.typography.titleMedium, color = if (selected) Palette.Lit else Palette.Text)
-        Text(body, style = MaterialTheme.typography.bodyMedium, color = Palette.TextDim)
+        Text(body, style = MaterialTheme.typography.bodySmall, color = Palette.TextDim)
     }
 }
 

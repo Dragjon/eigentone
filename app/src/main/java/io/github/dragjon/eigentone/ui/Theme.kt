@@ -63,6 +63,12 @@ data class ThemeColors(
     /** Text in the strip's opened drawer, made for its tone. Unspecified means the strip's own text colours suit it. */
     val drawerText: Color = Color.Unspecified,
     val drawerDim: Color = Color.Unspecified,
+    /**
+     * The second accent, opposite the main colour, kept for the few things that should stand out most: the EQ curve,
+     * the power switch (user decision). Unspecified means the main colour.
+     */
+    val accent: Color = Color.Unspecified,
+    val onAccent: Color = Color.Unspecified,
 )
 
 /**
@@ -139,17 +145,28 @@ object Palette {
     /** Whether the theme in use is dark, whichever palette it came from. */
     internal var dark by mutableStateOf(true)
 
+    /** Whether the quieter colours are drawn nearer the text, for the colours made outside the theme below. */
+    internal var highContrast = false
+
+    /**
+     * The colours worn while a colour slider is dragged, ahead of the rest of the app: the strip's and the lit
+     * controls'. Only what uses those reads these, so they can follow the finger, where recolouring the whole app
+     * took about 40 ms on a Galaxy A54 and made the slider stutter (tester feedback, user decision).
+     */
+    internal var stripColors by mutableStateOf<ThemeColors?>(null)
+    private val live get() = stripColors ?: colors
+
     val Background get() = colors.background
     val Bar get() = colors.bar
-    val Strip get() = colors.strip
-    val StripDim get() = colors.stripDim
-    val StripText get() = colors.stripText
-    val StripOn get() = colors.stripOn
-    val StripDanger get() = colors.stripDanger
-    val StripPanel get() = colors.stripPanel
-    val DrawerText get() = colors.drawerText.takeOrElse { colors.stripText }
-    val DrawerOn get() = colors.drawerText.takeOrElse { colors.stripOn }
-    val DrawerDim get() = colors.drawerDim.takeOrElse { colors.stripDim }
+    val Strip get() = live.strip
+    val StripDim get() = live.stripDim
+    val StripText get() = live.stripText
+    val StripOn get() = live.stripOn
+    val StripDanger get() = live.stripDanger
+    val StripPanel get() = live.stripPanel
+    val DrawerText get() = live.let { it.drawerText.takeOrElse { it.stripText } }
+    val DrawerOn get() = live.let { it.drawerText.takeOrElse { it.stripOn } }
+    val DrawerDim get() = live.let { it.drawerDim.takeOrElse { it.stripDim } }
     val Surface get() = colors.surface
     val SurfaceHigh get() = colors.surfaceHigh
     val Tooltip get() = colors.tooltip
@@ -158,34 +175,42 @@ object Palette {
     val Track get() = colors.track
     val Text get() = colors.text
     val TextDim get() = colors.textDim
-    val Lit get() = colors.lit
-    val LitFill get() = colors.litFill
+    val Lit get() = live.lit
+    val LitFill get() = live.litFill
 
     /** The selected fader's cap: bright at night, and the lit orange by day rather than a black block. */
-    val SelectedCap get() = if (dark) colors.text else colors.lit
+    val SelectedCap get() = if (dark) colors.text else live.lit
 
     /** Lit text that has to stand out on a dark page, such as the levels above the faders: lighter at night. */
-    val LitBright get() = if (dark) androidx.compose.ui.graphics.lerp(colors.lit, Color.White, 0.45f) else colors.lit
+    val LitBright get() = live.lit.let { if (dark) androidx.compose.ui.graphics.lerp(it, Color.White, 0.45f) else it }
 
     /**
      * The unfilled part of every selector, slider and fader track. At night a touch of the theme colour; by day a
-     * plain grey, since the tinted container looked off on white (user decision).
+     * plain grey, since the tinted container looked off on white (user decision). See-through rather than solid, so
+     * the panel or page beneath shows through, as it does through the bars (user decision).
      */
     val Track2 get() = if (dark) {
-        androidx.compose.ui.graphics.lerp(colors.surfaceHigh, colors.litFill, 0.16f)
+        // Over a panel, about as light as the solid tint it replaced.
+        live.litFill.copy(alpha = TRACK_TINT_DARK)
     } else {
         // Light enough to sit gently on the white page as well as on a panel.
-        androidx.compose.ui.graphics.lerp(colors.surfaceHigh, colors.background, 0.35f)
+        live.text.copy(alpha = TRACK_TINT_LIGHT)
     }
+    private const val TRACK_TINT_DARK = 0.2f
+    private const val TRACK_TINT_LIGHT = 0.06f
 
     /** Floating notes, such as unsaved changes and messages: a tint of the theme colour rather than grey (user decision). */
-    val Note get() = androidx.compose.ui.graphics.lerp(colors.surfaceHigh, colors.litFill, if (dark) 0.22f else 0.14f)
+    val Note get() = androidx.compose.ui.graphics.lerp(live.surfaceHigh, live.litFill, if (dark) 0.22f else 0.14f)
     val NoteText get() = colors.text
 
     /** The edge of an unlit key or toggle: clear enough to see on any panel, quieter than a control's outline. */
     val KeyBorder get() = androidx.compose.ui.graphics.lerp(colors.line, colors.outline, 0.55f)
-    val LitPressed get() = colors.litPressed
-    val OnLit get() = colors.onLit
+    val LitPressed get() = live.litPressed
+    val OnLit get() = live.onLit
+
+    /** The second accent and the colour of what's on it. See [ThemeColors.accent]. */
+    val Accent get() = live.accent.takeOrElse { live.litFill }
+    val OnAccent get() = live.onAccent.takeOrElse { live.onLit }
     val Danger get() = colors.danger
     val LeftEar get() = colors.leftEar
     val RightEar get() = colors.rightEar
@@ -214,11 +239,16 @@ internal fun ThemeColors.contrasted(): ThemeColors {
 }
 
 /**
- * A colour being tried while the hue slider moves. The theme wears it at once, so the app recolours as the
- * finger slides; it's saved as the setting once the finger lifts, and cleared.
+ * A colour being tried while a colour slider moves. The strip wears it at once, through [strip]; the whole app
+ * wears it through [seed] once the finger pauses. It's saved as the setting once the finger lifts, and cleared.
  */
 object ThemePreview {
     var seed by mutableStateOf<Long?>(null)
+
+    /** Recolours the strip alone, or puts it back with the rest of the app when null. */
+    fun strip(seed: Long?) {
+        Palette.stripColors = seed?.let { themeColors(SeedScheme.scheme(it, Palette.dark), Palette.dark, Palette.highContrast) }
+    }
 }
 
 /** Whether this choice means dark right now. Follows the device live, including a dark mode schedule. */
@@ -281,16 +311,43 @@ val PanelLegend = TextStyle(
 /** A tool's main measurement, large enough to read at arm's length. */
 val BigReadout = TextStyle(fontFamily = ReadoutFamily, fontSize = 38.sp, lineHeight = 44.sp)
 
+/**
+ * Axis and point labels drawn on graphs: monospaced, at Material's smallest size, 11 sp. They were 10, below the
+ * smallest size Material allows for text (MD3 audit).
+ */
+val ChartLabel = TextStyle(fontFamily = ReadoutFamily, fontSize = 11.sp, lineHeight = 14.sp)
+
+/** A panel's engraved legend at its smallest, for a label beside a control. */
+val PanelLegendSmall = PanelLegend.copy(fontSize = 11.sp, lineHeight = 16.sp)
+
 /** Monospaced digits, so measurements stay still while their values change. */
 val Readout = TextStyle(fontFamily = ReadoutFamily, fontSize = 13.sp, lineHeight = 18.sp)
 
-// Material You's own corner scale, so menus, chips, fields and dialogs are as soft as the rest.
+/**
+ * The app's one corner scale. Everything rounded takes its corners from here, Material's own components through
+ * [Corners] and the app's own through these, so no corner is a size of its own (MD3 audit).
+ */
+internal object Corner {
+    /** Small marks inside other things, such as the strip's little curve. */
+    val tiny = RoundedCornerShape(4.dp)
+    val extraSmall = RoundedCornerShape(8.dp)
+    val small = RoundedCornerShape(12.dp)
+    /** Panels. */
+    val medium = RoundedCornerShape(16.dp)
+    /** Keys and toggles. */
+    val large = RoundedCornerShape(20.dp)
+    /** The bars that hold keys: the medium corners of the key inside plus the 8 dp between them, so they nest. */
+    val largeIncreased = RoundedCornerShape(24.dp)
+    val extraLarge = RoundedCornerShape(28.dp)
+}
+
+// Material's components take the same scale, so menus, chips, fields and dialogs are as soft as the rest.
 private val Corners = Shapes(
-    extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(16.dp),
-    large = RoundedCornerShape(20.dp),
-    extraLarge = RoundedCornerShape(28.dp),
+    extraSmall = Corner.extraSmall,
+    small = Corner.small,
+    medium = Corner.medium,
+    large = Corner.large,
+    extraLarge = Corner.extraLarge,
 )
 
 /**
@@ -305,19 +362,21 @@ private fun fromScheme(s: androidx.compose.material3.ColorScheme, fixed: ThemeCo
         background = s.surface,
         // Material's lowest tone: near-black framing the page at night, and white by day (user decisions).
         bar = s.surfaceContainerLowest,
-        // The wallpaper's own colour, rather than a grey, so the status window stands out (user decision).
-        strip = s.primary,
-        stripDim = over(s.onPrimary, 0.72f, s.primary),
-        stripText = s.onPrimary,
-        stripOn = s.onPrimary,
+        // The tab bar's own surface, so the two read as a pair at top and bottom, with the colour only on what's lit
+        // inside it. Filled with the colour it looked like a bigger toggle, and tinted grey it looked muddy (user decision).
+        strip = s.surfaceContainerLowest,
+        stripDim = s.onSurfaceVariant,
+        stripText = s.onSurface,
+        stripOn = s.primary,
         // A lighter shade of the strip's own colour for its drawer.
         // At night the strip's colour is a pale tint, so its drawer goes a shade deeper; by day a shade lighter.
         // The drawer is the strip itself carried on down, in the same colour with the same text, set apart only by a
         // faint line and its shadow. A different tone flipped light and dark between the two, so they read as two
         // pieces rather than one bar opening (user decision).
-        stripPanel = s.primary,
-        // A tinted step off the page in both themes, so panels read as panels on white too.
-        surface = s.surfaceContainerLow,
+        stripPanel = s.surfaceContainerLowest,
+        // Half a step off the page in both themes: panels are felt rather than seen, as the graph's is, with the space
+        // between them doing more of the grouping (user decision).
+        surface = over(s.surfaceContainerLow, PANEL_STEP, s.surface),
         surfaceHigh = s.surfaceContainerHighest,
         // Menus and dialogs: a raised grey at night, and white with their shadow by day, rather than a dark grey on white.
         tooltip = if (dark) s.surfaceContainerHigh else s.surfaceContainerLowest,
@@ -330,7 +389,10 @@ private fun fromScheme(s: androidx.compose.material3.ColorScheme, fixed: ThemeCo
         litFill = s.primary,
         litPressed = over(s.onPrimary, 0.12f, s.primary),
         onLit = s.onPrimary,
-    )
+    ).let { colours ->
+        val (accent, onAccent) = SeedScheme.accentFor(s.primary, dark)
+        colours.copy(accent = accent, onAccent = onAccent)
+    }
 }
 
 @Composable
@@ -347,11 +409,17 @@ fun EigentoneTheme(dark: Boolean, seed: Long? = null, highContrast: Boolean = fa
             else -> SeedScheme.scheme(seed ?: SeedScheme.DEFAULT_SEED, dark)
         }
     }
-    val colors = androidx.compose.runtime.remember(scheme, dark, highContrast) {
-        fromScheme(scheme, if (dark) DarkColors else LightColors, dark).let { if (highContrast) it.contrasted() else it }
-    }
+    val colors = androidx.compose.runtime.remember(scheme, dark, highContrast) { themeColors(scheme, dark, highContrast) }
     // Set before anything below reads it, so a change can't show one frame of the old theme.
     if (Palette.colors != colors) Palette.colors = colors
     Palette.dark = dark
+    Palette.highContrast = highContrast
     MaterialTheme(colorScheme = scheme, typography = Type, shapes = Corners, content = content)
 }
+
+/** How far a panel steps from the page towards Material's low container: half way, for quiet panels. */
+private const val PANEL_STEP = 0.55f
+
+/** The app's colours from a Material scheme, as the theme wears them. */
+internal fun themeColors(scheme: androidx.compose.material3.ColorScheme, dark: Boolean, highContrast: Boolean): ThemeColors =
+    fromScheme(scheme, if (dark) DarkColors else LightColors, dark).let { if (highContrast) it.contrasted() else it }

@@ -3,6 +3,7 @@ package io.github.dragjon.eigentone.ui
 import androidx.compose.material.icons.filled.Close
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.ui.draw.clip
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
@@ -10,10 +11,12 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Snackbar
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.material3.SnackbarData
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
@@ -71,34 +74,40 @@ fun NoticeHost(state: SnackbarHostState, modifier: Modifier = Modifier, longer: 
     ) { shown: SnackbarData? ->
         // Material's ready-made snackbar adds its own 12 dp margin, which left messages narrower than the save bars and
         // higher above them. Built from its plain layout instead, a message lines up with the save bars exactly.
-        if (shown != null) Box {
-            Snackbar(
-                shape = PanelShape,
-                containerColor = Palette.Note,
-                contentColor = Palette.NoteText,
-                actionContentColor = Palette.LitBright,
-                dismissActionContentColor = Palette.TextDim,
-                action = shown.visuals.actionLabel?.let { label ->
-                    {
-                        androidx.compose.material3.TextButton(
-                            onClick = { shown.performAction() },
-                            colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = Palette.LitBright),
-                        ) { androidx.compose.material3.Text(label) }
-                    }
-                },
-                dismissAction = if (shown.visuals.withDismissAction) {
-                    {
-                        androidx.compose.material3.IconButton(onClick = { shown.dismiss() }) {
-                            androidx.compose.material3.Icon(
-                                androidx.compose.material.icons.Icons.Filled.Close,
-                                contentDescription = androidx.compose.ui.res.stringResource(R.string.ui_dismiss),
-                            )
-                        }
-                    }
-                } else {
-                    null
-                },
-            ) { androidx.compose.material3.Text(shown.visuals.message) }
+        // Built as the save bars are, frosted over its own shadow (user decision). Material's snackbar keeps a shadow
+        // of its own, which showed through the frosting as a pale bar behind the message (tester feedback).
+        if (shown != null) androidx.compose.foundation.layout.Row(
+            androidx.compose.ui.Modifier
+                .fillMaxWidth()
+                .shadow(6.dp, PanelShape)
+                .clip(PanelShape)
+                .glass(Palette.Note)
+                .semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite }
+                .heightIn(min = 48.dp)
+                .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
+            androidx.compose.material3.Text(
+                shown.visuals.message,
+                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                color = Palette.NoteText,
+                modifier = androidx.compose.ui.Modifier.weight(1f).padding(vertical = 10.dp),
+            )
+            shown.visuals.actionLabel?.let { label ->
+                androidx.compose.material3.TextButton(
+                    onClick = { shown.performAction() },
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = Palette.LitBright),
+                ) { androidx.compose.material3.Text(label) }
+            }
+            if (shown.visuals.withDismissAction) {
+                androidx.compose.material3.IconButton(onClick = { shown.dismiss() }) {
+                    androidx.compose.material3.Icon(
+                        androidx.compose.material.icons.Icons.Filled.Close,
+                        contentDescription = androidx.compose.ui.res.stringResource(R.string.ui_dismiss),
+                        tint = Palette.TextDim,
+                    )
+                }
+            }
         }
     }
 }

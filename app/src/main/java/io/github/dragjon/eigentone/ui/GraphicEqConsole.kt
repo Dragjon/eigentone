@@ -125,7 +125,7 @@ private fun IconPill(options: List<Pair<Int, String>>, selected: Int, onSelect: 
 private fun PillLabel(label: String) {
     Text(
         label.uppercase(),
-        style = PanelLegend.copy(fontSize = 11.sp),
+        style = PanelLegendSmall,
         color = Palette.TextDim,
         // Room before its toggle, so the word reads as its label rather than touching it.
         modifier = Modifier.padding(end = 4.dp).clearAndSetSemantics { },
@@ -400,8 +400,8 @@ fun GraphicEqConsole(tone: Tone, presetId: String, onBrowseShapes: () -> Unit, o
                         },
                         label = { Text(shape.name, maxLines = 1) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Palette.LitFill,
-                            selectedLabelColor = Palette.OnLit,
+                            selectedContainerColor = Palette.LitFill.copy(alpha = QUIET_TINT),
+                            selectedLabelColor = Palette.LitBright,
                             labelColor = Palette.Text,
                         ),
                     )
@@ -476,7 +476,7 @@ private fun Faders(
     val measurer = rememberTextMeasurer()
     // Material's colour for a slider's unfilled track.
     val faderTrack = Palette.Track2
-    val labelStyle = TextStyle(color = Palette.TextDim, fontSize = 10.sp, fontFamily = ReadoutFamily)
+    val labelStyle = ChartLabel.copy(color = Palette.TextDim)
     val bands = gains.size
     val freqs = GraphicEq.frequencies(bands)
     val density = LocalDensity.current
@@ -699,8 +699,8 @@ private fun Faders(
                     if (smooth) {
                         drawSmoothCurve(shown, selected, gutter, slot, height, zero, yOf)
                     } else shown.forEachIndexed { i, gain ->
-                        // A Material You slider stood on end (user decision, after Wavelet): a rounded track filled
-                        // from 0 dB, and a round handle that grows a little and takes a ring while it's selected.
+                        // A slider stood on end, drawn as quietly as the graph (user decision): a thin track lit from
+                        // 0 dB, and a hollow ring for a handle, as the parametric EQ's nodes are, filled while selected.
                         val centre = gutter + slot * i + slot / 2
                         val isSelected = i == selected
                         val track = minOf(FADER_TRACK_DP.dp.toPx(), slot * 0.4f)
@@ -743,7 +743,13 @@ private fun Faders(
                         if (isSelected) drawCircle(Palette.LitFill.copy(alpha = 0.22f), radius + halo, Offset(centre, y))
                         // The gap sets a handle apart from its track; the selected one's halo does that instead.
                         if (!isSelected && gap > 0.5f) drawCircle(Palette.Surface, radius + gap, Offset(centre, y))
-                        drawCircle(Palette.LitFill, radius, Offset(centre, y))
+                        if (isSelected) {
+                            drawCircle(Palette.LitFill, radius, Offset(centre, y))
+                        } else {
+                            val ring = FADER_RING_DP.dp.toPx()
+                            drawCircle(Palette.Surface, radius, Offset(centre, y))
+                            drawCircle(Palette.LitFill, radius - ring / 2, Offset(centre, y), style = androidx.compose.ui.graphics.drawscope.Stroke(ring))
+                        }
 
                     }
 
@@ -939,7 +945,9 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSmoothCurve(
 private const val SMOOTH_FILL_ALPHA = 0.16f
 
 /** The faders, as Material You sliders on end. */
-private const val FADER_TRACK_DP = 6
+private const val FADER_TRACK_DP = 3
+/** The width of an unselected fader handle's ring. */
+private const val FADER_RING_DP = 2
 private const val FADER_HANDLE_DP = 16
 private const val FADER_HANDLE_SCROLL_DP = 20
 private const val FADER_HANDLE_GROW_DP = 5
@@ -954,8 +962,9 @@ private const val LABEL_TEXT_DP = 14
 /** How wide each fader is in precision mode, so a finger lands on the right one. */
 private const val PRECISION_SLOT_DP = 44
 private const val OVERVIEW_HEIGHT_DP = 44
-private const val OVERVIEW_CORNER_DP = 10
-private val OverviewShape = androidx.compose.foundation.shape.RoundedCornerShape(OVERVIEW_CORNER_DP.dp)
+private val OverviewShape = Corner.small
+/** [Corner.small]'s radius, so the window drawn inside the overview keeps to its corners. */
+private const val OVERVIEW_CORNER_DP = 12
 /** How far from the handle's centre a touch still grabs it, a 72 dp target, well beyond the small round handle. */
 private const val CAP_GRAB_DP = 36
 /** Clear space above the rails, a cap's grab reach, so a fader at the top never reaches the overview. */

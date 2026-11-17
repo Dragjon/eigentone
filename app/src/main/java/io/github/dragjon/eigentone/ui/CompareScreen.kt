@@ -257,7 +257,7 @@ private fun Slot(label: String, name: String, active: Boolean, modifier: Modifie
     Column(
         modifier
             .clip(PanelShape)
-            .background(if (active) Palette.SurfaceHigh else Palette.Surface)
+            .background(if (active) Palette.LitFill.copy(alpha = QUIET_TINT) else Palette.Surface)
             // The slot being chosen for is outlined too, so it isn't told apart by tone alone.
             .border(1.dp, if (active) Palette.Lit else Palette.Line, PanelShape)
             .selectable(selected = active, role = Role.Tab, onClick = onClick)

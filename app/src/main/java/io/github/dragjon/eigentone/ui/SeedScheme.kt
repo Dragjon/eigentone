@@ -8,7 +8,9 @@ import androidx.compose.ui.graphics.toArgb
 import kotlin.math.atan2
 import kotlin.math.cbrt
 import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
@@ -35,18 +37,22 @@ object SeedScheme {
 
     fun scheme(seed: Long, dark: Boolean): ColorScheme {
         val hue = hueOf(Color(seed.toInt()))
-        val p = Tonal(hue, PRIMARY_CHROMA)
-        val s = Tonal(hue, SECONDARY_CHROMA)
-        val t = Tonal(hue + 60.0, TERTIARY_CHROMA)
-        val n = Tonal(hue, NEUTRAL_CHROMA)
-        val nv = Tonal(hue, NEUTRAL_VARIANT_CHROMA)
+        // A colour of one's own also carries how vivid and how light it is. The swatches are as designed.
+        val own = if (seed in SWATCHES) null else picked(seed)
+        val vivid = own?.saturation?.toDouble() ?: 1.0
+        val shift = own?.let { ((it.lightness - 0.5f) * 2 * MAX_TONE_SHIFT).roundToInt() } ?: 0
+        val p = Tonal(hue, PRIMARY_CHROMA * vivid)
+        val s = Tonal(hue, SECONDARY_CHROMA * vivid)
+        val t = Tonal(hue + 60.0, TERTIARY_CHROMA * vivid)
+        val n = Tonal(hue, NEUTRAL_CHROMA * vivid)
+        val nv = Tonal(hue, NEUTRAL_VARIANT_CHROMA * vivid)
         val error = Tonal(25.0, 60.0)
         return if (dark) darkColorScheme(
-            primary = p(80), onPrimary = p(20), primaryContainer = p(30), onPrimaryContainer = p(90), inversePrimary = p(40),
+            primary = p(80 + shift), onPrimary = p(20), primaryContainer = p(30), onPrimaryContainer = p(90), inversePrimary = p(40),
             secondary = s(80), onSecondary = s(20), secondaryContainer = s(30), onSecondaryContainer = s(90),
             tertiary = t(80), onTertiary = t(20), tertiaryContainer = t(30), onTertiaryContainer = t(90),
             background = n(6), onBackground = n(90), surface = n(6), onSurface = n(90),
-            surfaceVariant = nv(30), onSurfaceVariant = nv(80), surfaceTint = p(80),
+            surfaceVariant = nv(30), onSurfaceVariant = nv(80), surfaceTint = p(80 + shift),
             inverseSurface = n(90), inverseOnSurface = n(20),
             error = error(80), onError = error(20), errorContainer = error(30), onErrorContainer = error(90),
             outline = nv(60), outlineVariant = nv(30), scrim = Color.Black,
@@ -54,11 +60,11 @@ object SeedScheme {
             surfaceContainerLowest = n(4), surfaceContainerLow = n(10), surfaceContainer = n(12),
             surfaceContainerHigh = n(17), surfaceContainerHighest = n(22),
         ) else lightColorScheme(
-            primary = p(40), onPrimary = p(100), primaryContainer = p(90), onPrimaryContainer = p(10), inversePrimary = p(80),
+            primary = p(40 + shift), onPrimary = p(100), primaryContainer = p(90), onPrimaryContainer = p(10), inversePrimary = p(80),
             secondary = s(40), onSecondary = s(100), secondaryContainer = s(90), onSecondaryContainer = s(10),
             tertiary = t(40), onTertiary = t(100), tertiaryContainer = t(90), onTertiaryContainer = t(10),
             background = n(98), onBackground = n(10), surface = n(98), onSurface = n(10),
-            surfaceVariant = nv(90), onSurfaceVariant = nv(30), surfaceTint = p(40),
+            surfaceVariant = nv(90), onSurfaceVariant = nv(30), surfaceTint = p(40 + shift),
             inverseSurface = n(20), inverseOnSurface = n(95),
             error = error(40), onError = error(100), errorContainer = error(90), onErrorContainer = error(10),
             outline = nv(50), outlineVariant = nv(80), scrim = Color.Black,
@@ -68,8 +74,78 @@ object SeedScheme {
         )
     }
 
+    /**
+     * The second accent: the hue opposite [primary]'s, at its lightness and about its vividness, so it reads as
+     * strongly against the page, and its text colour (user decision). Used sparingly, on the few things that should
+     * stand out from the controls in the main colour.
+     */
+    fun accentFor(primary: Color, dark: Boolean): Pair<Color, Color> {
+        // A pair chosen by eye for the main colour's family, as modern apps pair them (blue with coral, purple
+        // with pink, amber with violet), rather than a fixed turn of the wheel: the exact opposite gave olive and
+        // brown that clashed (tester feedback).
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(primary.toArgb(), hsv)
+        val pick = Color(ACCENT_PAIRS.first { (range, _) -> hsv[0] in range }.second.toInt())
+        val (pl, pa, pb) = lab(pick)
+        val hue = hueOf(pick)
+        val chroma = hypot(pa, pb)
+        // Lighter at night, as Material's own accents are there, and as picked by day.
+        val tone = if (dark) maxOf(pl, NIGHT_ACCENT_TONE) else pl.coerceAtMost(DAY_ACCENT_TONE)
+        val accent = fromLch(tone, chroma, hue)
+        // Dark text on a light accent and white on a deep one.
+        val onAccent = if (tone >= LIGHT_ACCENT_TONE) fromLch(15.0, chroma / 4, hue) else Color.White
+        return accent to onAccent
+    }
+
+    /**
+     * Each main colour family, by hue in degrees, and the accent it pairs with. Cool colours take a warm coral or
+     * pink; warm ones a cool violet or blue, so the accent always stands apart.
+     */
+    private val ACCENT_PAIRS: List<Pair<ClosedFloatingPointRange<Float>, Long>> = listOf(
+        0f..20f to 0xFF7C5CFF, // red: violet
+        20f..50f to 0xFF4F6BFF, // orange: blue
+        50f..80f to 0xFF7C5CFF, // amber and yellow: violet
+        80f..165f to 0xFFFF5C8A, // green: pink
+        165f..195f to 0xFFFF7A59, // teal: coral
+        195f..260f to 0xFFFF6B5A, // blue: coral
+        260f..320f to 0xFFFF5CA8, // purple: pink
+        320f..360f to 0xFF7C5CFF, // pink: violet
+    )
+    private const val NIGHT_ACCENT_TONE = 72.0
+    // Dark enough by day for the curve to stand 3:1 against the white page; at 62 it was about 2.8:1 (MD3 audit).
+    private const val DAY_ACCENT_TONE = 55.0
+    private const val LIGHT_ACCENT_TONE = 60.0
+
     /** A colour of the given [hue] in degrees, as vivid as a swatch, for a colour picked by hue alone. */
-    fun fromHue(hue: Float): Long = Tonal(hue.toDouble(), PRIMARY_CHROMA)(50).argbLong()
+    fun fromHue(hue: Float): Long = fromPicked(hue, 1f, 0.5f)
+
+    /**
+     * A colour picked by hue, how vivid it is (0 grey to 1 as vivid as a swatch) and how light (0 to 1, a
+     * swatch's lightness halfway). Saved as the colour itself, which [picked] reads back.
+     */
+    fun fromPicked(hue: Float, saturation: Float, lightness: Float): Long {
+        val tone = PICK_TONE_LOW + (PICK_TONE_HIGH - PICK_TONE_LOW) * lightness.coerceIn(0f, 1f).toDouble()
+        val most = chromaOf(fromLch(tone, PRIMARY_CHROMA, hue.toDouble()))
+        return fromLch(tone, most * saturation.coerceIn(0f, 1f), hue.toDouble()).argbLong()
+    }
+
+    /** A picked colour: its hue in degrees, and its saturation and lightness from 0 to 1. */
+    data class Picked(val hue: Float, val saturation: Float, val lightness: Float)
+
+    /** Reads a colour of one's own back as hue, saturation and lightness, the opposite of [fromPicked]. */
+    fun picked(seed: Long): Picked {
+        val color = Color(seed.toInt())
+        val (l, a, b) = lab(color)
+        val hue = hueOf(color)
+        val most = chromaOf(fromLch(l, PRIMARY_CHROMA, hue))
+        return Picked(
+            hue = hue.toFloat(),
+            saturation = (if (most > 0.5) hypot(a, b) / most else 0.0).coerceIn(0.0, 1.0).toFloat(),
+            lightness = ((l - PICK_TONE_LOW) / (PICK_TONE_HIGH - PICK_TONE_LOW)).coerceIn(0.0, 1.0).toFloat(),
+        )
+    }
+
+    private fun chromaOf(color: Color): Double = lab(color).let { (_, a, b) -> hypot(a, b) }
 
     fun hueOf(color: Color): Double {
         val (_, a, b) = lab(color)
@@ -141,6 +217,13 @@ object SeedScheme {
         val l = 116 * f(y) - 16
         return Triple(l, 500 * (f(x) - f(y)), 200 * (f(y) - f(z)))
     }
+
+    /** The lightness range a picked colour spans, a swatch's 50 in the middle. */
+    private const val PICK_TONE_LOW = 35.0
+    private const val PICK_TONE_HIGH = 65.0
+
+    /** How far the accent's tone moves at either end of the lightness slider, kept small so text on it stays readable. */
+    private const val MAX_TONE_SHIFT = 10
 
     // Lab chroma, a little above Material's CAM16 figures, which run lower for the same vividness.
     private const val PRIMARY_CHROMA = 48.0

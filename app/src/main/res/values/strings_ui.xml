@@ -564,6 +564,10 @@
     <string name="ui_none" formatted="false">None</string>
     <string name="ui_use_correction" formatted="false">Use %1$s correction</string>
     <string name="ui_assign" formatted="false">Assign %1$s</string>
+    <string name="ui_assign_detail" formatted="false">The preset in use. Assign it to load it whenever these are connected</string>
+    <string name="ui_assign_short" formatted="false">Assign</string>
+    <string name="ui_use_short" formatted="false">Use</string>
+    <string name="ui_assign_correction_detail" formatted="false">Made for this model, to make it sound neutral</string>
     <string name="ui_current_preset_assigned" formatted="false">The preset in use is the one assigned</string>
     <string name="ui_your_presets" formatted="false">Your presets</string>
     <string name="ui_liberty_4_nc_correction" formatted="false">Liberty 4 NC correction</string>
@@ -701,7 +705,7 @@
     <string name="ui_target_published_below_harman" formatted="false">As AutoEq published it, which aims for about %1$d dB less deep bass than Harman. If this sounds thin, try Harman.</string>
     <string name="welcome_start" formatted="false">Start</string>
     <string name="welcome_swipe_finish" formatted="false">Swipe to start listening</string>
-    <string name="welcome_swipe_hint" formatted="false">Swipe to start</string>
+    <string name="welcome_next" formatted="false">Next</string>
     <string name="ui_autoeq_detected" formatted="false">Found from the connected %1$s, best measurement first. Search for another model if these aren\'t yours.</string>
     <string name="ui_target_harman_detail" formatted="false">The curve most listeners preferred in Harman\'s tests, at about 64% of those tested.</string>
     <string name="ui_target_less_bass_detail" formatted="false">About 2 dB less bass than Harman, which about 21% of those tested preferred.</string>
@@ -906,7 +910,7 @@
     <string name="welcome_sound_start" formatted="false">Start</string>
     <string name="welcome_sound_later" formatted="false">Optional. It\'s also on the device tab, under Listening tools.</string>
     <string name="welcome_hands_title" formatted="false">How hands-on?</string>
-    <string name="welcome_hands_body" formatted="false">Choose whether to turn on Advanced controls, which show every setting. Simple suits most people, and anything you change always stays in view.</string>
+    <string name="welcome_hands_body" formatted="false">Choose how many controls to show.</string>
     <string name="welcome_simple" formatted="false">Simple (recommended)</string>
     <string name="welcome_simple_body" formatted="false">What most people need. Anything you change stays in view.</string>
     <string name="welcome_full" formatted="false">Advanced controls</string>
@@ -915,7 +919,7 @@
     <string name="welcome_show_again" formatted="false">Show the welcome again</string>
     <string name="help_welcome_title" formatted="false">Welcome</string>
     <string name="help_welcome_body" formatted="false">The short setup shown on first run: turning Eigentone on, your headphones\' correction, finding your sound, and how much of the app to show. Nothing you\'ve set is lost by running it again.</string>
-    <string name="welcome_hands_where" formatted="false">You can change this any time: tap the gear at the top right, then Appearance, Advanced controls.</string>
+    <string name="welcome_hands_where" formatted="false">Change this any time in Settings, under Controls.</string>
     <string name="tour_step_of" formatted="false">%1$d of %2$d</string>
     <string name="tour_next" formatted="false">Next</string>
     <string name="tour_done" formatted="false">Done</string>
@@ -945,6 +949,10 @@
     <string name="welcome_background_title" formatted="false">Keep it running when locked</string>
     <string name="welcome_background_body" formatted="false">Android\'s battery optimisation can stop Eigentone in the background, so the EQ cuts out when the screen is off. Allowing background use keeps it going.</string>
     <string name="welcome_background_done" formatted="false">Background use is allowed, so the EQ keeps going with the screen off.</string>
+    <string name="welcome_playing_title" formatted="false">See what\'s playing</string>
+    <string name="welcome_playing_body" formatted="false">Optional. With access to see which app is playing, the status bar names it, and each app can have its own preset. Android lists this under notification access. Eigentone only checks which app is playing.</string>
+    <string name="welcome_playing_allow" formatted="false">Allow access</string>
+    <string name="welcome_playing_done" formatted="false">Eigentone can see which app is playing.</string>
     <string name="ui_debug_console" formatted="false">Debug console</string>
     <string name="ui_debug_console_detail" formatted="false">Eigentone\'s live log, to copy or share when reporting a problem.</string>
     <string name="ui_console_eigentone" formatted="false">Eigentone</string>

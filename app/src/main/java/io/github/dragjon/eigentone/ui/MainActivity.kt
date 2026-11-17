@@ -145,6 +145,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         pendingWindowTheme?.let(::matchWindowToTheme)
+        // Once the app is out of sight, so the home screen redrawing its icon can't interrupt anything.
+        AppIcon.match(this, Repo.state.value.themeColor)
         getSystemService(AudioManager::class.java).unregisterAudioDeviceCallback(outputs)
         super.onStop()
     }

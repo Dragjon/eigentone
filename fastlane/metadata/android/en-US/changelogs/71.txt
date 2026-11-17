@@ -1,0 +1,6 @@
+- A quieter, modern design: tinted choices, thin sliders with ring handles, outline buttons
+- A second accent colour on the EQ curve and the power switch
+- A frosted status strip that names the app playing
+- Saturation and lightness for your colour, and an app icon to match
+- A smoother welcome, and predictive back from Settings
+- Fixes for colour sliders and the Graphic/Parametric switch

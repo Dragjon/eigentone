@@ -89,12 +89,14 @@ fun EqGraph(
     overlay: List<Filter>? = null,
 ) {
     val currentFilters by rememberUpdatedState(filters)
+    val currentSelected by rememberUpdatedState(selectedId)
     val measurer = rememberTextMeasurer()
-    val labelStyle = TextStyle(color = Palette.TextDim, fontSize = 10.sp, fontFamily = ReadoutFamily)
+    val labelStyle = ChartLabel.copy(color = Palette.TextDim)
     val accent = when {
         dimmed -> Palette.TextDim
         rightCurveFilters != null -> Palette.LeftEar
-        else -> Palette.Lit
+        // The sound itself, in the second accent, so it stands out from the controls (user decision).
+        else -> Palette.Accent
     }
     // Curves only change when filters do, so spectrum redraws don't recalculate them.
     val curve = remember(curveFilters) {
@@ -108,7 +110,8 @@ fun EqGraph(
     val shownCurve = rememberMorphed(curve, morphKey)
     val shownRight = rememberMorphed(rightCurve ?: curve, morphKey)
     val rightColour = if (dimmed) Palette.TextDim else Palette.RightEar
-    val nodeColour = if (dimmed) Palette.TextDim else Palette.Lit
+    // The curve's handles, in its accent, so they read as part of it (user decision).
+    val nodeColour = if (dimmed) Palette.TextDim else Palette.Accent
     // Some edits don't change the curve, such as the compressor, and then there's nothing to show.
     val ghost = remember(ghostFilters, curve, rightCurve) {
         ghostFilters?.let { saved ->
@@ -147,14 +150,15 @@ fun EqGraph(
                     val down = awaitFirstDown()
                     val w = size.width.toFloat()
                     val h = size.height.toFloat()
-                    val hit = currentFilters
-                        .map { f ->
-                            val fx = xOf(f.freq, w)
-                            val fy = yOf(if (f.type.hasGain) f.gainDb else 0.0, h)
-                            f to hypot(fx - down.position.x, fy - down.position.y)
-                        }
-                        .filter { it.second <= touchRadius }
-                        .minByOrNull { it.second }
+                    val distances = currentFilters.map { f ->
+                        val fx = xOf(f.freq, w)
+                        val fy = yOf(if (f.type.hasGain) f.gainDb else 0.0, h)
+                        f to hypot(fx - down.position.x, fy - down.position.y)
+                    }
+                    // The active knob is drawn on top, so a touch on it, halo and all, takes it, even over another
+                    // knob's centre beneath (user decision).
+                    val onActive = distances.firstOrNull { (f, d) -> f.id == currentSelected && d <= ACTIVE_GRAB_DP.dp.toPx() }
+                    val hit = (onActive ?: distances.filter { it.second <= touchRadius }.minByOrNull { it.second })
                         ?.first
                         ?: return@awaitEachGesture
 
@@ -320,7 +324,8 @@ fun EqGraph(
             drawCircle(rightColour, mark, Offset(w - 10.dp.toPx(), markY), style = Stroke(stroke))
         }
 
-        filters.forEach { f ->
+        // The active knob last, so it's always on top of the others, the curve and the labels (user decision).
+        filters.sortedBy { it.id == selectedId }.forEach { f ->
             val center = Offset(xOf(f.freq, w), yOf(if (f.type.hasGain) f.gainDb else 0.0, h))
             val selected = f.id == selectedId
             val radius = (if (selected) 9.dp else 6.dp).toPx()
@@ -398,3 +403,6 @@ private class AnimatedHeight(val height: () -> androidx.compose.ui.unit.Dp) : an
         width: Int,
     ): Int = height().roundToPx()
 }
+
+/** How far from the active knob's centre a touch still takes it: its halo. */
+private const val ACTIVE_GRAB_DP = 18

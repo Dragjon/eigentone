@@ -612,7 +612,7 @@ private fun ShapeRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .background(if (selected) Palette.SurfaceHigh else Palette.Background)
+            .background(if (selected) Palette.LitFill.copy(alpha = QUIET_TINT) else Palette.Background)
             .semantics { this.selected = selected }
             .clickable(role = Role.Button, onClickLabel = stringResource(R.string.ui_hear, shape.name), onClick = onClick)
             .heightIn(min = 64.dp)

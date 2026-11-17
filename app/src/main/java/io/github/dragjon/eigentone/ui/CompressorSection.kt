@@ -124,8 +124,8 @@ fun CompressorSection(state: AppState) {
                     },
                     label = { Text(style.name) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Palette.LitFill,
-                        selectedLabelColor = Palette.OnLit,
+                        selectedContainerColor = Palette.LitFill.copy(alpha = QUIET_TINT),
+                        selectedLabelColor = Palette.LitBright,
                         labelColor = Palette.Text,
                     ),
                 )

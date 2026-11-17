@@ -88,9 +88,10 @@ fun SlidingToggle(
 ) = SlidingToggle(options.map { (icon, label) -> ToggleOption(label, icon) }, selected, onSelect, modifier, weighted = false)
 
 /**
- * Every few-way choice in the app (user decision): a casing with a lit thumb that slides to the chosen option
- * and takes its width, so it reads as one control rather than separate buttons. The press flash has the thumb's
- * own shape, so a tap never shows a second, differently rounded box.
+ * Every few-way choice in the app (user decision): a casing with a thumb that slides to the chosen option and takes
+ * its width, so it reads as one control rather than separate buttons. Quiet, as the graph is: a thin outline, a
+ * faint tint of the theme's colour on the choice and its words lit, rather than a solid fill (user decision). The
+ * press flash has the thumb's own shape, so a tap never shows a second, differently rounded box.
  */
 @Composable
 fun SlidingToggle(
@@ -113,8 +114,7 @@ fun SlidingToggle(
         modifier
             .height(height)
             .clip(KeyShape)
-            // A tonal casing that stands out from the panel by its own colour, with no outline (user decision).
-            .background(Palette.Track2)
+            .border(1.dp, Palette.KeyBorder, KeyShape)
             .padding(TOGGLE_INSET_DP.dp)
             .selectableGroup(),
     ) {
@@ -126,7 +126,8 @@ fun SlidingToggle(
                     .fillMaxHeight()
                     // Its corners follow the casing's, less the gap between them, so the two curves run parallel.
                     .clip(ToggleThumbShape)
-                    .background(Palette.LitFill),
+                    .background(Palette.LitFill.copy(alpha = QUIET_TINT))
+                    .border(1.dp, Palette.LitFill.copy(alpha = QUIET_EDGE), ToggleThumbShape),
             )
         }
         Row(Modifier.fillMaxSize()) {
@@ -148,7 +149,7 @@ fun SlidingToggle(
                         androidx.compose.material3.Icon(
                             androidx.compose.ui.res.painterResource(icon),
                             contentDescription = null,
-                            tint = if (on) Palette.OnLit else Palette.TextDim,
+                            tint = if (on) Palette.LitBright else Palette.TextDim,
                             modifier = Modifier.size(18.dp),
                         )
                     }
@@ -156,7 +157,7 @@ fun SlidingToggle(
                         WholeWordText(
                             option.label,
                             style = MaterialTheme.typography.labelLarge,
-                            color = if (on) Palette.OnLit else Palette.Text,
+                            color = if (on) Palette.LitBright else Palette.TextDim,
                             textAlign = TextAlign.Center,
                             maxLines = 2,
                             modifier = Modifier.padding(start = if (option.icon != null) 6.dp else 0.dp),
@@ -169,10 +170,14 @@ fun SlidingToggle(
 }
 
 /** Keys, segments and pressed rows: soft and nearly pill-shaped, as in Material You (user decision). */
-val KeyShape = RoundedCornerShape(20.dp)
+val KeyShape = Corner.large
 
 /** Panels and cards, rounded like Material You's large cards, and gentle enough that content near a corner sits clear of it. */
-val PanelShape = RoundedCornerShape(16.dp)
+val PanelShape = Corner.medium
+
+/** How strongly the theme's colour tints a chosen option, and the edge around it: faint, so the words carry it. */
+internal const val QUIET_TINT = 0.16f
+internal const val QUIET_EDGE = 0.45f
 
 /** The gap between a sliding toggle's casing and its thumb. */
 private const val TOGGLE_INSET_DP = 3
@@ -219,7 +224,10 @@ fun Button(
     )
 }
 
-/** An unlit key: raised above the faceplate, for everything that isn't the primary action. */
+/**
+ * Everything that isn't a screen's main action: a thin outline on the panel, with no fill, so only the one main
+ * action is solid (user decision).
+ */
 @Composable
 fun FilledTonalButton(
     onClick: () -> Unit,
@@ -237,12 +245,12 @@ fun FilledTonalButton(
         shape = KeyShape,
         interactionSource = source,
         colors = ButtonDefaults.filledTonalButtonColors(
-            containerColor = if (pressed) Palette.Surface else Palette.SurfaceHigh,
+            containerColor = if (pressed) Palette.LitFill.copy(alpha = QUIET_TINT) else Color.Transparent,
             contentColor = Palette.Text,
-            disabledContainerColor = Palette.Surface,
+            disabledContainerColor = Color.Transparent,
             disabledContentColor = Palette.TextDim,
         ),
-        border = BorderStroke(1.dp, Palette.KeyBorder),
+        border = BorderStroke(1.dp, if (enabled) Palette.KeyBorder else Palette.Line),
         contentPadding = contentPadding,
         content = content,
     )
@@ -279,16 +287,16 @@ fun FilledTonalIconButton(
     val pressed by source.collectIsPressedAsState()
     androidx.compose.material3.FilledTonalIconButton(
         onClick = onClick,
-        modifier = modifier,
         enabled = enabled,
         shape = KeyShape,
         interactionSource = source,
         colors = IconButtonDefaults.filledTonalIconButtonColors(
-            containerColor = if (pressed) Palette.Surface else Palette.SurfaceHigh,
+            containerColor = if (pressed) Palette.LitFill.copy(alpha = QUIET_TINT) else Color.Transparent,
             contentColor = Palette.Text,
-            disabledContainerColor = Palette.Surface,
+            disabledContainerColor = Color.Transparent,
             disabledContentColor = Palette.TextDim,
         ),
+        modifier = modifier.border(1.dp, if (enabled) Palette.KeyBorder else Palette.Line, KeyShape),
         content = content,
     )
 }
@@ -316,7 +324,7 @@ fun PresetSwitcher(
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
                 // Smaller corners than a key, so the press highlight never clips the name at its edge.
-                .clip(RoundedCornerShape(8.dp))
+                .clip(Corner.extraSmall)
                 .clickable(role = Role.DropdownList, onClickLabel = stringResource(R.string.ui_change_preset)) { open = true },
         ) {
             header()
@@ -338,7 +346,9 @@ fun PresetSwitcher(
             }
         }
         // Capped, so a long list scrolls rather than running under the navigation bar out of reach.
-        MotionMenu(expanded = open, onDismissRequest = { open = false }) {
+        // Opens on the status strip, its corner on the strip's, so the strip's rounded end doesn't poke out beside it
+        // (tester feedback).
+        MotionMenu(expanded = open, onDismissRequest = { open = false }, pin = { StripDrawer.bounds }) {
             presets.forEach { preset ->
                 val current = preset.id == currentId
                 DropdownMenuItem(

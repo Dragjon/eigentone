@@ -86,8 +86,8 @@ fun PresetDetailsDialog(preset: Preset, folders: List<String>, onDismiss: () -> 
                                 onClick = { folder = if (folder.trim() == existing) "" else existing },
                                 label = { Text(existing, maxLines = 1) },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Palette.LitFill,
-                                    selectedLabelColor = Palette.OnLit,
+                                    selectedContainerColor = Palette.LitFill.copy(alpha = QUIET_TINT),
+                                    selectedLabelColor = Palette.LitBright,
                                     labelColor = Palette.Text,
                                 ),
                             )
@@ -177,8 +177,8 @@ fun CorrectionTuner(onDismiss: () -> Unit) {
                                 onClick = { change { it.copy(targetId = option?.id, correctionInfo = info) } },
                                 label = { Text(stringResource(targetName(option)), maxLines = 1) },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Palette.LitFill,
-                                    selectedLabelColor = Palette.OnLit,
+                                    selectedContainerColor = Palette.LitFill.copy(alpha = QUIET_TINT),
+                                    selectedLabelColor = Palette.LitBright,
                                     labelColor = Palette.Text,
                                 ),
                             )
